@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("SALES") // ADMIN, SALES
+  status    String   @default("ACTIVE") // ACTIVE, INACTIVE
+  leads     Lead[]
+  calls     CallLog[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Lead {
+  id          String   @id @default(cuid())
+  name        String
+  phone       String   @unique
+  email       String?
+  company     String?
+  status      String   @default("NEW") // NEW, CONTACTED, QUALIFIED, WON, LOST
+  source      String?  // WEBSITE, REFERRAL, COLD_CALL
+  assignedTo  String?
+  salesPerson User?    @relation(fields: [assignedTo], references: [id])
+  calls       CallLog[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CallLog {
+  id          String   @id @default(cuid())
+  startTime   DateTime @default(now())
+  endTime     DateTime?
+  duration    Int?     // in seconds
+  status      String   @default("CONNECTED") // CONNECTED, MISSED, VOICEMAIL
+  stage       String   @default("New Lead")  // New Lead, Attempted Contact, Connected, Engaged, Interested, Qualified, Follow-up Needed, Closed
+  transcript  String?  // JSON or text transcript
+  analysis    String?  // AI Analysis summary
+  aiScore     Int?     @default(0) // 0-100 score
+  notes       String?
+  leadId      String
+  userId      String
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+}
