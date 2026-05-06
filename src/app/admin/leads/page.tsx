@@ -4,6 +4,8 @@ import Link from "next/link";
 import LeadList from "./LeadList";
 import StatusModal from "@/components/StatusModal";
 
+export const dynamic = "force-dynamic";
+
 export default async function LeadsPage() {
   const leads = await getLeads();
 

@@ -27,6 +27,8 @@ const data = [
   { name: "Dec", earnings: 1890 },
 ];
 
+export const dynamic = "force-dynamic";
+
 export default function AdminDashboard() {
   const [isMounted, setIsMounted] = React.useState(false);
 

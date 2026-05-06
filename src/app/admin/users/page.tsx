@@ -3,6 +3,8 @@ import { getAllUsers } from "./actions";
 import UserList from "./UserList";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 export default async function UserListingPage() {
   const users = await getAllUsers();
 

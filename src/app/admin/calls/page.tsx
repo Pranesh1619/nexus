@@ -3,6 +3,8 @@ import { getCallLogs } from "./actions";
 import Link from "next/link";
 import CallList from "./CallList";
 
+export const dynamic = "force-dynamic";
+
 export default async function CallLogsPage() {
   const logs = await getCallLogs();
 

@@ -2,6 +2,8 @@ import { getUsers } from "./actions";
 import Link from "next/link";
 import SalesListClient from "./SalesListClient";
 
+export const dynamic = "force-dynamic";
+
 export default async function SalesManagement() {
   const users = await getUsers();
 
