@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import React from "react";
 import { getCallLogs } from "./actions";
 import Link from "next/link";
@@ -6,7 +7,11 @@ import CallList from "./CallList";
 export const dynamic = "force-dynamic";
 
 export default async function CallLogsPage() {
-  const logs = await getCallLogs();
+  const cookieStore = await cookies();
+  const userId = cookieStore.get("user_id")?.value;
+  const userRole = cookieStore.get("user_role")?.value;
+
+  const logs = await getCallLogs(userRole === "SALES" ? userId : undefined);
 
   return (
     <div className="page-container">

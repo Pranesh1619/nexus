@@ -160,8 +160,9 @@ body {
 }
 
 .page-container {
-  max-width: 1400px;
-  margin: 0 auto;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
 }
 
 
@@ -275,4 +276,125 @@ body {
 .cursor-pointer {
   cursor: pointer;
 }
+
+/* Global 15px Font Size & Rounded Buttons Override */
+body, p, span, div, input, select, textarea, td, th, table, .nav-link, label, .stats-title, .form-label, .dropdown-item, li, a {
+  font-size: 15px !important;
+}
+
+.btn, .btn-primary, .btn-secondary, .btn-light, .btn-danger, .btn-success, .btn-info, .btn-warning, button {
+  padding: 5px 16px !important; /* Slightly more side padding for gorgeous pill buttons */
+  font-size: 15px !important;
+  border-radius: 50px !important;
+  font-weight: 600 !important;
+}
+
+/* Force 50px pill/capsule border radius on all buttons even with Bootstrap utility classes */
+.btn.rounded-2, button.rounded-2, .btn.rounded-3, button.rounded-3, .btn.rounded, button.rounded, .btn.rounded-pill, button.rounded-pill {
+  border-radius: 50px !important;
+}
+
+/* Color updates for Outline Buttons in our Brand Green */
+.btn-outline-primary {
+  color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  background-color: transparent !important;
+}
+.btn-outline-primary:hover, .btn-outline-primary:active, .btn-outline-primary:focus {
+  color: #fff !important;
+  background-color: var(--primary-hover) !important;
+  border-color: var(--primary-hover) !important;
+}
+
+.btn-outline-secondary {
+  color: var(--secondary-color) !important;
+  border-color: var(--border-color) !important;
+  background-color: transparent !important;
+}
+.btn-outline-secondary:hover {
+  color: #fff !important;
+  background-color: var(--secondary-color) !important;
+  border-color: var(--secondary-color) !important;
+}
+
+/* Map Bootstrap blue utilities to our beautiful Emerald Green design color */
+.text-primary {
+  color: var(--primary-color) !important;
+}
+.bg-primary {
+  background-color: var(--primary-color) !important;
+}
+.border-primary {
+  border-color: var(--primary-color) !important;
+}
+
+/* Skeleton Loaders Animation */
+.skeleton-box {
+  animation: skeleton-loading 1.5s infinite linear;
+}
+
+@keyframes skeleton-loading {
+  0% { opacity: 0.5; }
+  50% { opacity: 1; }
+  100% { opacity: 0.5; }
+}
+
+/* Collapsible Sidebar Smooth Transitions */
+.dashboard-wrapper {
+  position: relative;
+  min-height: 100vh;
+}
+
+.sidebar {
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* When collapsed, keep the sidebar visible but reduce width to 80px and hide text */
+.sidebar.collapsed {
+  width: 80px !important;
+  padding: 24px 8px !important;
+}
+
+.sidebar.collapsed .sidebar-logo {
+  justify-content: center;
+  padding: 8px 0;
+  margin-bottom: 30px;
+}
+
+.sidebar.collapsed .sidebar-logo span {
+  display: none !important;
+}
+
+.sidebar.collapsed .nav-section-title {
+  display: none !important;
+}
+
+.sidebar.collapsed .nav-link {
+  justify-content: center;
+  padding: 12px 0;
+  gap: 0 !important;
+}
+
+.sidebar.collapsed .nav-link span {
+  display: none !important;
+}
+
+.header {
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.header.collapsed {
+  left: 80px !important;
+}
+
+.main-content {
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.main-content.collapsed {
+  margin-left: 80px !important;
+}
+
+
+
 

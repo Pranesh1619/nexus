@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import React from "react";
 import { prisma } from "@/lib/db";
 import DashboardClient from "./DashboardClient";
@@ -5,8 +6,14 @@ import DashboardClient from "./DashboardClient";
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
+  const cookieStore = await cookies();
+  const userId = cookieStore.get("user_id")?.value;
+  const userRole = cookieStore.get("user_role")?.value;
+  const isSales = userRole === "SALES";
+
   // Fetch real calls, leads, and users from the database
   const calls = await prisma.callLog.findMany({
+    where: isSales ? { userId } : {},
     include: {
       lead: true,
       user: true,
@@ -15,10 +22,12 @@ export default async function AdminDashboardPage() {
   });
 
   const leads = await prisma.lead.findMany({
+    where: isSales ? { assignedTo: userId } : {},
     orderBy: { createdAt: "desc" },
   });
 
   const users = await prisma.user.findMany({
+    where: isSales ? { id: userId } : {},
     orderBy: { createdAt: "desc" },
   });
 

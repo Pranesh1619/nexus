@@ -21,14 +21,26 @@ export async function loginUser(formData: FormData) {
       return { error: "Invalid email or password" };
     }
 
-    // In a real app, you would set a session cookie here
-    // For now, we'll just redirect to admin
+    // Set secure cookie session tokens
+    const { cookies } = await import("next/headers");
+    const cookieStore = await cookies();
+    cookieStore.set("user_id", user.id, { path: "/", httpOnly: true, secure: process.env.NODE_ENV === "production" });
+    cookieStore.set("user_role", user.role || "ADMIN", { path: "/", httpOnly: true, secure: process.env.NODE_ENV === "production" });
+    cookieStore.set("user_name", user.name, { path: "/", httpOnly: true, secure: process.env.NODE_ENV === "production" });
   } catch (error) {
     console.error("Login error:", error);
     return { error: "Something went wrong" };
   }
 
   redirect("/admin");
+}
+
+export async function logoutUser() {
+  const { cookies } = await import("next/headers");
+  const cookieStore = await cookies();
+  cookieStore.delete("user_id");
+  cookieStore.delete("user_role");
+  cookieStore.delete("user_name");
 }
 
 export async function resetPasswordDirect(formData: FormData) {

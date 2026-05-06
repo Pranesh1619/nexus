@@ -12,7 +12,7 @@ export async function createSalesPerson(formData: FormData) {
     data: {
       name,
       email,
-      password, // In a real app, hash this!
+      password, // Plain text as per local dev requirement (In production, hash this!)
       role: "SALES",
     },
   });
@@ -29,10 +29,43 @@ export async function deleteUser(id: string) {
 }
 
 export async function getUsers(role: string = "SALES") {
-  return await prisma.user.findMany({
+  let users = await prisma.user.findMany({
     where: { role },
     orderBy: { createdAt: "desc" },
   });
+
+  // Auto-provision 2 sales agent personas if fewer than 2 exist
+  if (users.length < 2) {
+    const john = await prisma.user.upsert({
+      where: { email: "john@virpa.com" },
+      update: {},
+      create: {
+        name: "John Sales Agent",
+        email: "john@virpa.com",
+        password: "password123",
+        role: "SALES",
+      }
+    });
+
+    const jane = await prisma.user.upsert({
+      where: { email: "jane@virpa.com" },
+      update: {},
+      create: {
+        name: "Jane Sales Agent",
+        email: "jane@virpa.com",
+        password: "password123",
+        role: "SALES",
+      }
+    });
+
+    // Re-fetch to return all current agents including auto-created ones
+    users = await prisma.user.findMany({
+      where: { role },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  return users;
 }
 
 export async function getUserById(id: string) {
@@ -56,4 +89,20 @@ export async function updateUser(id: string, formData: FormData) {
   });
 
   revalidatePath("/admin/sales");
+}
+
+export async function getLeadsForSalesFloor() {
+  return await prisma.lead.findMany({
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+export async function assignLeadToUser(leadId: string, userId: string | null) {
+  await prisma.lead.update({
+    where: { id: leadId },
+    data: { assignedTo: userId }
+  });
+
+  revalidatePath("/admin/sales");
+  revalidatePath("/admin/leads");
 }

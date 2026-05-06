@@ -2,7 +2,19 @@
 
 import { prisma } from "@/lib/db";
 
-export async function getCallLogs() {
+export async function getCallLogs(userId?: string) {
+  if (userId) {
+    return await prisma.callLog.findMany({
+      where: { userId },
+      include: {
+        lead: true,
+        user: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+  }
   return await prisma.callLog.findMany({
     include: {
       lead: true,
@@ -14,13 +26,16 @@ export async function getCallLogs() {
   });
 }
 
-export async function updateCallStage(id: string, stage: string) {
+export async function updateCallStage(id: string, stage: string, outcome?: "WON" | "LOST") {
   const { revalidatePath } = await import("next/cache");
-  
-  // Update the Call Log stage
+
+  // Update the Call Log stage & AI score
   const updatedCall = await prisma.callLog.update({
     where: { id },
-    data: { stage },
+    data: {
+      stage,
+      ...(stage === "Closed" ? { aiScore: outcome === "LOST" ? 0 : 100 } : {})
+    },
     include: { lead: true }
   });
 
@@ -28,7 +43,9 @@ export async function updateCallStage(id: string, stage: string) {
   let leadStatus = "CONTACTED";
   if (stage === "New Lead") leadStatus = "NEW";
   if (["Interested", "Qualified", "Follow-up Needed", "Desire", "Enquiry"].includes(stage)) leadStatus = "QUALIFIED";
-  if (stage === "Closed") leadStatus = "CLOSED_WON";
+  if (stage === "Closed") {
+    leadStatus = outcome === "LOST" ? "LOST" : "WON";
+  }
 
   // Update the Lead status as well
   await prisma.lead.update({
@@ -46,5 +63,26 @@ export async function deleteCallLog(id: string) {
   await prisma.callLog.delete({
     where: { id },
   });
+  revalidatePath("/admin/calls");
+}
+
+export async function updateCallDocumentation(id: string, formData: FormData) {
+  const { revalidatePath } = await import("next/cache");
+  const status = formData.get("status") as string;
+  const stage = formData.get("stage") as string;
+  const notes = formData.get("notes") as string;
+  const aiScore = parseInt(formData.get("aiScore") as string) || 0;
+
+  await prisma.callLog.update({
+    where: { id },
+    data: {
+      status,
+      stage,
+      notes,
+      aiScore,
+    },
+  });
+
+  revalidatePath(`/admin/calls/${id}`);
   revalidatePath("/admin/calls");
 }

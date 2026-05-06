@@ -13,7 +13,7 @@ const roboto = Roboto({
 
 export const metadata: Metadata = {
   title: "Virpa Intelligent Sales Agent",
-  description: "Virpa Intelligent Sales Agent - Advanced BPO management system with real-time call tracking and lead management.",
+  description: "Virpa Intelligent Sales Agent - Advanced management system with real-time call tracking and lead management.",
 };
 
 export default function RootLayout({

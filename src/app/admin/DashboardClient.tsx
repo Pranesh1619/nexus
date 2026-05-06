@@ -221,7 +221,7 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
       {/* 1. Welcoming Header */}
       <div className="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
         <div>
-          <h2 className="fw-bold mb-1">BPO Performance Hub</h2>
+          <h2 className="fw-bold mb-1">Performance Hub</h2>
           <p className="text-secondary small">Real-time Call Center analysis, agent statistics, and conversation metrics.</p>
         </div>
         
@@ -297,7 +297,7 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
           <div className="card h-100 p-4 border-0 shadow-sm">
             <div className="stats-card d-flex flex-column justify-content-between h-100">
               <div className="d-flex justify-content-between align-items-center mb-3">
-                <div className="stats-icon bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center rounded-3" style={{ width: 44, height: 44 }}>
+                <div className="stats-icon bg-opacity-10 text-primary d-flex align-items-center justify-content-center rounded-3" style={{ width: 44, height: 44 }}>
                   <i className="bi bi-telephone-inbound fs-5"></i>
                 </div>
                 <span className="badge bg-success bg-opacity-10 text-success small">+14.2%</span>
@@ -529,7 +529,7 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
                       <td>
                         <div>
                           <div className="fw-semibold small text-dark">{call.lead.name}</div>
-                          <div className="text-secondary small" style={{ fontSize: "11px" }}>{call.lead.phone}</div>
+                          <div className="text-secondary small" style={{ fontSize: "11px", whiteSpace: "nowrap" }}>{call.lead.phone}</div>
                         </div>
                       </td>
                       <td className="small fw-medium text-secondary">
@@ -539,11 +539,15 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
                         {call.status === "CONNECTED" ? formatDuration(call.duration) : "—"}
                       </td>
                       <td>
-                        <span className={`badge ${
-                          call.status === "MISSED" ? "bg-light text-secondary border" : "bg-primary bg-opacity-10 text-primary"
-                        } rounded-pill px-2.5 py-1.5 small`} style={{ fontSize: "11px" }}>
-                          {call.stage}
-                        </span>
+                        {call.status === "MISSED" ? (
+                          <span className="badge bg-light text-secondary border rounded-pill px-2.5 py-1.5 small" style={{ fontSize: "11px" }}>
+                            {call.stage}
+                          </span>
+                        ) : (
+                          <span className="badge rounded-pill px-2.5 py-1.5 small" style={{ fontSize: "11px", backgroundColor: "rgba(0, 167, 111, 0.15)", color: "var(--primary-color)", fontWeight: "600" }}>
+                            {call.stage}
+                          </span>
+                        )}
                       </td>
                       <td className="text-center">
                         {call.status === "CONNECTED" ? (
@@ -557,11 +561,15 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
                         )}
                       </td>
                       <td>
-                        <span className={`badge ${
-                          call.status === "CONNECTED" ? "bg-success bg-opacity-10 text-success" : "bg-danger bg-opacity-10 text-danger"
-                        } rounded-pill px-3 py-1.5 small`}>
-                          {call.status}
-                        </span>
+                        {call.status === "CONNECTED" ? (
+                          <span className="badge rounded-pill px-3 py-1.5 small" style={{ fontSize: "11px", backgroundColor: "rgba(40, 167, 69, 0.15)", color: "#28a745", fontWeight: "600" }}>
+                            {call.status}
+                          </span>
+                        ) : (
+                          <span className="badge rounded-pill px-3 py-1.5 small" style={{ fontSize: "11px", backgroundColor: "rgba(220, 53, 69, 0.15)", color: "#dc3545", fontWeight: "600" }}>
+                            {call.status}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -579,18 +587,18 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
 
             <div className="d-flex flex-column gap-3">
               {filteredMetrics.leaders.map((leader, idx) => (
-                <div key={idx} className="d-flex align-items-center justify-content-between p-2.5 border rounded-3 bg-light bg-opacity-40">
-                  <div className="d-flex align-items-center gap-3">
-                    <div className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold small" style={{ width: 38, height: 38, backgroundColor: leader.color }}>
+                <div key={idx} className="d-flex align-items-center justify-content-between px-2 py-2.5 border rounded-3 bg-light bg-opacity-40">
+                  <div className="d-flex align-items-center gap-2 overflow-hidden" style={{ minWidth: 0 }}>
+                    <div className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold small flex-shrink-0" style={{ width: 36, height: 36, backgroundColor: "var(--primary-color)" }}>
                       {leader.avatar}
                     </div>
-                    <div>
-                      <div className="fw-semibold small text-dark">{leader.name}</div>
-                      <div className="text-secondary small" style={{ fontSize: "11px" }}>{leader.role}</div>
+                    <div className="overflow-hidden" style={{ minWidth: 0 }}>
+                      <div className="fw-semibold small text-dark text-truncate" style={{ fontSize: "13.5px" }}>{leader.name}</div>
+                      <div className="text-secondary small text-truncate" style={{ fontSize: "11px" }}>{leader.role}</div>
                     </div>
                   </div>
-                  <div className="text-end">
-                    <div className="fw-bold small">{leader.calls} calls</div>
+                  <div className="text-end flex-shrink-0" style={{ minWidth: "90px", whiteSpace: "nowrap" }}>
+                    <div className="fw-bold small" style={{ fontSize: "13.5px" }}>{leader.calls} calls</div>
                     <div className="text-success small fw-semibold" style={{ fontSize: "11px" }}>★ {leader.ai}% AI Quality</div>
                   </div>
                 </div>

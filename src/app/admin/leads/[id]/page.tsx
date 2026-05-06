@@ -1,7 +1,8 @@
 import { getLeadById } from "../actions";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import LeadDeleteWrapper from "./LeadDeleteWrapper";
+import { getAllUsers } from "../../users/actions";
+import LeadAssignWrapper from "./LeadAssignWrapper";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,13 @@ export default async function LeadDetailsPage({ params }: { params: Promise<{ id
     notFound();
   }
 
+  // Fetch all registered users to select assignments
+  const users = await getAllUsers();
+  const salesAgents = users.filter((u) => u.role === "SALES" || u.role === "ADMIN");
+
+  // Determine current assigned agent name
+  const currentAgent = users.find((u) => u.id === lead.assignedTo);
+  const assignedAgentName = currentAgent ? currentAgent.name : "Unassigned";
 
   return (
     <div className="page-container">
@@ -22,13 +30,12 @@ export default async function LeadDetailsPage({ params }: { params: Promise<{ id
             <i className="bi bi-arrow-left me-1 x-small"></i> <span className="x-small fw-bold uppercase">Back to Leads</span>
           </Link>
           <h3 className="fw-bold mb-1">{lead.name} Profile</h3>
-          {/* <p className="text-secondary x-small">Comprehensive view and interaction history for this record.</p> */}
         </div>
         <div className="d-flex gap-2">
           <Link href={`/admin/leads/${id}/edit`} className="btn btn-light border px-3 py-1 small">
-            <i className="bi bi-pencil-square me-2 text-info"></i> Edit
+            <i className="bi bi-pencil-square me-2 text-info"></i>Edit
           </Link>
-          <LeadDeleteWrapper id={id} />
+          <LeadAssignWrapper leadId={id} currentAssignedTo={lead.assignedTo} agents={salesAgents} />
         </div>
       </div>
 
@@ -37,13 +44,6 @@ export default async function LeadDetailsPage({ params }: { params: Promise<{ id
         <div className="card-body p-4">
           <div className="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
             <h6 className="fw-bold mb-0">Record Overview</h6>
-            <span className={`badge ${
-              lead.status === 'NEW' ? 'bg-primary' : 
-              lead.status === 'CLOSED_WON' ? 'bg-success' : 
-              'bg-warning'
-            } bg-opacity-10 text-${lead.status === 'NEW' ? 'primary' : lead.status === 'CLOSED_WON' ? 'success' : 'warning'} rounded-pill px-3 py-1 x-small fw-bold`}>
-              Status: {lead.status}
-            </span>
           </div>
           
           <div className="row g-4">
@@ -69,6 +69,15 @@ export default async function LeadDetailsPage({ params }: { params: Promise<{ id
               <div className="p-2 px-3 bg-light rounded-3">
                 <label className="form-label mb-1">Company Name</label>
                 <div className="fw-bold text-dark small">{lead.company || '—'}</div>
+              </div>
+            </div>
+            <div className="col-md-4 col-lg-3">
+              <div className="p-2 px-3 bg-light rounded-3">
+                <label className="form-label mb-1">Assigned Agent</label>
+                <div className="fw-bold text-primary small d-flex align-items-center gap-1.5">
+                  <i className="bi bi-person-badge-fill"></i>
+                  <span>{assignedAgentName}</span>
+                </div>
               </div>
             </div>
             <div className="col-md-4 col-lg-3">

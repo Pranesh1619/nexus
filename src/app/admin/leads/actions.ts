@@ -3,7 +3,13 @@
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 
-export async function getLeads() {
+export async function getLeads(userId?: string) {
+  if (userId) {
+    return await prisma.lead.findMany({
+      where: { assignedTo: userId },
+      orderBy: { createdAt: "desc" },
+    });
+  }
   return await prisma.lead.findMany({
     orderBy: { createdAt: "desc" },
   });

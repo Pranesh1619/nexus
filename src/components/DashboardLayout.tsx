@@ -1,24 +1,28 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({ children, userRole = "ADMIN", userName = "Administrator" }: { children: React.ReactNode; userRole?: string; userName?: string }) {
   const pathname = usePathname();
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const menuItems = [
     { title: "Dashboard", icon: "bi-grid", path: "/admin" },
     { title: "Leads", icon: "bi-person-badge", path: "/admin/leads" },
-    { title: "Users", icon: "bi-people", path: "/admin/users" },
+    { title: "Deals Pipeline", icon: "bi-kanban", path: "/admin/deals" },
     { title: "Calls", icon: "bi-telephone-outbound", path: "/admin/calls" },
-    { title: "Sales", icon: "bi-graph-up-arrow", path: "/admin/sales" },
+    ...(userRole === "ADMIN" ? [
+      { title: "Users", icon: "bi-people", path: "/admin/users" },
+      { title: "Sales Floor", icon: "bi-graph-up-arrow", path: "/admin/sales" }
+    ] : [])
   ];
 
   return (
     <div className="dashboard-wrapper">
       {/* Sidebar */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${isCollapsed ? "collapsed" : ""}`}>
         <Link href="/admin" className="sidebar-logo">
           <i className="bi bi-intersect text-success fs-2"></i>
           <span>Virpa</span>
@@ -33,7 +37,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               className={`nav-link ${pathname === item.path ? "active" : ""}`}
             >
               <i className={`bi ${item.icon}`}></i>
-              {item.title}
+              <span>{item.title}</span>
             </Link>
           ))}
         </div>
@@ -42,24 +46,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="nav-section-title">General</div>
           <Link href="/admin/settings" className={`nav-link ${pathname === "/admin/settings" ? "active" : ""}`}>
             <i className="bi bi-gear"></i>
-            Settings
+            <span>Settings</span>
           </Link>
           <Link href="/login" className="nav-link text-danger mt-2">
             <i className="bi bi-box-arrow-right"></i>
-            Log out
+            <span>Log out</span>
           </Link>
-        </div>
-
-        <div className="upgrade-card mt-auto">
-          <h6>Upgrade Pro! 🚀</h6>
-          <p>Higher productivity with better organization</p>
-          <button className="btn btn-sm w-100">Upgrade</button>
         </div>
       </aside>
 
       {/* Header */}
-      <header className="header">
+      <header className={`header ${isCollapsed ? "collapsed" : ""}`}>
         <div className="d-flex align-items-center gap-3">
+          {/* Hamburger Menu Toggle Button */}
+          <button 
+            onClick={() => setIsCollapsed(!isCollapsed)} 
+            className="btn btn-light d-flex align-items-center justify-content-center p-0 border shadow-sm"
+            style={{ 
+              width: "40px", 
+              height: "40px", 
+              borderRadius: "10px", 
+              backgroundColor: "#ffffff",
+              transition: "transform 0.2s ease"
+            }}
+            title="Toggle Sidebar"
+          >
+            <i className="bi bi-list fs-4 text-dark"></i>
+          </button>
+
           <div className="search-box">
             <i className="bi bi-search text-secondary"></i>
             <input type="text" placeholder="Search..." />
@@ -78,11 +92,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               data-bs-toggle="dropdown" 
               aria-expanded="false"
             >
-              <div className="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white" style={{ width: 40, height: 40 }}>
-                <i className="bi bi-person"></i>
+              <span className="small text-secondary fw-semibold d-none d-md-inline">{userName} ({userRole})</span>
+              <div className="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white fw-bold" style={{ width: 40, height: 40 }}>
+                {userName.charAt(0).toUpperCase()}
               </div>
             </div>
             <ul className="dropdown-menu dropdown-menu-end shadow border-0" aria-labelledby="profileDropdown">
+              <li><div className="dropdown-header small text-muted border-bottom pb-2 mb-1">Signed in as <strong>{userName}</strong></div></li>
               <li><Link className="dropdown-item py-2" href="/admin/settings"><i className="bi bi-person me-2"></i> Profile</Link></li>
               <li><Link className="dropdown-item py-2" href="/admin/settings"><i className="bi bi-gear me-2"></i> Settings</Link></li>
               <li><hr className="dropdown-divider" /></li>
@@ -93,7 +109,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </header>
 
       {/* Main Content */}
-      <main className="main-content">
+      <main className={`main-content ${isCollapsed ? "collapsed" : ""}`}>
         {children}
       </main>
     </div>

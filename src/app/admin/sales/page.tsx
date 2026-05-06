@@ -1,25 +1,33 @@
-import { getUsers } from "./actions";
+import { getUsers, getLeadsForSalesFloor } from "./actions";
 import Link from "next/link";
-import SalesListClient from "./SalesListClient";
+import SalesFloorWorkspace from "./SalesFloorWorkspace";
 
 export const dynamic = "force-dynamic";
 
 export default async function SalesManagement() {
-  const users = await getUsers();
+  // 1. Fetch agents (with auto-provisioning) and leads
+  const agents = await getUsers();
+  const leads = await getLeadsForSalesFloor();
 
   return (
-    <div className="page-container">
-      <div className="d-flex justify-content-between align-items-center mb-4">
+    <div className="page-container animate-fade">
+      <div className="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3 mb-4">
         <div>
-          <h3 className="fw-bold mb-1">Sales Team Management</h3>
-          <p className="text-secondary x-small">Configure sales agent access and view performance oversight.</p>
+          <h2 className="fw-bold mb-1">Interactive Sales Floor</h2>
+          <p className="text-secondary small mb-0">Assign leads to sales representatives visually via drag-and-drop.</p>
         </div>
-        <Link href="/admin/sales/new" className="btn btn-primary px-4 py-2 small fw-bold shadow-sm">
-          <i className="bi bi-person-plus me-2"></i> Add Team Member
-        </Link>
+        <div className="d-flex gap-2">
+          <Link href="/admin/users" className="btn btn-outline-secondary px-3 py-2 small fw-bold">
+            <i className="bi bi-people me-1"></i> Manage Users
+          </Link>
+          <Link href="/admin/sales/new" className="btn btn-primary px-4 py-2 small fw-bold shadow-sm">
+            <i className="bi bi-person-plus me-1"></i> Add Team Member
+          </Link>
+        </div>
       </div>
 
-      <SalesListClient users={users} />
+      {/* Interactive DND Workspace Component */}
+      <SalesFloorWorkspace agents={agents} leads={leads} />
     </div>
   );
 }

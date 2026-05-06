@@ -32,12 +32,20 @@ export default function CallProgression({ callId, currentStage, aiScore, analysi
   const [selectedStageIndex, setSelectedStageIndex] = useState(getInitialIndex());
   const maxStageIndex = getInitialIndex();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showOutcomeModal, setShowOutcomeModal] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [showSympathy, setShowSympathy] = useState(false);
 
   const handleStageClick = (index: number) => {
     setSelectedStageIndex(index);
   };
 
   const handleUpdatePermanent = async () => {
+    if (stages[selectedStageIndex] === "Closed") {
+      setShowOutcomeModal(true);
+      return;
+    }
+    
     setIsUpdating(true);
     try {
       await updateCallStage(callId, stages[selectedStageIndex]);
@@ -48,8 +56,136 @@ export default function CallProgression({ callId, currentStage, aiScore, analysi
     }
   };
 
+  const handleConfirmOutcome = async (finalOutcome: "WON" | "LOST") => {
+    setShowOutcomeModal(false);
+    if (finalOutcome === "WON") {
+      setShowCelebration(true);
+    } else {
+      setShowSympathy(true);
+    }
+    
+    setIsUpdating(true);
+    setTimeout(async () => {
+      try {
+        await updateCallStage(callId, "Closed", finalOutcome);
+        setShowCelebration(false);
+        setShowSympathy(false);
+      } catch (error) {
+        console.error("Failed to update closed stage:", error);
+      } finally {
+        setIsUpdating(false);
+      }
+    }, 3200);
+  };
+
   return (
     <div className="w-100">
+      {/* 1. Choice Modal */}
+      {showOutcomeModal && (
+        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center animate-fade" style={{ zIndex: 1050, backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}>
+          <div className="card border-0 shadow-lg p-4 bg-white position-relative" style={{ maxWidth: "420px", width: "90%", borderRadius: "16px" }}>
+            
+            {/* Absolute Close Button */}
+            <button 
+              onClick={() => setShowOutcomeModal(false)}
+              className="position-absolute border-0 bg-transparent text-secondary p-1"
+              style={{ top: "16px", right: "16px", outline: "none", cursor: "pointer" }}
+              title="Close"
+            >
+              <i className="bi bi-x-lg" style={{ fontSize: "16px" }}></i>
+            </button>
+
+            <div className="text-center">
+              <div className="display-4 mb-2">🤝</div>
+              <h5 className="fw-bold text-dark">Close Deal Outcome</h5>
+              <p className="text-secondary small mb-4">Please select the final outcome of this sales interaction to proceed.</p>
+              
+              <div className="d-flex gap-3 justify-content-center">
+                <button 
+                  onClick={() => handleConfirmOutcome("WON")}
+                  className="btn btn-success px-4 py-2 fw-bold d-flex align-items-center gap-2"
+                  style={{ borderRadius: "50px" }}
+                >
+                  🏆 Deal Won
+                </button>
+                <button 
+                  onClick={() => handleConfirmOutcome("LOST")}
+                  className="btn btn-outline-danger px-4 py-2 fw-bold d-flex align-items-center gap-2"
+                  style={{ borderRadius: "50px" }}
+                >
+                  ❌ Deal Lost
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Celebration Screen */}
+      {showCelebration && (
+        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center text-center animate-fade" style={{ zIndex: 9999, backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}>
+          {/* Pure CSS Confetti Particles */}
+          {Array.from({ length: 60 }).map((_, idx) => {
+            const left = Math.random() * 100;
+            const delay = Math.random() * 2.5;
+            const color = ["#00A76F", "#ffc107", "#0d6efd", "#e91e63", "#9c27b0"][Math.floor(Math.random() * 5)];
+            const size = Math.random() * 8 + 6;
+            return (
+              <div 
+                key={idx} 
+                className="confetti-particle" 
+                style={{ 
+                  left: `${left}%`, 
+                  animationDelay: `${delay}s`, 
+                  backgroundColor: color,
+                  width: `${size}px`,
+                  height: `${size}px`
+                }} 
+              />
+            );
+          })}
+          
+          <div className="card border-0 shadow-lg p-5 bg-white text-center animate-fade position-relative" style={{ maxWidth: "450px", width: "90%", borderRadius: "20px" }}>
+            {/* Absolute Close Button */}
+            <button 
+              onClick={() => setShowCelebration(false)}
+              className="position-absolute border-0 bg-transparent text-secondary p-1"
+              style={{ top: "16px", right: "16px", outline: "none", cursor: "pointer" }}
+              title="Close"
+            >
+              <i className="bi bi-x-lg" style={{ fontSize: "16px" }}></i>
+            </button>
+
+            <div className="display-3 mb-3 animate-bounce">🎉 🏆 🎉</div>
+            <h2 className="fw-bold text-dark mb-2">Congratulations!</h2>
+            <p className="lead fw-semibold text-success mb-3" style={{ fontSize: "1.3rem" }}>This Deal is officially WON! 🚀</p>
+            <p className="text-secondary small mb-0">Updating lead status and syncing dashboard performance records...</p>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Sympathy Screen */}
+      {showSympathy && (
+        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center text-center animate-fade" style={{ zIndex: 9999, backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}>
+          <div className="card border-0 shadow-lg p-5 bg-white text-center animate-fade position-relative" style={{ maxWidth: "450px", width: "90%", borderRadius: "20px" }}>
+            {/* Absolute Close Button */}
+            <button 
+              onClick={() => setShowSympathy(false)}
+              className="position-absolute border-0 bg-transparent text-secondary p-1"
+              style={{ top: "16px", right: "16px", outline: "none", cursor: "pointer" }}
+              title="Close"
+            >
+              <i className="bi bi-x-lg" style={{ fontSize: "16px" }}></i>
+            </button>
+
+            <div className="display-3 mb-3 animate-bounce">💪 ❤️ 🤝</div>
+            <h2 className="fw-bold text-dark mb-2">Keep Pushing!</h2>
+            <p className="lead fw-semibold text-danger mb-3" style={{ fontSize: "1.3rem" }}>Every 'No' brings us closer to a 'Yes'!</p>
+            <p className="text-secondary small mb-0">Recording outcome and updating sales logs. We'll win the next one!</p>
+          </div>
+        </div>
+      )}
+
       {/* Premium Bubble-Step Pipeline */}
       <div className="card mb-4 border-0 shadow-sm overflow-hidden">
         <div className="card-header bg-white border-0 pt-4 px-4 pb-0 d-flex justify-content-between align-items-center">
@@ -142,7 +278,7 @@ export default function CallProgression({ callId, currentStage, aiScore, analysi
                   <div className="p-2 px-3 border rounded-3 bg-white">
                     <h6 className="x-small fw-bold text-secondary text-uppercase mb-1">Key Signals</h6>
                     <div className="d-flex flex-wrap gap-1 mt-1">
-                      <span className="badge bg-primary bg-opacity-10 text-primary x-small fw-normal">Engaged</span>
+                      <span className="badge  bg-opacity-10 text-primary x-small fw-normal">Engaged</span>
                       <span className="badge bg-success bg-opacity-10 text-success x-small fw-normal">Verified</span>
                     </div>
                   </div>
@@ -249,11 +385,37 @@ export default function CallProgression({ callId, currentStage, aiScore, analysi
           border-color: #fff;
         }
         .bubble-label {
-          font-size: 10px;
-          text-transform: uppercase;
-          letter-spacing: 0.3px;
-          max-width: 60px;
+          font-size: 10.5px;
+          text-transform: none;
+          letter-spacing: 0.2px;
+          max-width: 75px;
           margin: 0 auto;
+          line-height: 1.25;
+        }
+        @keyframes confetti-fall {
+          0% { transform: translateY(-100%) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+        }
+        .confetti-particle {
+          position: fixed;
+          top: -20px;
+          z-index: 9999;
+          border-radius: 50%;
+          animation: confetti-fall 3.5s linear infinite;
+        }
+        @keyframes bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-15px); }
+        }
+        .animate-bounce {
+          animation: bounce 1.5s infinite ease-in-out;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.9); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        .animate-fade {
+          animation: fadeIn 0.5s ease-out;
         }
       `}</style>
     </div>

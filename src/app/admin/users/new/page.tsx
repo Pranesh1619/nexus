@@ -1,13 +1,26 @@
-import React from "react";
+"use client";
+
+import React, { useTransition } from "react";
 import { createUser } from "../actions";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 export default function NewUserPage() {
-  async function handleSubmit(formData: FormData) {
-    "use server";
-    await createUser(formData);
-    redirect("/admin/users");
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+
+    startTransition(async () => {
+      try {
+        await createUser(formData);
+        router.push("/admin/users");
+      } catch (err) {
+        console.error("Failed to create user:", err);
+      }
+    });
   }
 
   return (
@@ -22,7 +35,7 @@ export default function NewUserPage() {
 
       <div className="card border-0 shadow-sm">
         <div className="card-body p-4">
-          <form action={handleSubmit}>
+          <form onSubmit={handleSubmit}>
             <div className="row g-3">
               <div className="col-md-6">
                 <label className="form-label">Full Name</label>
@@ -45,11 +58,30 @@ export default function NewUserPage() {
               </div>
             </div>
             <div className="d-grid d-md-flex justify-content-md-end mt-4 pt-3 border-top">
-              <button type="submit" className="btn btn-primary px-5 py-2 small fw-bold shadow-sm">Create Account</button>
+              <button type="submit" disabled={isPending} className="btn btn-primary px-5 py-2 small fw-bold shadow-sm d-flex align-items-center gap-2">
+                {isPending && <span className="spinner-border spinner-border-sm" role="status"></span>}
+                Create Account
+              </button>
             </div>
           </form>
         </div>
       </div>
+
+      {/* Account Creation High-Fidelity Overlay */}
+      {isPending && (
+        <div 
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-dark bg-opacity-50 animate-fade" 
+          style={{ zIndex: 1060 }}
+        >
+          <div className="card p-4 border-0 shadow-lg text-center bg-white" style={{ maxWidth: "400px", borderRadius: "16px" }}>
+            <div className="spinner-border text-primary mb-3" role="status" style={{ width: "3rem", height: "3rem" }}>
+              <span className="visually-hidden">Loading...</span>
+            </div>
+            <h5 className="fw-bold text-dark mb-1">Creating Account...</h5>
+            <p className="text-secondary small mb-0 px-2">Initializing new user profile and setting security keys.</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
