@@ -69,7 +69,7 @@ export default async function CallViewPage({ params }: { params: Promise<{ id: s
                         <span className="fw-bold small text-primary">Agent: {call.user.name}</span>
                         <span className="x-small text-secondary">00:05</span>
                       </div>
-                      <p className="small mb-0 text-dark">Hello, thank you for reaching out to Nexus BPO. How can I assist you with your business needs today?</p>
+                      <p className="small mb-0 text-dark">Hello, thank you for reaching out to Virpa Intelligent Sales Agent support. How can I assist you with your business needs today?</p>
                     </div>
                   </div>
                   

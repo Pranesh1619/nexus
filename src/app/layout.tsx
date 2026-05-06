@@ -12,8 +12,8 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: "Nexus | BPO Dashboard",
-  description: "Advanced BPO management system with real-time call tracking and lead management.",
+  title: "Virpa Intelligent Sales Agent",
+  description: "Virpa Intelligent Sales Agent - Advanced BPO management system with real-time call tracking and lead management.",
 };
 
 export default function RootLayout({

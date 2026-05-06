@@ -45,7 +45,7 @@ export default function ForgotPasswordPage() {
                 name="email" 
                 type="email" 
                 className="form-control form-control-sm bg-light border-0 px-3 py-2" 
-                placeholder="admin@nexus.com" 
+                placeholder="admin@virpa.com" 
                 required 
               />
             </div>

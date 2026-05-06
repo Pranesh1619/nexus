@@ -38,7 +38,7 @@ export default function NewLeadPage() {
               </div>
               <div className="col-md-6">
                 <label className="form-label x-small fw-bold text-secondary text-uppercase mb-1">Company Name</label>
-                <input name="company" type="text" className="form-control form-control-sm bg-light border-0 small" placeholder="Nexus Solutions" />
+                <input name="company" type="text" className="form-control form-control-sm bg-light border-0 small" placeholder="Virpa Solutions" />
               </div>
               <div className="col-md-6">
                 <label className="form-label x-small fw-bold text-secondary text-uppercase mb-1">Source</label>

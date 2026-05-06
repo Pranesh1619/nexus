@@ -21,7 +21,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <aside className="sidebar">
         <Link href="/admin" className="sidebar-logo">
           <i className="bi bi-intersect text-success fs-2"></i>
-          <span>Nexus</span>
+          <span>Virpa</span>
         </Link>
 
         <div className="nav-section">

@@ -30,7 +30,7 @@ export default function NewUserPage() {
               </div>
               <div className="col-md-6">
                 <label className="form-label">Email Address</label>
-                <input name="email" type="email" className="form-control form-control-sm bg-light border-0 small px-3 py-2" placeholder="alex@nexus.com" required />
+                <input name="email" type="email" className="form-control form-control-sm bg-light border-0 small px-3 py-2" placeholder="alex@virpa.com" required />
               </div>
               <div className="col-md-6">
                 <label className="form-label">Access Role</label>

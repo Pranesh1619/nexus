@@ -28,7 +28,7 @@ export default function RegisterPage() {
         <div className="text-center mb-4">
           <i className="bi bi-intersect text-success fs-1"></i>
           <h2 className="fw-bold mt-2">Get started free</h2>
-          <p className="text-secondary small">Create your Nexus account.</p>
+          <p className="text-secondary small">Create your Virpa account.</p>
         </div>
 
         {error && (

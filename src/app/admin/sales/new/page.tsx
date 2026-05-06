@@ -30,7 +30,7 @@ export default function NewAgentPage() {
               </div>
               <div className="col-md-6">
                 <label className="form-label">Work Email</label>
-                <input name="email" type="email" className="form-control form-control-sm bg-light border-0 small px-3 py-2" placeholder="michael@nexus.com" required />
+                <input name="email" type="email" className="form-control form-control-sm bg-light border-0 small px-3 py-2" placeholder="michael@virpa.com" required />
               </div>
               <div className="col-md-6">
                 <label className="form-label">Initial Password</label>

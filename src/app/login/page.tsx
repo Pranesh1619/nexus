@@ -27,7 +27,7 @@ export default function LoginPage() {
       <div className="card border-0 shadow-lg p-4 w-100" style={{ maxWidth: "400px" }}>
         <div className="text-center mb-4">
           <i className="bi bi-intersect text-success fs-1"></i>
-          <h2 className="fw-bold mt-2">Sign in to Nexus</h2>
+          <h2 className="fw-bold mt-2" style={{ fontSize: "1.6rem" }}>Sign in to Virpa</h2>
           <p className="text-secondary small">Enter your details below.</p>
         </div>
 
@@ -45,7 +45,7 @@ export default function LoginPage() {
               type="email" 
               className="form-control form-control-sm bg-light border-0 px-3 py-2" 
               required
-              placeholder="admin@nexus.com" 
+              placeholder="admin@virpa.com" 
             />
           </div>
 
