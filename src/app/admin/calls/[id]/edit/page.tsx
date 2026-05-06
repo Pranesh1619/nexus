@@ -4,6 +4,8 @@ import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
+export const dynamic = "force-dynamic";
+
 export default async function EditCallPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const call = await prisma.callLog.findUnique({
