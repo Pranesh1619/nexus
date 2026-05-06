@@ -3,6 +3,8 @@ import { getUserById, deleteUser } from "../actions";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 export default async function UserDetailsPage({ params }: { params: { id: string } }) {
   const { id } = await params;
   const user = await getUserById(id);

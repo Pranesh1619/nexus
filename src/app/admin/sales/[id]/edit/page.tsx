@@ -4,6 +4,8 @@ import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import StatusModal from "@/components/StatusModal";
 
+export const dynamic = "force-dynamic";
+
 export default async function EditAgentPage({ params, searchParams }: { params: Promise<{ id: string }>, searchParams: Promise<{ success?: string }> }) {
   const { id } = await params;
   const { success } = await searchParams;

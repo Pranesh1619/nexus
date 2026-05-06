@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import Link from "next/link";
 import CallProgression from "./CallProgression";
 
+export const dynamic = "force-dynamic";
+
 export default async function CallViewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const call = await prisma.callLog.findUnique({
