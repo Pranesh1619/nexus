@@ -278,19 +278,51 @@ body {
 }
 
 /* Global 15px Font Size & Rounded Buttons Override */
-body, p, span, div, input, select, textarea, td, th, table, .nav-link, label, .stats-title, .form-label, .dropdown-item, li, a {
+body,
+p,
+span,
+div,
+input,
+select,
+textarea,
+td,
+th,
+table,
+.nav-link,
+label,
+.stats-title,
+.form-label,
+.dropdown-item,
+li,
+a {
   font-size: 15px !important;
 }
 
-.btn, .btn-primary, .btn-secondary, .btn-light, .btn-danger, .btn-success, .btn-info, .btn-warning, button {
-  padding: 5px 16px !important; /* Slightly more side padding for gorgeous pill buttons */
+.btn,
+.btn-primary,
+.btn-secondary,
+.btn-light,
+.btn-danger,
+.btn-success,
+.btn-info,
+.btn-warning,
+button {
+  padding: 5px 16px !important;
+  /* Slightly more side padding for gorgeous pill buttons */
   font-size: 15px !important;
   border-radius: 50px !important;
   font-weight: 600 !important;
 }
 
 /* Force 50px pill/capsule border radius on all buttons even with Bootstrap utility classes */
-.btn.rounded-2, button.rounded-2, .btn.rounded-3, button.rounded-3, .btn.rounded, button.rounded, .btn.rounded-pill, button.rounded-pill {
+.btn.rounded-2,
+button.rounded-2,
+.btn.rounded-3,
+button.rounded-3,
+.btn.rounded,
+button.rounded,
+.btn.rounded-pill,
+button.rounded-pill {
   border-radius: 50px !important;
 }
 
@@ -300,7 +332,10 @@ body, p, span, div, input, select, textarea, td, th, table, .nav-link, label, .s
   border-color: var(--primary-color) !important;
   background-color: transparent !important;
 }
-.btn-outline-primary:hover, .btn-outline-primary:active, .btn-outline-primary:focus {
+
+.btn-outline-primary:hover,
+.btn-outline-primary:active,
+.btn-outline-primary:focus {
   color: #fff !important;
   background-color: var(--primary-hover) !important;
   border-color: var(--primary-hover) !important;
@@ -311,6 +346,7 @@ body, p, span, div, input, select, textarea, td, th, table, .nav-link, label, .s
   border-color: var(--border-color) !important;
   background-color: transparent !important;
 }
+
 .btn-outline-secondary:hover {
   color: #fff !important;
   background-color: var(--secondary-color) !important;
@@ -321,9 +357,11 @@ body, p, span, div, input, select, textarea, td, th, table, .nav-link, label, .s
 .text-primary {
   color: var(--primary-color) !important;
 }
+
 .bg-primary {
   background-color: var(--primary-color) !important;
 }
+
 .border-primary {
   border-color: var(--primary-color) !important;
 }
@@ -334,9 +372,17 @@ body, p, span, div, input, select, textarea, td, th, table, .nav-link, label, .s
 }
 
 @keyframes skeleton-loading {
-  0% { opacity: 0.5; }
-  50% { opacity: 1; }
-  100% { opacity: 0.5; }
+  0% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.5;
+  }
 }
 
 /* Collapsible Sidebar Smooth Transitions */
@@ -395,6 +441,293 @@ body, p, span, div, input, select, textarea, td, th, table, .nav-link, label, .s
   margin-left: 80px !important;
 }
 
+/* ==========================================================================
+   MOBILE RESPONSIVENESS OVERRIDES (width <= 768px)
+   ========================================================================== */
+@media (max-width: 768px) {
+  :root {
+    --header-height: 64px;
+  }
 
+  /* Sidebar Drawer styling for mobile */
+  .sidebar {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    height: 100vh !important;
+    width: 280px !important;
+    transform: translateX(-100%) !important;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    z-index: 1010 !important;
+    padding: 24px 16px !important;
+    box-shadow: 20px 0px 40px rgba(15, 23, 42, 0.15) !important;
+  }
 
+  /* Slide in sidebar when collapsed (which we reuse as active state on mobile) */
+  .sidebar.collapsed {
+    transform: translateX(0) !important;
+    width: 280px !important;
+    padding: 24px 16px !important;
+  }
 
+  .sidebar.collapsed .sidebar-logo span,
+  .sidebar.collapsed .nav-section-title,
+  .sidebar.collapsed .nav-link span {
+    display: inline-block !important;
+    /* Keep text visible on mobile slide-in! */
+  }
+
+  .sidebar.collapsed .sidebar-logo {
+    justify-content: flex-start !important;
+    padding: 8px 12px !important;
+    margin-bottom: 40px !important;
+  }
+
+  .sidebar.collapsed .nav-link {
+    justify-content: flex-start !important;
+    padding: 12px !important;
+    gap: 16px !important;
+  }
+
+  /* Header mobile layouts */
+  .header {
+    left: 0 !important;
+    height: var(--header-height) !important;
+    padding: 0 16px !important;
+  }
+
+  .search-box {
+    display: none !important;
+    /* Hide search box on mobile to prevent navbar crowding */
+  }
+
+  /* Main content area */
+  .main-content {
+    margin-left: 0 !important;
+    padding: calc(var(--header-height) + 16px) 16px 24px !important;
+  }
+
+  .main-content.collapsed {
+    margin-left: 0 !important;
+  }
+
+  /* Cards and spacing */
+  .card-body {
+    padding: 16px !important;
+  }
+
+  /* Stack form rows and custom padding overrides */
+  .row.g-4,
+  .row.g-3 {
+    --bs-gutter-x: 12px !important;
+    --bs-gutter-y: 12px !important;
+  }
+
+  /* Ensure modal dialogue fits perfectly inside mobile screens */
+  .card.border-0.shadow-lg.p-4 {
+    padding: 24px 16px !important;
+    margin: 0 12px !important;
+  }
+
+  /* Title sizing polishes */
+  h2,
+  .h2 {
+    font-size: 20px !important;
+  }
+
+  h3,
+  .h3 {
+    font-size: 18px !important;
+  }
+
+  h4,
+  .h4 {
+    font-size: 16px !important;
+  }
+
+  /* Sales Floor Horizontal Scroll Columns Adjustment for mobile screens */
+  .col-lg-8 .d-flex.flex-row.flex-nowrap>div {
+    min-width: 88% !important;
+    max-width: 88% !important;
+    flex: 0 0 88% !important;
+  }
+
+  /* Prevent buttons from squishing into circular shapes on small viewports */
+  .btn,
+  button,
+  .btn-light,
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger,
+  .btn-info,
+  .btn-success {
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Bubble Progression Timeline Horizontal Scroll on mobile screens */
+  .pb-4.position-relative {
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 20px !important;
+  }
+
+  .pb-4.position-relative>.d-flex.justify-content-between {
+    min-width: 580px !important;
+    /* Forces steps to maintain spacing without squishing! */
+    padding: 0 10px !important;
+  }
+
+  /* Make page headers and card headers wrap beautifully on mobile instead of overlapping */
+  .page-container>.d-flex.justify-content-between,
+  .page-container .d-flex.flex-column.flex-sm-row.justify-content-between,
+  .card-header.d-flex.justify-content-between,
+  .d-flex.justify-content-between.align-items-center.mb-4,
+  .d-flex.justify-content-between.align-items-center.mb-3 {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  /* Let headers actions blocks scale to full width on mobile */
+  .page-container>.d-flex.justify-content-between>.d-flex,
+  .card-header .d-flex,
+  .d-flex.justify-content-between.align-items-center.mb-4>.d-flex {
+    width: 100% !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  /* Ensure card header elements span full width or flow naturally on mobile */
+  .card-header .d-flex select,
+  .card-header .d-flex button,
+  .card-header .d-flex input,
+  .card-header .d-flex .btn {
+    flex: 1 1 auto !important;
+    width: auto !important;
+  }
+}
+
+/* ==========================================================================
+   MICRO-MOBILE DEVICES SPECIFIC CORRECTIONS (width <= 320px)
+   ========================================================================== */
+@media (max-width: 320px) {
+
+  /* Prevent header overlapping entirely by forcing stacking */
+  .page-container>.d-flex.justify-content-between,
+  .d-flex.justify-content-between.align-items-center.mb-4,
+  .d-flex.justify-content-between.align-items-center.mb-3 {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  /* Make actions container full width */
+  .page-container>.d-flex.justify-content-between>.d-flex,
+  .d-flex.justify-content-between.align-items-center.mb-4>.d-flex {
+    width: 100% !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+    gap: 8px !important;
+  }
+
+  /* Enforce smaller font-size and padding on buttons to fit on 320px */
+  .btn,
+  button,
+  .btn-light,
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger,
+  .btn-info,
+  .btn-success {
+    font-size: 11px !important;
+    padding: 5px 10px !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    border-radius: 50px !important;
+    height: auto !important;
+    width: auto !important;
+  }
+
+  /* Fix for Sidebar Close Button inside 320px view */
+  .sidebar button.btn-light,
+  .sidebar button {
+    font-size: 14px !important;
+    padding: 2px !important;
+    width: auto !important;
+    height: auto !important;
+  }
+
+  /* Fix the overall AI score badge and Edit Log on Calls Detail Page */
+  .page-container .d-flex.flex-column.flex-sm-row.gap-2 {
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+
+  .page-container .d-flex.flex-column.flex-sm-row.gap-2>div,
+  .page-container .d-flex.flex-column.flex-sm-row.gap-2>a {
+    flex: 1 1 50% !important;
+    max-width: 50% !important;
+    font-size: 11px !important;
+  }
+
+  /* Operations Performance Trend badge scaling on micro-mobile */
+  .card-body .d-flex.justify-content-between.align-items-center span.badge,
+  .card-header.d-flex.justify-content-between span.badge {
+    margin-top: 8px !important;
+    align-self: flex-start !important;
+  }
+}
+
+/* Custom stacking overrides to keep Kanban card dropdown menus on top of adjacent cards */
+.card {
+  position: relative !important;
+}
+
+.card:focus-within,
+.card:has(.show) {
+  z-index: 100 !important;
+  overflow: visible !important;
+}
+
+.dropdown-menu {
+  z-index: 1050 !important;
+}
+
+/* Eliminate browser-default or Bootstrap blue focus outlines, borders, and active backgrounds */
+select:focus,
+input:focus,
+textarea:focus,
+.form-select:focus,
+.form-control:focus {
+  border-color: #cbd5e1 !important; /* Premium neutral slate gray border */
+  box-shadow: 0 0 0 2px rgba(203, 213, 225, 0.25) !important; /* Soft, premium slate glow instead of bright blue! */
+  outline: none !important;
+}
+
+/* Eliminate blue background / highlight on active dropdown items */
+.dropdown-item:focus,
+.dropdown-item:active {
+  background-color: transparent !important;
+  color: #1e293b !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Style hover state of dropdown items with a clean, light neutral slate background instead of blue */
+.dropdown-item:hover {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+/* Eliminate blue glow focus ring on buttons */
+.btn:focus,
+button:focus,
+.form-check-input:focus {
+  box-shadow: none !important;
+  outline: none !important;
+}

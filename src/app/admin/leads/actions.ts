@@ -7,10 +7,20 @@ export async function getLeads(userId?: string) {
   if (userId) {
     return await prisma.lead.findMany({
       where: { assignedTo: userId },
+      include: {
+        calls: {
+          orderBy: { createdAt: "desc" },
+        },
+      },
       orderBy: { createdAt: "desc" },
     });
   }
   return await prisma.lead.findMany({
+    include: {
+      calls: {
+        orderBy: { createdAt: "desc" },
+      },
+    },
     orderBy: { createdAt: "desc" },
   });
 }

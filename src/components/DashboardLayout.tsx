@@ -23,6 +23,26 @@ export default function DashboardLayout({ children, userRole = "ADMIN", userName
     <div className="dashboard-wrapper">
       {/* Sidebar */}
       <aside className={`sidebar ${isCollapsed ? "collapsed" : ""}`}>
+        {/* Mobile Close Icon (visible only on mobile) */}
+        <button 
+          onClick={() => setIsCollapsed(false)}
+          className="btn border-0 p-1 position-absolute d-md-none text-secondary"
+          style={{ 
+            top: "20px", 
+            right: "20px", 
+            zIndex: 1020, 
+            backgroundColor: "transparent",
+            outline: "none",
+            cursor: "pointer",
+            width: "auto",
+            height: "auto",
+            borderRadius: "0px"
+          }}
+          title="Close Menu"
+        >
+          <i className="bi bi-x-lg" style={{ fontSize: "18px" }}></i>
+        </button>
+
         <Link href="/admin" className="sidebar-logo">
           <i className="bi bi-intersect text-success fs-2"></i>
           <span>Virpa</span>
@@ -74,7 +94,7 @@ export default function DashboardLayout({ children, userRole = "ADMIN", userName
             <i className="bi bi-list fs-4 text-dark"></i>
           </button>
 
-          <div className="search-box">
+          <div className="search-box d-none d-md-flex">
             <i className="bi bi-search text-secondary"></i>
             <input type="text" placeholder="Search..." />
             <span className="badge bg-white text-dark border ms-auto">⌘ K</span>
@@ -82,9 +102,6 @@ export default function DashboardLayout({ children, userRole = "ADMIN", userName
         </div>
 
         <div className="header-actions">
-          <i className="bi bi-question-circle fs-5 text-secondary cursor-pointer"></i>
-          <i className="bi bi-chat-dots fs-5 text-secondary cursor-pointer"></i>
-          <i className="bi bi-bell fs-5 text-secondary cursor-pointer"></i>
           <div className="dropdown ms-3">
             <div 
               className="d-flex align-items-center gap-2 cursor-pointer dropdown-toggle" 
@@ -112,6 +129,21 @@ export default function DashboardLayout({ children, userRole = "ADMIN", userName
       <main className={`main-content ${isCollapsed ? "collapsed" : ""}`}>
         {children}
       </main>
+
+      {/* Mobile Backdrop Overlay Drawer */}
+      {isCollapsed && (
+        <div 
+          className="d-md-none position-fixed top-0 start-0 w-100 h-100" 
+          style={{ 
+            zIndex: 999, 
+            backgroundColor: "rgba(15, 23, 42, 0.45)", 
+            backdropFilter: "blur(3px)",
+            WebkitBackdropFilter: "blur(3px)",
+            transition: "all 0.3s ease" 
+          }}
+          onClick={() => setIsCollapsed(false)}
+        />
+      )}
     </div>
   );
 }

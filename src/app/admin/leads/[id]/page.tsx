@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAllUsers } from "../../users/actions";
 import LeadAssignWrapper from "./LeadAssignWrapper";
+import LeadTimelineChart from "./LeadTimelineChart";
 
 export const dynamic = "force-dynamic";
 
@@ -101,6 +102,12 @@ export default async function LeadDetailsPage({ params }: { params: Promise<{ id
           </div>
         </div>
       </div>
+
+
+      {/* Recharts Analytics Area Trend Graph */}
+      {lead.calls && lead.calls.length > 0 && (
+        <LeadTimelineChart calls={lead.calls} />
+      )}
 
       {/* Full Width Interaction History */}
       <div className="card border-0 shadow-sm">

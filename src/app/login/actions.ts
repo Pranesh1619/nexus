@@ -21,9 +21,13 @@ export async function loginUser(formData: FormData) {
       return { error: "Invalid email or password" };
     }
 
-    // Set secure cookie session tokens
+    // Set secure cookie session tokens with cryptographically signed JWT
+    const { signToken } = await import("@/lib/jwt");
+    const token = signToken({ id: user.id, role: user.role || "ADMIN", name: user.name });
+
     const { cookies } = await import("next/headers");
     const cookieStore = await cookies();
+    cookieStore.set("auth_token", token, { path: "/", httpOnly: true, secure: process.env.NODE_ENV === "production" });
     cookieStore.set("user_id", user.id, { path: "/", httpOnly: true, secure: process.env.NODE_ENV === "production" });
     cookieStore.set("user_role", user.role || "ADMIN", { path: "/", httpOnly: true, secure: process.env.NODE_ENV === "production" });
     cookieStore.set("user_name", user.name, { path: "/", httpOnly: true, secure: process.env.NODE_ENV === "production" });
@@ -38,6 +42,7 @@ export async function loginUser(formData: FormData) {
 export async function logoutUser() {
   const { cookies } = await import("next/headers");
   const cookieStore = await cookies();
+  cookieStore.delete("auth_token");
   cookieStore.delete("user_id");
   cookieStore.delete("user_role");
   cookieStore.delete("user_name");

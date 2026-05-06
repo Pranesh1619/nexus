@@ -30,10 +30,44 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
   const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
   const [activeDropTarget, setActiveDropTarget] = useState<string | null>(null); // "unassigned" or agent.id
 
+  // Dropdown-driven lead assignment state variables (highly mobile/touch responsive)
+  const [selectedLeadForAssign, setSelectedLeadForAssign] = useState<Lead | null>(null);
+  const [selectedTargetAgentId, setSelectedTargetAgentId] = useState<string>("");
+
+  const handleOpenAssignModal = (lead: Lead) => {
+    setSelectedLeadForAssign(lead);
+    setSelectedTargetAgentId(lead.assignedTo || "");
+  };
+
+  const handleConfirmAssignment = async () => {
+    if (!selectedLeadForAssign) return;
+    const targetUserId = selectedTargetAgentId === "" ? null : selectedTargetAgentId;
+    
+    startTransition(async () => {
+      try {
+        await assignLeadToUser(selectedLeadForAssign.id, targetUserId);
+      } catch (error) {
+        console.error("Failed to assign:", error);
+      } finally {
+        setSelectedLeadForAssign(null);
+      }
+    });
+  };
+
+  const handleUnassignLead = async (leadId: string) => {
+    startTransition(async () => {
+      try {
+        await assignLeadToUser(leadId, null);
+      } catch (error) {
+        console.error("Failed to unassign:", error);
+      }
+    });
+  };
+
   // Client-Side Search Filters for high scale (1000+ records)
   const [agentSearch, setAgentSearch] = useState("");
   const [unassignedLeadsSearch, setUnassignedLeadsSearch] = useState("");
-  const [agentLeadsSearch, setAgentLeadsSearch] = useState<{[userId: string]: string}>({});
+  const [agentLeadsSearch, setAgentLeadsSearch] = useState<{ [userId: string]: string }>({});
 
   // 1. Memoized calculation of unassigned pool
   const unassignedLeads = useMemo(() => {
@@ -44,7 +78,7 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
   const filteredUnassignedLeads = useMemo(() => {
     if (!unassignedLeadsSearch) return unassignedLeads;
     const q = unassignedLeadsSearch.toLowerCase();
-    return unassignedLeads.filter(l => 
+    return unassignedLeads.filter(l =>
       l.name.toLowerCase().includes(q) ||
       (l.company || "").toLowerCase().includes(q) ||
       l.phone.includes(q)
@@ -55,8 +89,8 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
   const filteredAgents = useMemo(() => {
     if (!agentSearch) return agents;
     const q = agentSearch.toLowerCase();
-    return agents.filter(agent => 
-      agent.name.toLowerCase().includes(q) || 
+    return agents.filter(agent =>
+      agent.name.toLowerCase().includes(q) ||
       agent.email.toLowerCase().includes(q)
     );
   }, [agents, agentSearch]);
@@ -83,7 +117,7 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
     e.preventDefault();
     setActiveDropTarget(null);
     const leadId = e.dataTransfer.getData("text/plain") || draggedLeadId;
-    
+
     if (!leadId) return;
 
     // Immediately trigger drop re-assignment
@@ -129,7 +163,7 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
                   {agents.length}
                 </h2>
               </div>
-              <div className="bg-primary bg-opacity-10 rounded-circle p-2.5 text-primary d-flex align-items-center justify-content-center" style={{ width: "45px", height: "45px" }}>
+              <div className="bg-opacity-10 rounded-circle p-2.5 text-primary d-flex align-items-center justify-content-center" style={{ width: "45px", height: "45px" }}>
                 <i className="bi bi-people fs-5"></i>
               </div>
             </div>
@@ -172,11 +206,11 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
             </h4>
             <span className="badge bg-secondary rounded-pill px-2.5 py-1 small fw-bold">{filteredUnassignedLeads.length}</span>
           </div>
-          <div className="search-box w-100 m-0" style={{ height: "42px" }}>
+          <div className="search-box w-100 m-0 d-none d-md-flex" style={{ height: "42px" }}>
             <i className="bi bi-search text-secondary"></i>
-            <input 
-              type="text" 
-              placeholder="Search pool leads..." 
+            <input
+              type="text"
+              placeholder="Search pool leads..."
               value={unassignedLeadsSearch}
               onChange={(e) => setUnassignedLeadsSearch(e.target.value)}
               className="w-100"
@@ -193,11 +227,11 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
             </h4>
             <span className="text-secondary small fw-bold">{filteredAgents.length} Active Agents</span>
           </div>
-          <div className="search-box w-100 m-0" style={{ height: "42px" }}>
+          <div className="search-box w-100 m-0 d-none d-md-flex" style={{ height: "42px" }}>
             <i className="bi bi-search text-secondary"></i>
-            <input 
-              type="text" 
-              placeholder="Search sales agents by name or email..." 
+            <input
+              type="text"
+              placeholder="Search sales agents by name or email..."
               value={agentSearch}
               onChange={(e) => setAgentSearch(e.target.value)}
               className="w-100"
@@ -208,13 +242,13 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
 
       {/* Workspace Grid */}
       <div className="row g-4 align-items-stretch">
-        
+
         {/* Column 1: Unassigned Pool */}
         <div className="col-lg-4 mb-4 mb-lg-0">
-          <div 
+          <div
             className="card border-0 shadow-sm d-flex flex-column"
-            style={{ 
-              borderRadius: "16px", 
+            style={{
+              borderRadius: "16px",
               backgroundColor: activeDropTarget === "unassigned" ? "rgba(220, 53, 69, 0.05)" : "#f8f9fa",
               border: activeDropTarget === "unassigned" ? "2px dashed #dc3545" : "2px solid transparent",
               transition: "all 0.25s ease-in-out",
@@ -230,7 +264,7 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
                 <p className="text-secondary x-small mb-0">Drag leads here to unassign them</p>
               </div>
             </div>
-            
+
             <div className="card-body p-3 overflow-auto" style={{ height: "540px", overflowY: "auto" }}>
               <div className="d-flex flex-column gap-3">
                 {filteredUnassignedLeads.length === 0 ? (
@@ -245,10 +279,10 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
                       draggable
                       onDragStart={(e) => handleDragStart(e, lead.id)}
                       className={`card border-0 shadow-sm p-3 bg-white cursor-grab position-relative transition-all ${draggedLeadId === lead.id ? "opacity-40 border border-primary border-dashed" : ""}`}
-                      style={{ 
-                        borderRadius: "12px", 
+                      style={{
+                        borderRadius: "12px",
                         cursor: "grab",
-                        transition: "transform 0.15s ease, box-shadow 0.15s ease" 
+                        transition: "transform 0.15s ease, box-shadow 0.15s ease"
                       }}
                     >
                       <div className="d-flex align-items-center justify-content-between mb-2">
@@ -260,9 +294,33 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
                         <i className="bi bi-building"></i>
                         <span>{lead.company || "No Company"}</span>
                       </div>
-                      <div className="text-muted x-small d-flex align-items-center gap-1">
-                        <i className="bi bi-telephone"></i>
-                        <span>{lead.phone}</span>
+                      <div className="d-flex align-items-center justify-content-between mt-1">
+                        <div className="text-muted x-small d-flex align-items-center gap-1">
+                          <i className="bi bi-telephone"></i>
+                          <span>{lead.phone}</span>
+                        </div>
+                        <div className="dropdown">
+                          <button 
+                            className="btn p-0 border-0 text-secondary bg-transparent" 
+                            type="button" 
+                            data-bs-toggle="dropdown" 
+                            aria-expanded="false"
+                            style={{ width: "auto", height: "auto", padding: "4px !important" }}
+                          >
+                            <i className="bi bi-three-dots-vertical" style={{ fontSize: "14px" }}></i>
+                          </button>
+                          <ul className="dropdown-menu dropdown-menu-end shadow border-0" style={{ minWidth: "160px", fontSize: "13px" }}>
+                            <li>
+                              <button 
+                                className="dropdown-item py-2 d-flex align-items-center gap-2"
+                                onClick={() => handleOpenAssignModal(lead)}
+                              >
+                                <i className="bi bi-person-check text-success"></i>
+                                <span>Move / Assign</span>
+                              </button>
+                            </li>
+                          </ul>
+                        </div>
                       </div>
                     </div>
                   ))
@@ -274,11 +332,11 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
 
         {/* Column 2 & 3: Active Sales Agents Columns (Horizontal Scroll with exactly two columns per row) */}
         <div className="col-lg-8">
-          <div 
-            className="d-flex flex-row flex-nowrap overflow-auto pb-2" 
-            style={{ 
-              overflowX: "auto", 
-              overflowY: "hidden", 
+          <div
+            className="d-flex flex-row flex-nowrap overflow-auto pb-2"
+            style={{
+              overflowX: "auto",
+              overflowY: "hidden",
               gap: "1.5rem",
               scrollbarWidth: "thin",
               paddingBottom: "10px"
@@ -296,26 +354,26 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
               filteredAgents.map((agent) => {
                 const agentLeads = leads.filter(l => l.assignedTo === agent.id);
                 const searchVal = agentLeadsSearch[agent.id] || "";
-                const filteredAgentLeads = agentLeads.filter(lead => 
+                const filteredAgentLeads = agentLeads.filter(lead =>
                   lead.name.toLowerCase().includes(searchVal.toLowerCase()) ||
                   (lead.company || "").toLowerCase().includes(searchVal.toLowerCase()) ||
                   lead.phone.includes(searchVal)
                 );
                 const isTargetingThis = activeDropTarget === agent.id;
-                
+
                 return (
-                  <div 
-                    key={agent.id} 
-                    style={{ 
-                      minWidth: "calc(50% - 0.75rem)", 
-                      maxWidth: "calc(50% - 0.75rem)", 
-                      flex: "0 0 calc(50% - 0.75rem)" 
+                  <div
+                    key={agent.id}
+                    style={{
+                      minWidth: "calc(50% - 0.75rem)",
+                      maxWidth: "calc(50% - 0.75rem)",
+                      flex: "0 0 calc(50% - 0.75rem)"
                     }}
                   >
-                    <div 
+                    <div
                       className="card border-0 shadow-sm d-flex flex-column"
-                      style={{ 
-                        borderRadius: "16px", 
+                      style={{
+                        borderRadius: "16px",
                         backgroundColor: isTargetingThis ? "rgba(40, 167, 69, 0.05)" : "#ffffff",
                         border: isTargetingThis ? "2px dashed #28a745" : "2px solid transparent",
                         boxShadow: isTargetingThis ? "0 10px 25px rgba(40, 167, 69, 0.12)" : "",
@@ -356,18 +414,17 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
                                 draggable
                                 onDragStart={(e) => handleDragStart(e, lead.id)}
                                 className={`card border-1 shadow-sm p-3 bg-white cursor-grab position-relative border-light hover-shadow ${draggedLeadId === lead.id ? "opacity-40 border border-primary border-dashed" : ""}`}
-                                style={{ 
-                                  borderRadius: "12px", 
+                                style={{
+                                  borderRadius: "12px",
                                   cursor: "grab",
-                                  transition: "all 0.2s" 
+                                  transition: "all 0.2s"
                                 }}
                               >
                                 <div className="d-flex align-items-center justify-content-between mb-2">
-                                  <span className={`badge x-small rounded-pill px-2.5 py-0.5 ${
-                                    lead.status === 'CLOSED_WON' || lead.status === 'WON' ? 'bg-success bg-opacity-10 text-success' :
-                                    lead.status === 'CLOSED_LOST' || lead.status === 'LOST' ? 'bg-danger bg-opacity-10 text-danger' :
-                                    'bg-warning bg-opacity-10 text-warning'
-                                  }`}>{lead.status}</span>
+                                  <span className={`badge x-small rounded-pill px-2.5 py-0.5 ${lead.status === 'CLOSED_WON' || lead.status === 'WON' ? 'bg-success bg-opacity-10 text-success' :
+                                      lead.status === 'CLOSED_LOST' || lead.status === 'LOST' ? 'bg-danger bg-opacity-10 text-danger' :
+                                        'bg-warning bg-opacity-10 text-warning'
+                                    }`}>{lead.status}</span>
                                   <i className="bi bi-grip-vertical text-muted fs-5 cursor-grab"></i>
                                 </div>
                                 <h6 className="fw-bold text-dark mb-1">{lead.name}</h6>
@@ -375,9 +432,42 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
                                   <i className="bi bi-building"></i>
                                   <span>{lead.company || "No Company"}</span>
                                 </div>
-                                <div className="text-muted x-small d-flex align-items-center gap-1">
-                                  <i className="bi bi-telephone"></i>
-                                  <span>{lead.phone}</span>
+                                <div className="d-flex align-items-center justify-content-between mt-1">
+                                  <div className="text-muted x-small d-flex align-items-center gap-1">
+                                    <i className="bi bi-telephone"></i>
+                                    <span>{lead.phone}</span>
+                                  </div>
+                                  <div className="dropdown">
+                                    <button 
+                                      className="btn p-0 border-0 text-secondary bg-transparent" 
+                                      type="button" 
+                                      data-bs-toggle="dropdown" 
+                                      aria-expanded="false"
+                                      style={{ width: "auto", height: "auto", padding: "4px" }}
+                                    >
+                                      <i className="bi bi-three-dots-vertical" style={{ fontSize: "14px" }}></i>
+                                    </button>
+                                    <ul className="dropdown-menu dropdown-menu-end shadow border-0" style={{ minWidth: "160px", fontSize: "13px" }}>
+                                      <li>
+                                        <button 
+                                          className="dropdown-item py-2 d-flex align-items-center gap-2"
+                                          onClick={() => handleOpenAssignModal(lead)}
+                                        >
+                                          <i className="bi bi-person-check text-success"></i>
+                                          <span>Move / Re-assign</span>
+                                        </button>
+                                      </li>
+                                      <li>
+                                        <button 
+                                          className="dropdown-item py-2 d-flex align-items-center gap-2 text-danger"
+                                          onClick={() => handleUnassignLead(lead.id)}
+                                        >
+                                          <i className="bi bi-x-circle text-danger"></i>
+                                          <span>Remove (Unassign)</span>
+                                        </button>
+                                      </li>
+                                    </ul>
+                                  </div>
                                 </div>
                               </div>
                             ))}
@@ -393,6 +483,60 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
         </div>
 
       </div>
+
+      {/* Client-Side Assignment Modal */}
+      {selectedLeadForAssign && (
+        <div 
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center animate-fade" 
+          style={{ 
+            zIndex: 9999, 
+            backgroundColor: "rgba(15, 23, 42, 0.4)", 
+            backdropFilter: "blur(4px)" 
+          }}
+        >
+          <div className="card border-0 shadow-lg p-4 bg-white" style={{ maxWidth: "420px", width: "90%", borderRadius: "16px" }}>
+            <div className="text-center mb-3">
+              <div className="rounded-circle bg-opacity-10 text-primary d-flex align-items-center justify-content-center mx-auto mb-2" style={{ width: 56, height: 56 }}>
+                <i className="bi bi-person-check fs-3"></i>
+              </div>
+              <h5 className="fw-bold mb-1">Assign Representative</h5>
+              <p className="text-secondary small">Route <strong>{selectedLeadForAssign.name}</strong> to an active representative's pipeline.</p>
+            </div>
+
+            <div className="mb-3">
+              <label className="form-label small fw-bold text-secondary text-uppercase mb-1">Active Sales Agent</label>
+              <select 
+                value={selectedTargetAgentId}
+                onChange={(e) => setSelectedTargetAgentId(e.target.value)}
+                className="form-select border"
+                style={{ borderRadius: "8px", fontWeight: "600" }}
+              >
+                <option value="">Unassigned (General Pool)</option>
+                {agents.map(agent => (
+                  <option key={agent.id} value={agent.id}>{agent.name} ({agent.email})</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="d-flex gap-2">
+              <button 
+                onClick={() => setSelectedLeadForAssign(null)}
+                className="btn btn-light border w-100 py-2 small fw-bold"
+                style={{ borderRadius: "10px" }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleConfirmAssignment}
+                className="btn btn-primary w-100 py-2 small fw-bold text-white"
+                style={{ borderRadius: "10px" }}
+              >
+                Confirm Assignment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
