@@ -20,6 +20,8 @@ export default function RegisterPage() {
     }
   };
 
+  const [showPassword, setShowPassword] = useState(false);
+
   return (
     <div className="min-vh-100 d-flex align-items-center justify-content-center bg-light p-3">
       <div className="card border-0 shadow-lg p-4 w-100" style={{ maxWidth: "400px" }}>
@@ -60,13 +62,23 @@ export default function RegisterPage() {
 
           <div className="mb-3">
             <label className="form-label x-small fw-bold text-secondary uppercase">Password</label>
-            <input 
-              name="password"
-              type="password" 
-              className="form-control form-control-sm bg-light border-0 px-3 py-2" 
-              required
-              placeholder="••••••••" 
-            />
+            <div className="position-relative">
+              <input 
+                name="password"
+                type={showPassword ? "text" : "password"} 
+                className="form-control form-control-sm bg-light border-0 px-3 py-2 pe-5" 
+                required
+                placeholder="••••••••" 
+              />
+              <button
+                type="button"
+                className="btn btn-link position-absolute end-0 top-50 translate-middle-y text-secondary text-decoration-none py-0 px-3"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{ zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" }}
+              >
+                <i className={`bi ${showPassword ? "bi-eye-slash-fill" : "bi-eye-fill"}`} style={{ fontSize: "1.1rem" }}></i>
+              </button>
+            </div>
           </div>
 
           <button 
