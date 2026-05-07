@@ -99,7 +99,7 @@ export default function LeadTimelineChart({ calls }: LeadTimelineChartProps) {
   return (
     <div className="card border-0 shadow-sm mb-4 bg-white" style={{ borderRadius: "16px" }}>
       <div className="card-body p-4">
-        
+
         {/* 1. Dashboard Header Panel */}
         <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
           <div>
@@ -139,10 +139,10 @@ export default function LeadTimelineChart({ calls }: LeadTimelineChartProps) {
         {/* 2. Unified Chronological Bubble Timeline (Now fully filterable!) */}
         <div className="mb-4 bg-light bg-opacity-30 p-3 rounded-4 border border-light">
           <h6 className="fw-bold text-secondary mb-3 x-small text-uppercase tracking-wider">
-            <i className="bi bi-hourglass-split me-1 text-primary"></i> 
+            <i className="bi bi-hourglass-split me-1 text-primary"></i>
             Milestone Sequence Path ({filteredCalls.length} interactions)
           </h6>
-          
+
           {filteredCalls.length === 0 ? (
             <div className="text-center py-4 text-muted small">
               No milestones found inside the selected timeframe filter.
@@ -150,31 +150,31 @@ export default function LeadTimelineChart({ calls }: LeadTimelineChartProps) {
           ) : (
             <div className="position-relative py-3" style={{ overflowX: "auto", overflowY: "hidden", scrollbarWidth: "thin" }}>
               {/* Connector line background */}
-              <div 
-                className="position-absolute start-0 end-0" 
-                style={{ 
-                  height: "3px", 
-                  backgroundColor: "#e2e8f0", 
-                  top: "50%", 
+              <div
+                className="position-absolute start-0 end-0"
+                style={{
+                  height: "3px",
+                  backgroundColor: "#e2e8f0",
+                  top: "50%",
                   transform: "translateY(-50%)",
                   zIndex: 1,
                   minWidth: `${Math.max(100, filteredCalls.length * 140)}px`
                 }}
               ></div>
-              
-              <div 
-                className="d-flex justify-content-between align-items-center position-relative" 
-                style={{ 
-                  zIndex: 2, 
+
+              <div
+                className="d-flex justify-content-between align-items-center position-relative"
+                style={{
+                  zIndex: 2,
                   minWidth: `${Math.max(100, filteredCalls.length * 140)}px`,
-                  padding: "0 30px" 
+                  padding: "0 30px"
                 }}
               >
                 {filteredCalls.map((call, idx) => {
                   const isConnected = call.status === "CONNECTED";
                   const dateStr = new Date(call.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" });
                   const timeStr = new Date(call.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-                  
+
                   return (
                     <div key={call.id} className="text-center d-flex flex-column align-items-center" style={{ width: "110px" }}>
                       {/* DateTime Stamp */}
@@ -184,13 +184,13 @@ export default function LeadTimelineChart({ calls }: LeadTimelineChartProps) {
                       </div>
 
                       {/* Interactive node button */}
-                      <Link 
+                      <Link
                         href={`/admin/calls/${call.id}`}
                         className="rounded-circle d-flex align-items-center justify-content-center border-2 shadow-sm"
-                        style={{ 
-                          width: "38px", 
-                          height: "38px", 
-                          backgroundColor: isConnected ? "rgba(0, 167, 111, 0.12)" : "rgba(220, 53, 69, 0.12)", 
+                        style={{
+                          width: "38px",
+                          height: "38px",
+                          backgroundColor: isConnected ? "rgba(0, 167, 111, 0.12)" : "rgba(220, 53, 69, 0.12)",
                           borderColor: isConnected ? "#00a76f" : "#dc3545",
                           color: isConnected ? "#00a76f" : "#dc3545",
                           transition: "all 0.15s ease",
@@ -219,7 +219,7 @@ export default function LeadTimelineChart({ calls }: LeadTimelineChartProps) {
         {/* 3. Dynamic KPI Filter Cards Row */}
         <div className="row g-3 mb-4">
           <div className="col-12 col-md-6 col-lg-3">
-            <div 
+            <div
               onClick={() => setMetricFilter("both")}
               className={`p-3 rounded-4 border transition-all cursor-pointer ${metricFilter === "both" ? "border-primary bg-primary bg-opacity-5" : "border-light bg-white"}`}
             >
@@ -232,7 +232,7 @@ export default function LeadTimelineChart({ calls }: LeadTimelineChartProps) {
           </div>
 
           <div className="col-12 col-md-6 col-lg-3">
-            <div 
+            <div
               onClick={() => setMetricFilter("score")}
               className={`p-3 rounded-4 border transition-all cursor-pointer ${metricFilter === "score" ? "border-primary bg-primary bg-opacity-5" : "border-light bg-white"}`}
             >
@@ -245,7 +245,7 @@ export default function LeadTimelineChart({ calls }: LeadTimelineChartProps) {
           </div>
 
           <div className="col-12 col-md-6 col-lg-3">
-            <div 
+            <div
               onClick={() => setMetricFilter("duration")}
               className={`p-3 rounded-4 border transition-all cursor-pointer ${metricFilter === "duration" ? "border-primary bg-primary bg-opacity-5" : "border-light bg-white"}`}
             >
@@ -293,13 +293,13 @@ export default function LeadTimelineChart({ calls }: LeadTimelineChartProps) {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#f1f5f9" />
-                <XAxis 
-                  dataKey="name" 
+                <XAxis
+                  dataKey="name"
                   axisLine={false}
                   tickLine={false}
                   tick={{ fill: "#64748b", fontSize: 11, fontWeight: "500" }}
                 />
-                <YAxis 
+                <YAxis
                   axisLine={false}
                   tickLine={false}
                   tick={{ fill: "#64748b", fontSize: 11, fontWeight: "500" }}
@@ -340,7 +340,7 @@ export default function LeadTimelineChart({ calls }: LeadTimelineChartProps) {
                     return null;
                   }}
                 />
-                
+
                 {/* AI Score Path */}
                 {(metricFilter === "both" || metricFilter === "score") && (
                   <Area
@@ -353,7 +353,7 @@ export default function LeadTimelineChart({ calls }: LeadTimelineChartProps) {
                     activeDot={{ r: 6, strokeWidth: 0, fill: "var(--primary-color)" }}
                   />
                 )}
-                
+
                 {/* Call Duration Path */}
                 {(metricFilter === "both" || metricFilter === "duration") && (
                   <Area
@@ -370,6 +370,39 @@ export default function LeadTimelineChart({ calls }: LeadTimelineChartProps) {
             </ResponsiveContainer>
           </div>
         )}
+
+        {/* Sleek helper legend card directly below the graph */}
+        <div className="mt-4 p-3 rounded-3 bg-light bg-opacity-40 border border-light" style={{ fontSize: "12px", borderRadius: "10px" }}>
+          <h6 className="fw-bold text-dark d-flex align-items-center gap-1.5 mb-2" style={{ fontSize: "13px" }}>
+            {/* <i className="bi bi-info-circle-fill text-primary"></i> */}
+            {/* <span>Understanding Graph Metrics:</span> */}
+          </h6>
+          <div className="row g-3">
+            <div className="col-md-6">
+              <div className="d-flex align-items-start gap-2">
+                <span className="fs-6 mt-0.5" style={{ lineHeight: 1 }}>🔵</span>
+                <div>
+                  <strong className="text-dark d-block mb-0.5" style={{ fontSize: "12.5px" }}>Blue Line (Call Duration)</strong>
+                  <span className="text-secondary" style={{ fontSize: "11px", lineHeight: "1.35", display: "block" }}>
+                    Measures length in seconds. Long peaks show detailed negotiation and pitching, while low lines show quick follow-ups.
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-6">
+              <div className="d-flex align-items-start gap-2">
+                <span className="fs-6 mt-0.5" style={{ lineHeight: 1 }}>🟢</span>
+                <div>
+                  <strong className="text-dark d-block mb-0.5" style={{ fontSize: "12.5px" }}>Green Line (AI Quality Score)</strong>
+                  <span className="text-secondary" style={{ fontSize: "11px", lineHeight: "1.35", display: "block" }}>
+                    Measures call success based on AI speech-to-text transcript analysis, positive customer sentiment, and checklist matching.
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );

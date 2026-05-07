@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getAllUsers } from "../../users/actions";
 import LeadAssignWrapper from "./LeadAssignWrapper";
 import LeadTimelineChart from "./LeadTimelineChart";
+import LeadProgressionTimeline from "./LeadProgressionTimeline";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,13 @@ export default async function LeadDetailsPage({ params }: { params: Promise<{ id
         </div>
       </div>
 
+      {/* 1. Lead Status Stage Pipeline at the top (Always displays the 5-stage Lead Lifecycle) */}
+      <LeadProgressionTimeline 
+        leadId={lead.id} 
+        leadStatus={lead.status} 
+        latestCall={null} 
+      />
+
       {/* High-Density Form View Lead Information */}
       <div className="card border-0 shadow-sm mb-4">
         <div className="card-body p-4">
@@ -73,13 +81,13 @@ export default async function LeadDetailsPage({ params }: { params: Promise<{ id
               </div>
             </div>
             <div className="col-md-4 col-lg-3">
-              <div className="p-2 px-3 bg-light rounded-3">
-                <label className="form-label mb-1">Assigned Agent</label>
-                <div className="fw-bold text-primary small d-flex align-items-center gap-1.5">
-                  <i className="bi bi-person-badge-fill"></i>
-                  <span>{assignedAgentName}</span>
-                </div>
-              </div>
+              <LeadAssignWrapper 
+                leadId={id} 
+                currentAssignedTo={lead.assignedTo} 
+                agents={salesAgents} 
+                mode="card" 
+                assignedAgentName={assignedAgentName} 
+              />
             </div>
             <div className="col-md-4 col-lg-3">
               <div className="p-2 px-3 bg-light rounded-3">

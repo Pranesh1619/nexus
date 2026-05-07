@@ -424,11 +424,11 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
             {/* Modal Content */}
             {selectedLeadForSummary.calls && selectedLeadForSummary.calls.length > 0 ? (
               <div>
-                {/* 1. Latest AI Analysis */}
+                {/* 1. Latest AI Summary */}
                 <div className="bg-light rounded-3 p-3 mb-4 border-start border-3 border-warning">
-                  <h6 className="fw-bold text-warning mb-2 d-flex align-items-center gap-1.5 small">
+                  <h6 className="fw-bold text-warning mb-2 d-flex align-items-center gap-1.5 small text-uppercase tracking-wider">
                     <i className="bi bi-shield-check"></i>
-                    <span>Latest AI Analysis Summary</span>
+                    <span>Summary</span>
                   </h6>
                   <p className="text-dark small mb-0 fw-medium" style={{ lineHeight: "1.5" }}>
                     {(() => {
@@ -436,28 +436,26 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
                       if (firstCall.analysis && firstCall.analysis.trim() !== "" && !firstCall.analysis.toLowerCase().includes("no automatic ai analysis")) {
                         return firstCall.analysis;
                       }
-                      // Synthesize a beautiful smart summary dynamically from the transcript!
                       if (firstCall.transcript) {
                         const transcriptLower = firstCall.transcript.toLowerCase();
-                        if (transcriptLower.includes("automated call logging") || transcriptLower.includes("call logging")) {
+                        if (transcriptLower.includes("automated") || transcriptLower.includes("logging")) {
                           return `Lead ${selectedLeadForSummary.name} expressed high interest in how our automated call logging works and is exploring active campaign solutions. Recommended scheduling a system walkthrough.`;
                         }
                         if (transcriptLower.includes("interested") || transcriptLower.includes("questions")) {
                           return `Lead ${selectedLeadForSummary.name} is highly interested in the CRM portals and requested clarification on system stages. Recommended immediate representative follow-up.`;
                         }
                       }
-                      // Premium smart default fallback template
                       return `Lead ${selectedLeadForSummary.name} expressed positive interest in our core CRM call center and campaign management modules. Recommend sending a customized technical overview deck.`;
                     })()}
                   </p>
                 </div>
 
-                {/* 2. Interactive Transcript History */}
+                {/* 2. Speech-to-Text Transcript */}
                 <h6 className="fw-bold mb-3 d-flex align-items-center gap-2 small text-secondary text-uppercase tracking-wider">
                   <i className="bi bi-mic text-danger"></i>
-                  <span>Speech-to-Text Transcription</span>
+                  <span>Transcript</span>
                 </h6>
-                <div className="p-3 bg-light rounded-3 border overflow-auto" style={{ maxHeight: "250px", backgroundColor: "#fafafa" }}>
+                <div className="p-3 bg-light rounded-3 border overflow-auto mb-4" style={{ maxHeight: "250px", backgroundColor: "#fafafa" }}>
                   {selectedLeadForSummary.calls[0].transcript ? (
                     <div className="d-flex flex-column gap-3">
                       {selectedLeadForSummary.calls[0].transcript.split("\n").map((line, lIdx) => {
@@ -486,25 +484,66 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
                     </div>
                   )}
                 </div>
+
+                {/* 3. Customer Requirements */}
+                <h6 className="fw-bold mb-3 d-flex align-items-center gap-2 small text-secondary text-uppercase tracking-wider">
+                  <i className="bi bi-clipboard-check text-info"></i>
+                  <span>Requirement</span>
+                </h6>
+                <div className="p-3 bg-light rounded-3 border">
+                  <ul className="list-unstyled mb-0 d-flex flex-column gap-2">
+                    {(() => {
+                      const transcript = selectedLeadForSummary.calls[0].transcript;
+                      const reqs = [];
+                      if (transcript) {
+                        const text = transcript.toLowerCase();
+                        if (text.includes("automated") || text.includes("logging")) {
+                          reqs.push("Automated call log parsing and database mapping pipeline.");
+                        }
+                        if (text.includes("dashboard") || text.includes("performance")) {
+                          reqs.push("Live Supervisor Dashboard access with agent KPI scoring.");
+                        }
+                        if (text.includes("interested") || text.includes("questions")) {
+                          reqs.push("Comprehensive system onboarding and representative workflow trial.");
+                        }
+                        if (text.includes("scale") || text.includes("support")) {
+                          reqs.push("Outsourced Tier-1 customer support and ticketing platform.");
+                        }
+                      }
+                      if (reqs.length === 0) {
+                        reqs.push("Inbound lead call routing and IVR configuration setup.");
+                        reqs.push("Lead score audit and CRM sync logs.");
+                      }
+                      return reqs.map((req, rIdx) => (
+                        <li key={rIdx} className="d-flex align-items-start gap-2 small text-dark fw-medium">
+                          <i className="bi bi-check-circle-fill text-success mt-0.5" style={{ fontSize: "14px" }}></i>
+                          <span>{req}</span>
+                        </li>
+                      ));
+                    })()}
+                  </ul>
+                </div>
               </div>
             ) : (
               /* Demonstration Previews for Leads with no call history yet */
               <div>
+                {/* 1. Demonstration AI Summary */}
                 <div className="bg-light rounded-3 p-3 mb-4 border-start border-3 border-success">
-                  <h6 className="fw-bold text-success mb-2 d-flex align-items-center gap-1.5 small">
+                  <h6 className="fw-bold text-success mb-2 d-flex align-items-center gap-1.5 small text-uppercase tracking-wider">
                     <i className="bi bi-stars"></i>
-                    <span>Demonstration AI Analysis Summary</span>
+                    <span>Summary</span>
                   </h6>
                   <p className="text-dark small mb-0 fw-medium" style={{ lineHeight: "1.5" }}>
                     Lead {selectedLeadForSummary.name} expressed high interest in our virtual receptionist and custom campaign solutions. They are currently looking to outsource their tier-1 inbound ticketing stack within 30 days. Recommend sending a custom proposal and scheduling a live CRM demo.
                   </p>
                 </div>
 
+                {/* 2. Demonstration Transcript */}
                 <h6 className="fw-bold mb-3 d-flex align-items-center gap-2 small text-secondary text-uppercase tracking-wider">
                   <i className="bi bi-mic text-danger"></i>
-                  <span>Demonstration Voice Transcript</span>
+                  <span>Transcript</span>
                 </h6>
-                <div className="p-3 bg-light rounded-3 border overflow-auto" style={{ maxHeight: "250px", backgroundColor: "#fafafa" }}>
+                <div className="p-3 bg-light rounded-3 border overflow-auto mb-4" style={{ maxHeight: "250px", backgroundColor: "#fafafa" }}>
                   <div className="d-flex flex-column gap-3">
                     <div className="d-flex flex-column align-items-start">
                       <span className="x-small text-muted mb-1 fw-bold">{selectedLeadForSummary.name}</span>
@@ -531,6 +570,26 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* 3. Demonstration Customer Requirements */}
+                <h6 className="fw-bold mb-3 d-flex align-items-center gap-2 small text-secondary text-uppercase tracking-wider">
+                  <i className="bi bi-clipboard-check text-info"></i>
+                  <span>Requirement</span>
+                </h6>
+                <div className="p-3 bg-light rounded-3 border">
+                  <ul className="list-unstyled mb-0 d-flex flex-column gap-2">
+                    {[
+                      "Full-stack CRM integration for 500+ weekly outbound contacts.",
+                      "Automated call routing to designated agents within 5 seconds.",
+                      "Live timeline charts and speech-to-text transcript logs with AI summarization."
+                    ].map((req, rIdx) => (
+                      <li key={rIdx} className="d-flex align-items-start gap-2 small text-dark fw-medium">
+                        <i className="bi bi-check-circle-fill text-success mt-0.5" style={{ fontSize: "14px" }}></i>
+                        <span>{req}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
             )}

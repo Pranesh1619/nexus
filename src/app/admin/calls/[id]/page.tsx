@@ -27,16 +27,16 @@ export default async function CallViewPage({ params }: { params: Promise<{ id: s
         <Link href="/admin/calls" className="btn btn-link text-secondary text-decoration-none p-0 mb-1">
           <i className="bi bi-chevron-left x-small"></i> <span className="x-small fw-bold uppercase">Back to Calls</span>
         </Link>
-        <div className="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-3 mt-3">
+        <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mt-3">
           <h3 className="fw-bold mb-0">{call.lead.name} Call Analysis</h3>
-          <div className="d-flex flex-column flex-sm-row gap-2 w-100 w-sm-auto">
-            <div className="bg-white border rounded-3 px-3 py-2 d-flex align-items-center justify-content-center gap-2 shadow-sm w-100 w-sm-auto">
-              <span className="x-small text-secondary fw-bold">OVERALL AI SCORE:</span>
+          <div className="d-flex align-items-center gap-2">
+            <div className="bg-white border rounded-3 px-3 py-1.5 d-flex align-items-center gap-1.5 shadow-sm">
+              <span className="text-secondary fw-bold" style={{ fontSize: "11px" }}>OVERALL AI SCORE:</span>
               <span className={`fw-bold small ${dynamicOverallScore > 70 ? 'text-success' : 'text-warning'}`}>
                 {dynamicOverallScore}%
               </span>
             </div>
-            <Link href={`/admin/calls/${id}/edit`} className="btn btn-light border px-3 py-2 small fw-bold w-100 w-sm-auto text-center d-flex align-items-center justify-content-center gap-2">
+            <Link href={`/admin/calls/${id}/edit`} className="btn btn-light border px-3 py-1.5 small fw-bold d-flex align-items-center gap-2" style={{ borderRadius: "8px" }}>
               <i className="bi bi-pencil-square text-info"></i><span>Edit Log</span>
             </Link>
           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition, useMemo } from "react";
+import React, { useState, useTransition, useMemo, useEffect } from "react";
 import { assignLeadToUser } from "./actions";
 
 type User = {
@@ -30,6 +30,14 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
   const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
   const [activeDropTarget, setActiveDropTarget] = useState<string | null>(null); // "unassigned" or agent.id
 
+  // Local client state for instant, blistering-fast responsive Drag & Drop (Optimistic UI)
+  const [leadsState, setLeadsState] = useState<Lead[]>(leads);
+
+  // Sync client state instantly if server props change
+  useEffect(() => {
+    setLeadsState(leads);
+  }, [leads]);
+
   // Dropdown-driven lead assignment state variables (highly mobile/touch responsive)
   const [selectedLeadForAssign, setSelectedLeadForAssign] = useState<Lead | null>(null);
   const [selectedTargetAgentId, setSelectedTargetAgentId] = useState<string>("");
@@ -43,11 +51,15 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
     if (!selectedLeadForAssign) return;
     const targetUserId = selectedTargetAgentId === "" ? null : selectedTargetAgentId;
     
+    // Instantly reflect assignment optimistically
+    setLeadsState(prev => prev.map(l => l.id === selectedLeadForAssign.id ? { ...l, assignedTo: targetUserId } : l));
+
     startTransition(async () => {
       try {
         await assignLeadToUser(selectedLeadForAssign.id, targetUserId);
       } catch (error) {
         console.error("Failed to assign:", error);
+        setLeadsState(leads); // Rollback on failure
       } finally {
         setSelectedLeadForAssign(null);
       }
@@ -55,11 +67,15 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
   };
 
   const handleUnassignLead = async (leadId: string) => {
+    // Instantly reflect unassignment optimistically
+    setLeadsState(prev => prev.map(l => l.id === leadId ? { ...l, assignedTo: null } : l));
+
     startTransition(async () => {
       try {
         await assignLeadToUser(leadId, null);
       } catch (error) {
         console.error("Failed to unassign:", error);
+        setLeadsState(leads); // Rollback on failure
       }
     });
   };
@@ -71,8 +87,8 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
 
   // 1. Memoized calculation of unassigned pool
   const unassignedLeads = useMemo(() => {
-    return leads.filter(l => !l.assignedTo);
-  }, [leads]);
+    return leadsState.filter(l => !l.assignedTo);
+  }, [leadsState]);
 
   // 2. Memoized filtered unassigned leads
   const filteredUnassignedLeads = useMemo(() => {
@@ -120,12 +136,16 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
 
     if (!leadId) return;
 
+    // Instantly update client-side state optimistically for responsive drag-and-drop feedback!
+    setLeadsState(prev => prev.map(l => l.id === leadId ? { ...l, assignedTo: targetUserId } : l));
+
     // Immediately trigger drop re-assignment
     startTransition(async () => {
       try {
         await assignLeadToUser(leadId, targetUserId);
       } catch (error) {
         console.error("Failed to assign lead:", error);
+        setLeadsState(leads); // Rollback on error
       } finally {
         setDraggedLeadId(null);
       }
@@ -138,7 +158,7 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
       <div className="row g-4 mb-4">
         {/* Card 1: Unassigned Pool */}
         <div className="col-md-4">
-          <div className="card border-0 shadow-sm p-3 bg-white" style={{ borderRadius: "16px" }}>
+          <div className="card border-0 shadow-sm p-4 bg-white" style={{ borderRadius: "16px" }}>
             <div className="d-flex align-items-center justify-content-between">
               <div>
                 <span className="text-secondary x-small fw-bold uppercase text-uppercase tracking-wider" style={{ fontSize: "11px", letterSpacing: "0.5px" }}>Unassigned Pool</span>
@@ -155,7 +175,7 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
 
         {/* Card 2: Active Sales Agents */}
         <div className="col-md-4">
-          <div className="card border-0 shadow-sm p-3 bg-white" style={{ borderRadius: "16px" }}>
+          <div className="card border-0 shadow-sm p-4 bg-white" style={{ borderRadius: "16px" }}>
             <div className="d-flex align-items-center justify-content-between">
               <div>
                 <span className="text-secondary x-small fw-bold uppercase text-uppercase tracking-wider" style={{ fontSize: "11px", letterSpacing: "0.5px" }}>Active Sales Agents</span>
@@ -172,12 +192,12 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
 
         {/* Card 3: Overall Assigned */}
         <div className="col-md-4">
-          <div className="card border-0 shadow-sm p-3 bg-white" style={{ borderRadius: "16px" }}>
+          <div className="card border-0 shadow-sm p-4 bg-white" style={{ borderRadius: "16px" }}>
             <div className="d-flex align-items-center justify-content-between">
               <div>
                 <span className="text-secondary x-small fw-bold uppercase text-uppercase tracking-wider" style={{ fontSize: "11px", letterSpacing: "0.5px" }}>Overall Assigned</span>
                 <h2 className="fw-bold text-success mb-0 mt-1" style={{ fontSize: "32px", letterSpacing: "-1px" }}>
-                  {leads.filter(l => l.assignedTo).length}
+                  {leadsState.filter(l => l.assignedTo).length}
                 </h2>
               </div>
               <div className="bg-success bg-opacity-10 rounded-circle p-2.5 text-success d-flex align-items-center justify-content-center" style={{ width: "45px", height: "45px" }}>
@@ -191,7 +211,7 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
       {isPending && (
         <div className="alert alert-info py-2 px-3 small d-flex align-items-center gap-2 mb-4 shadow-sm border-0 animate-fade" style={{ borderRadius: "10px" }}>
           <span className="spinner-border spinner-border-sm"></span>
-          <span>Re-assigning lead and re-routing agent logs...</span>
+          <span>Saving pipeline assignment changes...</span>
         </div>
       )}
 
@@ -260,7 +280,12 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
           >
             <div className="card-header bg-transparent border-0 pt-4 px-4 pb-3 d-flex justify-content-between align-items-center">
               <div>
-                <h5 className="fw-bold text-dark mb-0">Unassigned Pool</h5>
+                <h5 className="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                  <span>Unassigned Pool</span>
+                  {isPending && (
+                    <span className="spinner-border spinner-border-sm text-secondary" style={{ width: "13px", height: "13px" }} role="status"></span>
+                  )}
+                </h5>
                 <p className="text-secondary x-small mb-0">Drag leads here to unassign them</p>
               </div>
             </div>
@@ -278,7 +303,7 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
                       key={lead.id}
                       draggable
                       onDragStart={(e) => handleDragStart(e, lead.id)}
-                      className={`card border-0 shadow-sm p-3 bg-white cursor-grab position-relative transition-all ${draggedLeadId === lead.id ? "opacity-40 border border-primary border-dashed" : ""}`}
+                      className={`card shadow-sm p-3 bg-white cursor-grab position-relative transition-all ${draggedLeadId === lead.id ? "border border-primary" : "border-0"}`}
                       style={{
                         borderRadius: "12px",
                         cursor: "grab",
@@ -352,7 +377,7 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
               </div>
             ) : (
               filteredAgents.map((agent) => {
-                const agentLeads = leads.filter(l => l.assignedTo === agent.id);
+                const agentLeads = leadsState.filter(l => l.assignedTo === agent.id);
                 const searchVal = agentLeadsSearch[agent.id] || "";
                 const filteredAgentLeads = agentLeads.filter(lead =>
                   lead.name.toLowerCase().includes(searchVal.toLowerCase()) ||
@@ -390,7 +415,12 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
                             {agent.name.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <h6 className="fw-bold text-dark mb-0">{agent.name}</h6>
+                            <h6 className="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                              <span>{agent.name}</span>
+                              {isPending && (
+                                <span className="spinner-border spinner-border-sm text-success" style={{ width: "13px", height: "13px" }} role="status"></span>
+                              )}
+                            </h6>
                             <span className="text-secondary x-small" style={{ fontSize: "11px" }}>{agent.email}</span>
                           </div>
                         </div>
@@ -413,7 +443,7 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
                                 key={lead.id}
                                 draggable
                                 onDragStart={(e) => handleDragStart(e, lead.id)}
-                                className={`card border-1 shadow-sm p-3 bg-white cursor-grab position-relative border-light hover-shadow ${draggedLeadId === lead.id ? "opacity-40 border border-primary border-dashed" : ""}`}
+                                className={`card shadow-sm p-3 bg-white cursor-grab position-relative hover-shadow ${draggedLeadId === lead.id ? "border border-primary" : "border-light border"}`}
                                 style={{
                                   borderRadius: "12px",
                                   cursor: "grab",
@@ -445,7 +475,7 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
                                       aria-expanded="false"
                                       style={{ width: "auto", height: "auto", padding: "4px" }}
                                     >
-                                      <i className="bi bi-three-dots-vertical" style={{ fontSize: "14px" }}></i>
+                                      <i className="bi bi-three-dots-vertical" style={{ fontSize: "14px",  }}></i>
                                     </button>
                                     <ul className="dropdown-menu dropdown-menu-end shadow border-0" style={{ minWidth: "160px", fontSize: "13px" }}>
                                       <li>
