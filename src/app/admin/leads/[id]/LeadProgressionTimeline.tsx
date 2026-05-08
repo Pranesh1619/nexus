@@ -40,9 +40,9 @@ interface LeadProgressionTimelineProps {
   calls?: { id: string; stage: string; createdAt: string | Date; duration: number | null; status: string; aiScore?: number | null; }[] | null;
 }
 
-export default function LeadProgressionTimeline({ 
-  leadId, 
-  leadStatus, 
+export default function LeadProgressionTimeline({
+  leadId,
+  leadStatus,
   latestCall,
   leadSource = "WEBSITE",
   createdAt,
@@ -71,6 +71,7 @@ export default function LeadProgressionTimeline({
   const maxLeadIndex = getInitialLeadIndex();
 
   const [isUpdating, setIsUpdating] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
   const [showOutcomeModal, setShowOutcomeModal] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [showSympathy, setShowSympathy] = useState(false);
@@ -87,12 +88,12 @@ export default function LeadProgressionTimeline({
   // 3. Update Permanent functions
   const handleUpdateCallStagePermanent = async () => {
     if (!latestCall) return;
-    
+
     if (CALL_STAGES[selectedCallIndex] === "Closed") {
       setShowOutcomeModal(true);
       return;
     }
-    
+
     setIsUpdating(true);
     try {
       await updateCallStage(latestCall.id, CALL_STAGES[selectedCallIndex]);
@@ -111,10 +112,15 @@ export default function LeadProgressionTimeline({
     }
 
     setIsUpdating(true);
+    setSyncStatus("syncing");
     try {
       await updateLeadStatus(leadId, targetStage.id);
+      setSyncStatus("success");
+      setTimeout(() => setSyncStatus("idle"), 3000);
     } catch (error) {
       console.error("Failed to update lead status:", error);
+      setSyncStatus("error");
+      setTimeout(() => setSyncStatus("idle"), 3000);
     } finally {
       setIsUpdating(false);
     }
@@ -128,19 +134,25 @@ export default function LeadProgressionTimeline({
     } else {
       setShowSympathy(true);
     }
-    
+
     setIsUpdating(true);
     setTimeout(async () => {
+      // Hide celebration/sympathy and show sync modal
+      setShowCelebration(false);
+      setShowSympathy(false);
+      setSyncStatus("syncing");
       try {
         if (hasCall && latestCall) {
           await updateCallStage(latestCall.id, "Closed", finalOutcome);
         } else {
           await updateLeadStatus(leadId, finalOutcome);
         }
-        setShowCelebration(false);
-        setShowSympathy(false);
+        setSyncStatus("success");
+        setTimeout(() => setSyncStatus("idle"), 3000);
       } catch (error) {
         console.error("Failed to update closed status:", error);
+        setSyncStatus("error");
+        setTimeout(() => setSyncStatus("idle"), 3000);
       } finally {
         setIsUpdating(false);
       }
@@ -222,7 +234,7 @@ export default function LeadProgressionTimeline({
       {showOutcomeModal && (
         <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center animate-fade" style={{ zIndex: 1050, backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(6px)" }}>
           <div className="card border-0 shadow-lg p-4 bg-white position-relative" style={{ maxWidth: "420px", width: "90%", borderRadius: "16px" }}>
-            <button 
+            <button
               onClick={() => setShowOutcomeModal(false)}
               className="position-absolute border-0 bg-transparent text-secondary p-1"
               style={{ top: "16px", right: "16px", outline: "none", cursor: "pointer" }}
@@ -235,16 +247,16 @@ export default function LeadProgressionTimeline({
               <div className="display-4 mb-2">🤝</div>
               <h5 className="fw-bold text-dark">Close Lead Outcome</h5>
               <p className="text-secondary small mb-4">Please select the final outcome of this sales interaction to proceed.</p>
-              
+
               <div className="d-flex gap-3 justify-content-center">
-                <button 
+                <button
                   onClick={() => handleConfirmOutcome("WON")}
                   className="btn btn-success px-4 py-2 fw-bold d-flex align-items-center gap-2"
                   style={{ borderRadius: "50px" }}
                 >
                   🏆 Deal Won
                 </button>
-                <button 
+                <button
                   onClick={() => handleConfirmOutcome("LOST")}
                   className="btn btn-outline-danger px-4 py-2 fw-bold d-flex align-items-center gap-2"
                   style={{ borderRadius: "50px" }}
@@ -266,22 +278,22 @@ export default function LeadProgressionTimeline({
             const color = ["#00A76F", "#ffc107", "#0d6efd", "#e91e63", "#9c27b0"][Math.floor(Math.random() * 5)];
             const size = Math.random() * 8 + 6;
             return (
-              <div 
-                key={idx} 
-                className="confetti-particle" 
-                style={{ 
-                  left: `${left}%`, 
-                  animationDelay: `${delay}s`, 
+              <div
+                key={idx}
+                className="confetti-particle"
+                style={{
+                  left: `${left}%`,
+                  animationDelay: `${delay}s`,
                   backgroundColor: color,
                   width: `${size}px`,
                   height: `${size}px`
-                }} 
+                }}
               />
             );
           })}
-          
+
           <div className="card border-0 shadow-lg p-5 bg-white text-center animate-fade position-relative" style={{ maxWidth: "450px", width: "90%", borderRadius: "20px" }}>
-            <button 
+            <button
               onClick={() => setShowCelebration(false)}
               className="position-absolute border-0 bg-transparent text-secondary p-1"
               style={{ top: "16px", right: "16px", outline: "none", cursor: "pointer" }}
@@ -302,7 +314,7 @@ export default function LeadProgressionTimeline({
       {showSympathy && (
         <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center text-center animate-fade" style={{ zIndex: 9999, backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(10px)" }}>
           <div className="card border-0 shadow-lg p-5 bg-white text-center animate-fade position-relative" style={{ maxWidth: "450px", width: "90%", borderRadius: "20px" }}>
-            <button 
+            <button
               onClick={() => setShowSympathy(false)}
               className="position-absolute border-0 bg-transparent text-secondary p-1"
               style={{ top: "16px", right: "16px", outline: "none", cursor: "pointer" }}
@@ -336,7 +348,7 @@ export default function LeadProgressionTimeline({
           </div>
           {hasCall ? (
             selectedCallIndex !== maxCallIndex && (
-              <button 
+              <button
                 onClick={handleUpdateCallStagePermanent}
                 disabled={isUpdating}
                 className="btn btn-sm btn-outline-primary px-3 py-1.5 x-small fw-bold"
@@ -347,7 +359,7 @@ export default function LeadProgressionTimeline({
             )
           ) : (
             selectedLeadIndex !== maxLeadIndex && (
-              <button 
+              <button
                 onClick={handleUpdateLeadStagePermanent}
                 disabled={isUpdating}
                 className="btn btn-sm btn-outline-primary px-3 py-1.5 x-small fw-bold"
@@ -358,31 +370,31 @@ export default function LeadProgressionTimeline({
             )
           )}
         </div>
-        
+
         <div className="p-4 p-md-5 overflow-auto">
           <div className="position-relative pb-4" style={{ minWidth: hasCall ? "900px" : "auto" }}>
             {/* The Horizontal Path */}
             <div className="progress position-absolute w-100" style={{ height: "2px", top: "28px", backgroundColor: "#f0f0f0" }}>
-              <div 
-                className="progress-bar bg-success" 
-                role="progressbar" 
-                style={{ 
+              <div
+                className="progress-bar bg-success"
+                role="progressbar"
+                style={{
                   width: `${hasCall ? (maxCallIndex / (CALL_STAGES.length - 1)) * 100 : (maxLeadIndex / (LEAD_STAGES.length - 1)) * 100}%`,
                   transition: 'width 0.5s ease-in-out'
                 }}
               ></div>
             </div>
-            
+
             {/* Bubble Steps */}
             <div className="d-flex justify-content-between position-relative z-1">
               {hasCall ? (
                 CALL_STAGES.map((stage, index) => {
                   const isReached = index <= maxCallIndex;
                   const isSelected = index === selectedCallIndex;
-                  
+
                   return (
                     <div key={stage} className="text-center" style={{ width: "60px" }}>
-                      <div 
+                      <div
                         onClick={() => handleCallStageClick(index)}
                         className={`bubble-step ${isSelected ? 'active' : ''} ${isReached ? 'reached' : ''}`}
                       >
@@ -402,10 +414,10 @@ export default function LeadProgressionTimeline({
                 LEAD_STAGES.map((stage, index) => {
                   const isReached = index <= maxLeadIndex;
                   const isSelected = index === selectedLeadIndex;
-                  
+
                   return (
                     <div key={stage.id} className="text-center" style={{ width: "100px" }}>
-                      <div 
+                      <div
                         onClick={() => handleLeadStageClick(index)}
                         className={`bubble-step ${isSelected ? 'active' : ''} ${isReached ? 'reached' : ''}`}
                       >
@@ -476,6 +488,52 @@ export default function LeadProgressionTimeline({
           </div>
         )}
       </div>
+
+      {/* Zoho Sync Status Modal */}
+      {syncStatus !== "idle" && (
+        <div
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          style={{ backgroundColor: "rgba(15,23,42,0.5)", backdropFilter: "blur(8px)", zIndex: 1070 }}
+        >
+          <div
+            className="card border-0 shadow-lg p-5 bg-white text-center"
+            style={{ maxWidth: "380px", width: "90%", borderRadius: "24px" }}
+          >
+            {syncStatus === "syncing" && (
+              <div className="d-flex flex-column align-items-center justify-content-center py-2">
+                <div className="spinner-border text-primary mb-4" role="status" style={{ width: "3.5rem", height: "3.5rem", borderWidth: "4px" }}>
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+                <h5 className="fw-bold text-dark mb-1">Syncing with Zoho CRM</h5>
+                <p className="text-secondary small mb-0">Updating lead lifecycle status across your CRM...</p>
+              </div>
+            )}
+            {syncStatus === "success" && (
+              <>
+                <div className="d-flex justify-content-center mb-3">
+                  <div className="rounded-circle bg-success bg-opacity-10 d-flex align-items-center justify-content-center" style={{ width: "72px", height: "72px" }}>
+                    <i className="bi bi-check-circle-fill text-success" style={{ fontSize: "2.5rem" }}></i>
+                  </div>
+                </div>
+                <h5 className="fw-bold text-dark mb-1">Sync Successful!</h5>
+                <p className="text-secondary small mb-0">Lead status has been updated in Zoho CRM.</p>
+              </>
+            )}
+            {syncStatus === "error" && (
+              <>
+                <div className="d-flex justify-content-center mb-3">
+                  <div className="rounded-circle bg-danger bg-opacity-10 d-flex align-items-center justify-content-center" style={{ width: "72px", height: "72px" }}>
+                    <i className="bi bi-exclamation-triangle-fill text-danger" style={{ fontSize: "2.5rem" }}></i>
+                  </div>
+                </div>
+                <h5 className="fw-bold text-dark mb-1">Sync Failed</h5>
+                <p className="text-secondary small mb-3">Could not sync with Zoho CRM. Check your credentials.</p>
+                <button onClick={() => setSyncStatus("idle")} className="btn btn-danger w-100 fw-bold" style={{ borderRadius: "12px" }}>Close</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         .bubble-step {

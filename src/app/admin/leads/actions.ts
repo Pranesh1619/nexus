@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { syncWithZoho, updateZohoLeadStatus } from "@/lib/zoho";
 
 export async function getLeads(userId?: string) {
   if (userId) {
@@ -57,10 +58,18 @@ export async function deleteLead(id: string) {
 }
 
 export async function updateLeadStatus(id: string, status: string) {
-  await prisma.lead.update({
+  const lead = await prisma.lead.update({
     where: { id },
     data: { status },
   });
+
+  if (lead && lead.phone) {
+    try {
+      await updateZohoLeadStatus(lead.phone, status);
+    } catch (e) {
+      console.error("[ZOHO SYNC] Error syncing lead status:", e);
+    }
+  }
 
   revalidatePath("/admin/leads");
 }
@@ -84,7 +93,7 @@ export async function updateLead(id: string, formData: FormData) {
   const source = formData.get("source") as string;
   const status = formData.get("status") as string;
 
-  await prisma.lead.update({
+  const lead = await prisma.lead.update({
     where: { id },
     data: {
       name,
@@ -96,6 +105,21 @@ export async function updateLead(id: string, formData: FormData) {
     },
   });
 
+  if (lead && lead.phone) {
+    try {
+      await updateZohoLeadStatus(lead.phone, status);
+    } catch (e) {
+      console.error("[ZOHO SYNC] Error syncing lead status during full update:", e);
+    }
+  }
+
   revalidatePath("/admin/leads");
   revalidatePath(`/admin/leads/${id}`);
+}
+
+export async function triggerZohoSync() {
+  const result = await syncWithZoho();
+  revalidatePath("/admin/leads");
+  revalidatePath("/admin/agents");
+  return result;
 }

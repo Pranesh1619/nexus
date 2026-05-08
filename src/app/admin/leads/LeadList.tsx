@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { deleteLead } from "./actions";
+import { deleteLead, triggerZohoSync } from "./actions";
 import StatusModal from "@/components/StatusModal";
 
 interface CallLog {
@@ -57,11 +57,44 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedLeadForSummary, setSelectedLeadForSummary] = useState<Lead | null>(null);
 
+  // Zoho Sync States
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncResult, setSyncResult] = useState<{
+    success: boolean;
+    logs: string[];
+    importedCount: number;
+    skippedCount: number;
+    exportedCount: number;
+  } | null>(null);
+
   // 1. Delete handler
   const handleDelete = async () => {
     if (deleteId) {
       await deleteLead(deleteId);
       setDeleteId(null);
+    }
+  };
+
+  // 1b. Zoho Sync Handler
+  const handleZohoSync = async () => {
+    setIsSyncing(true);
+    setSyncResult(null);
+    setShowSyncModal(true);
+    try {
+      const res = await triggerZohoSync();
+      setSyncResult(res);
+    } catch (err) {
+      console.error("[ZOHO SYNC] Error running Zoho migration:", err);
+      setSyncResult({
+        success: false,
+        logs: ["[SYSTEM] Starting sync...", "[ERROR] Unhandled connection error. Please verify database URL and network state."],
+        importedCount: 0,
+        skippedCount: 0,
+        exportedCount: 0,
+      });
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -152,6 +185,56 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
   return (
     <div className="d-flex flex-column gap-3 animate-fade">
       
+      {/* Page Header with Actions */}
+      <div className="d-flex justify-content-between align-items-center mb-1">
+        <div>
+          <h2 className="fw-bold mb-1" style={{ fontSize: "28px" }}>Leads Management</h2>
+          <p className="text-secondary small mb-0">Track and manage your potential customers.</p>
+        </div>
+        <div className="d-flex align-items-center gap-2">
+          <button 
+            onClick={handleZohoSync}
+            disabled={isSyncing}
+            className="btn btn-primary d-flex align-items-center gap-1.5 px-3.5 fw-bold shadow-sm"
+            style={{ 
+              borderRadius: "8px", 
+              backgroundColor: "#10b981", 
+              borderColor: "#10b981",
+              fontSize: "13.5px",
+              height: "38px"
+            }}
+          >
+            {isSyncing ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-1.5" role="status" aria-hidden="true" style={{ width: "12px", height: "12px" }}></span>
+                <span>Syncing...</span>
+              </>
+            ) : (
+              <>
+                <i className="bi bi-cloud-lightning-fill me-1.5"></i>
+                <span>Migrate CRM</span>
+              </>
+            )}
+          </button>
+          
+          <Link 
+            href="/admin/leads/new" 
+            className="btn btn-success d-flex align-items-center gap-1.5 px-3.5 fw-bold shadow-sm text-decoration-none"
+            style={{ 
+              borderRadius: "8px", 
+              backgroundColor: "#00a76f", 
+              borderColor: "#00a76f",
+              fontSize: "13.5px",
+              height: "38px",
+              color: "#fff"
+            }}
+          >
+            <i className="bi bi-plus-lg"></i>
+            <span>Add Lead</span>
+          </Link>
+        </div>
+      </div>
+      
       {/* Search, Segment, Agent Filters Bar */}
       <div className="card border-0 shadow-sm p-3 bg-white" style={{ overflow: "hidden" }}>
         <div className="d-flex align-items-center justify-content-between gap-3 flex-nowrap" style={{ overflowX: "auto", width: "100%" }}>
@@ -200,6 +283,7 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
             <button 
               onClick={() => setShowImportModal(true)}
               className="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1.5 px-3 fw-semibold"
+              style={{ borderRadius: "8px" }}
             >
               <i className="bi bi-file-earmark-arrow-up"></i>
               Import CSV
@@ -208,6 +292,7 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
               onClick={handleExportCSV}
               disabled={leads.length === 0}
               className="btn btn-sm btn-outline-primary d-flex align-items-center gap-1.5 px-3 fw-semibold"
+              style={{ borderRadius: "8px" }}
             >
               <i className="bi bi-file-earmark-arrow-down"></i>
               Export CSV
@@ -579,6 +664,130 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
                 style={{ borderRadius: "10px" }}
               >
                 Close Transcript
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Zoho Sync Console Terminal Modal */}
+      {showSyncModal && (
+        <div 
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center animate-fade" 
+          style={{ 
+            zIndex: 9999, 
+            backgroundColor: "rgba(15, 23, 42, 0.5)", 
+            backdropFilter: "blur(6px)" 
+          }}
+        >
+          <div className="card border-0 shadow-lg p-4 bg-white text-dark" style={{ maxWidth: "700px", width: "95%", borderRadius: "20px" }}>
+            <div className="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+              <div className="d-flex align-items-center gap-2">
+                <div className="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center animate-bounce" style={{ width: 40, height: 40 }}>
+                  <i className="bi bi-cloud-lightning-fill fs-5"></i>
+                </div>
+                <div>
+                  <h5 className="fw-bold mb-0">Zoho CRM Sync Control Panel</h5>
+                  <span className="text-secondary x-small">Two-way migration, duplication filtering, and state locks.</span>
+                </div>
+              </div>
+              {!isSyncing && (
+                <button 
+                  onClick={() => setShowSyncModal(false)} 
+                  className="btn-close"
+                  style={{ outline: "none" }}
+                ></button>
+              )}
+            </div>
+
+            {/* Sync Progress Statistics Row */}
+            <div className="row g-3 mb-3">
+              <div className="col-4">
+                <div className="bg-light p-3 rounded-3 text-center border">
+                  <span className="x-small text-secondary text-uppercase fw-bold block" style={{ fontSize: "10px", letterSpacing: "0.3px" }}>Imported (Unique)</span>
+                  <h3 className="fw-bold text-success mb-0 mt-1">
+                    {isSyncing ? "..." : syncResult?.importedCount ?? 0}
+                  </h3>
+                </div>
+              </div>
+              <div className="col-4">
+                <div className="bg-light p-3 rounded-3 text-center border">
+                  <span className="x-small text-secondary text-uppercase fw-bold block" style={{ fontSize: "10px", letterSpacing: "0.3px" }}>Skipped (Duplicates)</span>
+                  <h3 className="fw-bold text-warning mb-0 mt-1">
+                    {isSyncing ? "..." : syncResult?.skippedCount ?? 0}
+                  </h3>
+                </div>
+              </div>
+              <div className="col-4">
+                <div className="bg-light p-3 rounded-3 text-center border">
+                  <span className="x-small text-secondary text-uppercase fw-bold block" style={{ fontSize: "10px", letterSpacing: "0.3px" }}>Exported to Zoho</span>
+                  <h3 className="fw-bold text-primary mb-0 mt-1">
+                    {isSyncing ? "..." : syncResult?.exportedCount ?? 0}
+                  </h3>
+                </div>
+              </div>
+            </div>
+
+            {/* Terminal Console Logs Area */}
+            <h6 className="small fw-bold text-secondary text-uppercase mb-2 d-flex align-items-center gap-2">
+              <i className="bi bi-terminal-fill text-dark"></i>
+              <span>Live Sync Engine Terminal</span>
+              {isSyncing && <span className="spinner-grow spinner-grow-sm text-primary" role="status"></span>}
+            </h6>
+            
+            <div 
+              className="p-3 font-monospace rounded-3 text-start mb-4 shadow-inner" 
+              style={{ 
+                height: "240px", 
+                backgroundColor: "#0d1117", 
+                color: "#c9d1d9", 
+                overflowY: "auto",
+                fontSize: "12px",
+                lineHeight: "1.6",
+                border: "1px solid #30363d"
+              }}
+            >
+              {isSyncing && (
+                <div className="text-info animate-pulse mb-2">
+                  [SYSTEM] Communicating with external Zoho servers... Connecting...
+                </div>
+              )}
+              {syncResult ? (
+                syncResult.logs.map((log, idx) => {
+                  let color = "#c9d1d9";
+                  if (log.startsWith("[IMPORT]")) color = "#4caf50";
+                  else if (log.startsWith("[CHECK]")) color = "#ffeb3b";
+                  else if (log.startsWith("[SKIP]")) color = "#ff9800";
+                  else if (log.startsWith("[EXPORT]")) color = "#2196f3";
+                  else if (log.startsWith("[ERROR]")) color = "#f44336";
+                  else if (log.startsWith("[SYSTEM]")) color = "#00bcd4";
+                  
+                  return (
+                    <div key={idx} style={{ color }}>
+                      {log}
+                    </div>
+                  );
+                })
+              ) : (
+                isSyncing && <div className="text-secondary">[PENDING] Fetching records...</div>
+              )}
+            </div>
+
+            <div className="border-top pt-3 d-flex justify-content-between align-items-center">
+              <span className="x-small text-secondary d-flex align-items-center gap-1.5 fw-semibold">
+                <span className={`rounded-circle ${isSyncing ? 'bg-warning animate-pulse' : 'bg-success'}`} style={{ width: "8px", height: "8px", display: "inline-block" }}></span>
+                {isSyncing ? "Migration in progress..." : "Database is fully in-sync with Zoho CRM"}
+              </span>
+              <button 
+                onClick={() => {
+                  setShowSyncModal(false);
+                  router.refresh();
+                }}
+                disabled={isSyncing}
+                className="btn btn-primary px-4 py-2 small fw-bold"
+                style={{ borderRadius: "10px" }}
+              >
+                Close & Refresh
               </button>
             </div>
           </div>
