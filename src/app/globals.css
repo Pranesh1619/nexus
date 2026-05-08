@@ -43,6 +43,14 @@ body {
   padding: 24px 16px;
   display: flex;
   flex-direction: column;
+  overflow-y: auto; /* Enable vertical scroll inside sidebar on short screens */
+  -ms-overflow-style: none;  /* Hide scrollbar for IE and Edge */
+  scrollbar-width: none;  /* Hide scrollbar for Firefox */
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.sidebar::-webkit-scrollbar {
+  display: none;
 }
 
 .sidebar-logo {
@@ -157,6 +165,7 @@ body {
   margin-left: var(--sidebar-width);
   padding: calc(var(--header-height) + 24px) 32px 32px;
   min-height: 100vh;
+  overflow-x: hidden; /* Prevent horizontal scrollbars */
 }
 
 .page-container {
@@ -353,18 +362,7 @@ button.rounded-pill {
   border-color: var(--secondary-color) !important;
 }
 
-/* Map Bootstrap blue utilities to our beautiful Emerald Green design color */
-.text-primary {
-  color: var(--primary-color) !important;
-}
 
-.bg-primary {
-  background-color: var(--primary-color) !important;
-}
-
-.border-primary {
-  border-color: var(--primary-color) !important;
-}
 
 /* Skeleton Loaders Animation */
 .skeleton-box {
@@ -730,4 +728,13 @@ button:focus,
 .form-check-input:focus {
   box-shadow: none !important;
   outline: none !important;
+}
+
+/* Hide horizontal and vertical scrollbars in all responsive tables while preserving scrolling function */
+.table-responsive {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+.table-responsive::-webkit-scrollbar {
+  display: none; /* Safari and Chrome */
 }

@@ -46,6 +46,10 @@ export default async function LeadDetailsPage({ params }: { params: Promise<{ id
         leadId={lead.id} 
         leadStatus={lead.status} 
         latestCall={null} 
+        leadSource={lead.source || "WEBSITE"}
+        createdAt={lead.createdAt}
+        updatedAt={lead.updatedAt}
+        calls={lead.calls}
       />
 
       {/* High-Density Form View Lead Information */}

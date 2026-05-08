@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition, useMemo, useEffect } from "react";
+import React, { useState, useTransition, useMemo, useEffect, useRef } from "react";
 import { assignLeadToUser } from "./actions";
 
 type User = {
@@ -27,6 +27,18 @@ interface SalesFloorWorkspaceProps {
 
 export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspaceProps) {
   const [isPending, startTransition] = useTransition();
+  const agentsContainerRef = useRef<HTMLDivElement>(null);
+
+  const scrollAgents = (direction: "left" | "right") => {
+    if (agentsContainerRef.current) {
+      const scrollAmount = direction === "left" ? -400 : 400;
+      agentsContainerRef.current.scrollBy({
+        left: scrollAmount,
+        behavior: "smooth"
+      });
+    }
+  };
+
   const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
   const [activeDropTarget, setActiveDropTarget] = useState<string | null>(null); // "unassigned" or agent.id
 
@@ -245,7 +257,29 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
               <i className="bi bi-people text-primary"></i>
               <span>Sales Users</span>
             </h4>
-            <span className="text-secondary small fw-bold">{filteredAgents.length} Active Agents</span>
+            <span className="text-secondary small fw-bold d-flex align-items-center gap-2">
+              <span>{filteredAgents.length} Active Agents</span>
+              <span className="d-flex gap-1 ms-1">
+                <button
+                  type="button"
+                  onClick={() => scrollAgents("left")}
+                  className="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center p-0 hover-shadow"
+                  style={{ width: "24px", height: "24px", borderRadius: "50%", border: "1px solid #ddd" }}
+                  title="Scroll Left"
+                >
+                  <i className="bi bi-chevron-left" style={{ fontSize: "11px" }}></i>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scrollAgents("right")}
+                  className="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center p-0 hover-shadow"
+                  style={{ width: "24px", height: "24px", borderRadius: "50%", border: "1px solid #ddd" }}
+                  title="Scroll Right"
+                >
+                  <i className="bi bi-chevron-right" style={{ fontSize: "11px" }}></i>
+                </button>
+              </span>
+            </span>
           </div>
           <div className="search-box w-100 m-0 d-none d-md-flex" style={{ height: "42px" }}>
             <i className="bi bi-search text-secondary"></i>
@@ -358,6 +392,7 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
         {/* Column 2 & 3: Active Sales Agents Columns (Horizontal Scroll with exactly two columns per row) */}
         <div className="col-lg-8">
           <div
+            ref={agentsContainerRef}
             className="d-flex flex-row flex-nowrap overflow-auto pb-2"
             style={{
               overflowX: "auto",

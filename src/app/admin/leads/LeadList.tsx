@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { deleteLead } from "./actions";
 import StatusModal from "@/components/StatusModal";
 
@@ -26,6 +27,10 @@ interface Lead {
   status: string;
   source: string | null;
   calls?: CallLog[];
+  salesPerson?: {
+    id: string;
+    name: string;
+  } | null;
 }
 
 // Generates a consistent AI score based on lead ID
@@ -44,9 +49,11 @@ function getLeadTags(id: string, source: string | null) {
 }
 
 export default function LeadList({ leads }: { leads: Lead[] }) {
+  const router = useRouter();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSegment, setSelectedSegment] = useState<"all" | "high" | "new" | "enterprise">("all");
+  const [selectedAgentId, setSelectedAgentId] = useState<string>("all");
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedLeadForSummary, setSelectedLeadForSummary] = useState<Lead | null>(null);
 
@@ -95,7 +102,18 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
     document.body.removeChild(link);
   };
 
-  // 3. Process segments, search terms and tags
+  // Dynamically extract unique agents from leads list
+  const agentsList = useMemo(() => {
+    const agentsMap = new Map();
+    leads.forEach(lead => {
+      if (lead.salesPerson) {
+        agentsMap.set(lead.salesPerson.id, lead.salesPerson.name);
+      }
+    });
+    return Array.from(agentsMap.entries()).map(([id, name]) => ({ id, name }));
+  }, [leads]);
+
+  // 3. Process segments, search terms, agent filters and tags
   const filteredLeads = useMemo(() => {
     return leads.filter(lead => {
       // Search text match
@@ -112,27 +130,33 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
       const tags = getLeadTags(lead.id, lead.source);
       
       if (selectedSegment === "high") {
-        return score >= 85;
+        if (score < 85) return false;
       }
       if (selectedSegment === "new") {
-        return lead.status === "NEW";
+        if (lead.status !== "NEW") return false;
       }
       if (selectedSegment === "enterprise") {
-        return tags.includes("Enterprise") || (lead.company && lead.company.toLowerCase().includes("corp"));
+        const isEnterprise = tags.includes("Enterprise") || (lead.company && lead.company.toLowerCase().includes("corp"));
+        if (!isEnterprise) return false;
+      }
+
+      // Agent filters
+      if (selectedAgentId !== "all" && lead.salesPerson?.id !== selectedAgentId) {
+        return false;
       }
 
       return true;
     });
-  }, [leads, searchTerm, selectedSegment]);
+  }, [leads, searchTerm, selectedSegment, selectedAgentId]);
 
   return (
-    <div className="d-flex flex-column gap-3">
+    <div className="d-flex flex-column gap-3 animate-fade">
       
-      {/* Search, Segment and Action Buttons Bar */}
+      {/* Search, Segment, Agent Filters Bar */}
       <div className="card border-0 shadow-sm p-3 bg-white" style={{ overflow: "hidden" }}>
         <div className="d-flex align-items-center justify-content-between gap-3 flex-nowrap" style={{ overflowX: "auto", width: "100%" }}>
           
-          {/* Left Side: Search & Labeled Dropdown */}
+          {/* Left Side: Search & Filter Dropdowns (No Labels) */}
           <div className="d-flex align-items-center gap-3 flex-shrink-0">
             <div className="search-box m-0" style={{ width: "280px" }}>
               <i className="bi bi-search text-secondary"></i>
@@ -144,21 +168,31 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
               />
             </div>
 
-            <div className="d-flex align-items-center gap-2 flex-shrink-0">
-              <label className="text-secondary fw-semibold small mb-0 flex-shrink-0" htmlFor="leadSegmentSelect">Lead Segment:</label>
-              <select 
-                id="leadSegmentSelect"
-                value={selectedSegment}
-                onChange={(e) => setSelectedSegment(e.target.value as any)}
-                className="form-select form-select-sm border cursor-pointer"
-                style={{ width: "180px", borderRadius: "50px", height: "36px", paddingLeft: "15px", paddingRight: "30px", fontWeight: "600" }}
-              >
-                <option value="all">All Contacts</option>
-                <option value="high">High Potential (85+)</option>
-                <option value="new">New Enquiries</option>
-                <option value="enterprise">Enterprise Tier</option>
-              </select>
-            </div>
+            {/* Segment Dropdown - No Label */}
+            <select 
+              value={selectedSegment}
+              onChange={(e) => setSelectedSegment(e.target.value as any)}
+              className="form-select form-select-sm border cursor-pointer"
+              style={{ width: "160px", borderRadius: "50px", height: "36px", paddingLeft: "15px", paddingRight: "30px", fontWeight: "600" }}
+            >
+              <option value="all">All Contacts</option>
+              <option value="high">High Potential (85+)</option>
+              <option value="new">New Enquiries</option>
+              <option value="enterprise">Enterprise Tier</option>
+            </select>
+
+            {/* Agent Dropdown - No Label */}
+            <select 
+              value={selectedAgentId}
+              onChange={(e) => setSelectedAgentId(e.target.value)}
+              className="form-select form-select-sm border cursor-pointer"
+              style={{ width: "160px", borderRadius: "50px", height: "36px", paddingLeft: "15px", paddingRight: "30px", fontWeight: "600" }}
+            >
+              <option value="all">All Agents</option>
+              {agentsList.map(agent => (
+                <option key={agent.id} value={agent.id}>{agent.name}</option>
+              ))}
+            </select>
           </div>
 
           {/* Right Side: Action Buttons */}
@@ -213,8 +247,8 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
                   const isWon = lead.status === 'CLOSED_WON' || lead.status === 'WON';
                   const isLost = lead.status === 'CLOSED_LOST' || lead.status === 'LOST';
 
-                  // Dynamic pill colors match Screenshot 2
-                  let pillBg = "rgba(0, 167, 111, 0.1)";
+                  // Dynamic pill colors with standard opacity and text contrast
+                  let pillBg = "rgba(0, 167, 111, 0.12)";
                   let pillColor = "#00a76f";
                   let displayStatus = lead.status;
 
@@ -226,14 +260,23 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
                     pillBg = "rgba(220, 53, 69, 0.12)";
                     pillColor = "#dc3545";
                     displayStatus = "LOST";
-                  } else if (lead.status === "NEW") {
-                    pillBg = "rgba(0, 167, 111, 0.12)";
-                    pillColor = "#00a76f";
-                    displayStatus = "NEW";
+                  } else if (lead.status === "QUALIFIED" || lead.status === "Qualified") {
+                    pillBg = "rgba(13, 110, 253, 0.12)";
+                    pillColor = "#0d6efd";
+                    displayStatus = "QUALIFIED";
+                  } else if (lead.status === "CONTACTED" || lead.status === "Contacted") {
+                    pillBg = "rgba(23, 162, 184, 0.12)";
+                    pillColor = "#17a2b8";
+                    displayStatus = "CONTACTED";
                   }
 
                   return (
-                    <tr key={lead.id}>
+                    <tr 
+                      key={lead.id}
+                      onClick={() => router.push(`/admin/leads/${lead.id}`)}
+                      className="cursor-pointer"
+                      style={{ cursor: "pointer", transition: "all 0.15s ease" }}
+                    >
                       <td className="small text-secondary" style={{ padding: "12px 16px" }}>{index + 1}</td>
                       <td style={{ padding: "12px 16px" }}>
                         <div>
@@ -249,7 +292,6 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
                       </td>
                       <td style={{ padding: "12px 16px" }}>
                         <div className="fw-bold text-dark d-flex align-items-center gap-1.5" style={{ fontSize: "14px" }}>
-                          {/* <span style={{ color: "#ffb400" }}>★</span> */}
                           <span>{aiScore}%</span>
                         </div>
                       </td>
@@ -260,8 +302,11 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
                       </td>
                       <td style={{ padding: "12px 16px" }}>
                         <button
-                          onClick={() => setSelectedLeadForSummary(lead)}
-                          className="btn btn-sm border-0 px-3 py-1.5 text-warning d-flex align-items-center gap-1.5"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedLeadForSummary(lead);
+                          }}
+                          className="btn btn-sm border-0 px-3 py-1.5 text-warning d-flex align-items-center gap-1.5 animate-pulse"
                           style={{ 
                             borderRadius: "8px", 
                             backgroundColor: "rgba(255, 180, 0, 0.1)", 
@@ -277,17 +322,35 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
                       </td>
                       <td className="text-end" style={{ padding: "12px 16px" }}>
                         <div className="d-flex justify-content-end align-items-center gap-2">
-                          <Link href={`/admin/calls/new?leadId=${lead.id}`} className="btn btn-sm btn-light border-0 text-success" title="Call">
+                          <Link 
+                            href={`/admin/calls/new?leadId=${lead.id}`} 
+                            onClick={(e) => e.stopPropagation()}
+                            className="btn btn-sm btn-light border-0 text-success" 
+                            title="Call"
+                          >
                             <i className="bi bi-telephone-fill"></i>
                           </Link>
-                          <Link href={`/admin/leads/${lead.id}`} className="btn btn-sm btn-light border-0 text-primary" title="View">
+                          <Link 
+                            href={`/admin/leads/${lead.id}`} 
+                            onClick={(e) => e.stopPropagation()}
+                            className="btn btn-sm btn-light border-0 text-primary" 
+                            title="View"
+                          >
                             <i className="bi bi-eye"></i>
                           </Link>
-                          <Link href={`/admin/leads/${lead.id}/edit`} className="btn btn-sm btn-light border-0 text-info" title="Edit">
+                          <Link 
+                            href={`/admin/leads/${lead.id}/edit`} 
+                            onClick={(e) => e.stopPropagation()}
+                            className="btn btn-sm btn-light border-0 text-info" 
+                            title="Edit"
+                          >
                             <i className="bi bi-pencil-square"></i>
                           </Link>
                           <button
-                            onClick={() => setDeleteId(lead.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteId(lead.id);
+                            }}
                             className="btn btn-sm btn-light border-0 text-danger"
                             title="Delete"
                           >
@@ -348,7 +411,7 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
         </div>
       )}
 
-      {/* 100% React State-Driven Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal */}
       {deleteId && (
         <div 
           className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center animate-fade"
@@ -393,7 +456,8 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
           </div>
         </div>
       )}
-      {/* 4. Interactive Quick AI Summary & Speech-to-Text Transcript Modal */}
+
+      {/* AI Summary Transcript Modal */}
       {selectedLeadForSummary && (
         <div 
           className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center animate-fade" 
@@ -421,10 +485,8 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
               ></button>
             </div>
 
-            {/* Modal Content */}
             {selectedLeadForSummary.calls && selectedLeadForSummary.calls.length > 0 ? (
               <div>
-                {/* 1. Latest AI Summary */}
                 <div className="bg-light rounded-3 p-3 mb-4 border-start border-3 border-warning">
                   <h6 className="fw-bold text-warning mb-2 d-flex align-items-center gap-1.5 small text-uppercase tracking-wider">
                     <i className="bi bi-shield-check"></i>
@@ -436,21 +498,11 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
                       if (firstCall.analysis && firstCall.analysis.trim() !== "" && !firstCall.analysis.toLowerCase().includes("no automatic ai analysis")) {
                         return firstCall.analysis;
                       }
-                      if (firstCall.transcript) {
-                        const transcriptLower = firstCall.transcript.toLowerCase();
-                        if (transcriptLower.includes("automated") || transcriptLower.includes("logging")) {
-                          return `Lead ${selectedLeadForSummary.name} expressed high interest in how our automated call logging works and is exploring active campaign solutions. Recommended scheduling a system walkthrough.`;
-                        }
-                        if (transcriptLower.includes("interested") || transcriptLower.includes("questions")) {
-                          return `Lead ${selectedLeadForSummary.name} is highly interested in the CRM portals and requested clarification on system stages. Recommended immediate representative follow-up.`;
-                        }
-                      }
                       return `Lead ${selectedLeadForSummary.name} expressed positive interest in our core CRM call center and campaign management modules. Recommend sending a customized technical overview deck.`;
                     })()}
                   </p>
                 </div>
 
-                {/* 2. Speech-to-Text Transcript */}
                 <h6 className="fw-bold mb-3 d-flex align-items-center gap-2 small text-secondary text-uppercase tracking-wider">
                   <i className="bi bi-mic text-danger"></i>
                   <span>Transcript</span>
@@ -484,50 +536,9 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
                     </div>
                   )}
                 </div>
-
-                {/* 3. Customer Requirements */}
-                <h6 className="fw-bold mb-3 d-flex align-items-center gap-2 small text-secondary text-uppercase tracking-wider">
-                  <i className="bi bi-clipboard-check text-info"></i>
-                  <span>Requirement</span>
-                </h6>
-                <div className="p-3 bg-light rounded-3 border">
-                  <ul className="list-unstyled mb-0 d-flex flex-column gap-2">
-                    {(() => {
-                      const transcript = selectedLeadForSummary.calls[0].transcript;
-                      const reqs = [];
-                      if (transcript) {
-                        const text = transcript.toLowerCase();
-                        if (text.includes("automated") || text.includes("logging")) {
-                          reqs.push("Automated call log parsing and database mapping pipeline.");
-                        }
-                        if (text.includes("dashboard") || text.includes("performance")) {
-                          reqs.push("Live Supervisor Dashboard access with agent KPI scoring.");
-                        }
-                        if (text.includes("interested") || text.includes("questions")) {
-                          reqs.push("Comprehensive system onboarding and representative workflow trial.");
-                        }
-                        if (text.includes("scale") || text.includes("support")) {
-                          reqs.push("Outsourced Tier-1 customer support and ticketing platform.");
-                        }
-                      }
-                      if (reqs.length === 0) {
-                        reqs.push("Inbound lead call routing and IVR configuration setup.");
-                        reqs.push("Lead score audit and CRM sync logs.");
-                      }
-                      return reqs.map((req, rIdx) => (
-                        <li key={rIdx} className="d-flex align-items-start gap-2 small text-dark fw-medium">
-                          <i className="bi bi-check-circle-fill text-success mt-0.5" style={{ fontSize: "14px" }}></i>
-                          <span>{req}</span>
-                        </li>
-                      ));
-                    })()}
-                  </ul>
-                </div>
               </div>
             ) : (
-              /* Demonstration Previews for Leads with no call history yet */
               <div>
-                {/* 1. Demonstration AI Summary */}
                 <div className="bg-light rounded-3 p-3 mb-4 border-start border-3 border-success">
                   <h6 className="fw-bold text-success mb-2 d-flex align-items-center gap-1.5 small text-uppercase tracking-wider">
                     <i className="bi bi-stars"></i>
@@ -538,7 +549,6 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
                   </p>
                 </div>
 
-                {/* 2. Demonstration Transcript */}
                 <h6 className="fw-bold mb-3 d-flex align-items-center gap-2 small text-secondary text-uppercase tracking-wider">
                   <i className="bi bi-mic text-danger"></i>
                   <span>Transcript</span>
@@ -557,39 +567,7 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
                         That's perfect! Our platform is designed specifically to handle outbound dialing workflows. We synchronize your leads instantly and route them to designated sales representatives within 5 seconds.
                       </div>
                     </div>
-                    <div className="d-flex flex-column align-items-start">
-                      <span className="x-small text-muted mb-1 fw-bold">{selectedLeadForSummary.name}</span>
-                      <div className="p-2 px-3 small bg-white border text-dark" style={{ borderRadius: "14px 14px 14px 2px", maxWidth: "85%" }}>
-                        Oh, that sounds incredibly fast. Do you also provide detailed dashboards to track agent performance and view voice call transcript logs?
-                      </div>
-                    </div>
-                    <div className="d-flex flex-column align-items-end">
-                      <span className="x-small text-muted mb-1 fw-bold">Sales Agent</span>
-                      <div className="p-2 px-3 small bg-primary text-white" style={{ borderRadius: "14px 14px 2px 14px", maxWidth: "85%" }}>
-                        Absolutely! We generate live timeline charts, offer client-side drag-and-drop agent columns, and transcribe calls into text with automated AI summaries in real time.
-                      </div>
-                    </div>
                   </div>
-                </div>
-
-                {/* 3. Demonstration Customer Requirements */}
-                <h6 className="fw-bold mb-3 d-flex align-items-center gap-2 small text-secondary text-uppercase tracking-wider">
-                  <i className="bi bi-clipboard-check text-info"></i>
-                  <span>Requirement</span>
-                </h6>
-                <div className="p-3 bg-light rounded-3 border">
-                  <ul className="list-unstyled mb-0 d-flex flex-column gap-2">
-                    {[
-                      "Full-stack CRM integration for 500+ weekly outbound contacts.",
-                      "Automated call routing to designated agents within 5 seconds.",
-                      "Live timeline charts and speech-to-text transcript logs with AI summarization."
-                    ].map((req, rIdx) => (
-                      <li key={rIdx} className="d-flex align-items-start gap-2 small text-dark fw-medium">
-                        <i className="bi bi-check-circle-fill text-success mt-0.5" style={{ fontSize: "14px" }}></i>
-                        <span>{req}</span>
-                      </li>
-                    ))}
-                  </ul>
                 </div>
               </div>
             )}

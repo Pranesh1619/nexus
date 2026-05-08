@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import StatusModal from "@/components/StatusModal";
 import { deleteCallLog } from "./actions";
 
@@ -35,9 +36,11 @@ function getCallOutcome(status: string, stage: string, leadStatus?: string) {
 }
 
 export default function CallList({ logs }: { logs: any[] }) {
+  const router = useRouter();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState<"all" | "missed" | "connected" | "converted">("all");
+  const [selectedAgentId, setSelectedAgentId] = useState<string>("all");
 
   const handleDelete = async () => {
     if (deleteId) {
@@ -54,7 +57,18 @@ export default function CallList({ logs }: { logs: any[] }) {
     return mins > 0 ? `${mins}m ${remaining}s` : `${remaining}s`;
   };
 
-  // Process and filter the call list based on selected tab and search query
+  // Dynamically extract unique agents from logs
+  const agentsList = useMemo(() => {
+    const agentsMap = new Map();
+    logs.forEach(log => {
+      if (log.user) {
+        agentsMap.set(log.user.id, log.user.name);
+      }
+    });
+    return Array.from(agentsMap.entries()).map(([id, name]) => ({ id, name }));
+  }, [logs]);
+
+  // Process and filter the call list based on selected filters and search query
   const filteredLogs = useMemo(() => {
     return logs.filter(log => {
       // Search query
@@ -68,27 +82,33 @@ export default function CallList({ logs }: { logs: any[] }) {
 
       // Tab filters
       if (selectedFilter === "missed") {
-        return log.status === "MISSED";
+        if (log.status !== "MISSED") return false;
       }
       if (selectedFilter === "connected") {
-        return log.status === "CONNECTED";
+        if (log.status !== "CONNECTED") return false;
       }
       if (selectedFilter === "converted") {
-        return log.stage === "Closed" || log.stage === "Qualified" || log.stage === "Interested";
+        const isConverted = log.stage === "Closed" || log.stage === "Qualified" || log.stage === "Interested";
+        if (!isConverted) return false;
+      }
+
+      // Agent filters
+      if (selectedAgentId !== "all" && log.userId !== selectedAgentId) {
+        return false;
       }
 
       return true;
     });
-  }, [logs, searchTerm, selectedFilter]);
+  }, [logs, searchTerm, selectedFilter, selectedAgentId]);
 
   return (
-    <div className="d-flex flex-column gap-3">
+    <div className="d-flex flex-column gap-3 animate-fade">
 
       {/* 1. Header Filter & Search controls */}
       <div className="card border-0 shadow-sm p-3 bg-white" style={{ overflow: "hidden" }}>
         <div className="d-flex align-items-center justify-content-between gap-3 flex-nowrap" style={{ overflowX: "auto", width: "100%" }}>
 
-          {/* Left Side: Search & Labeled Dropdown */}
+          {/* Left Side: Search & Filter Dropdowns (No Labels) */}
           <div className="d-flex align-items-center gap-3 flex-shrink-0">
             <div className="search-box m-0" style={{ width: "280px" }}>
               <i className="bi bi-search text-secondary"></i>
@@ -100,21 +120,31 @@ export default function CallList({ logs }: { logs: any[] }) {
               />
             </div>
 
-            <div className="d-flex align-items-center gap-2 flex-shrink-0">
-              <label className="text-secondary fw-semibold small mb-0 flex-shrink-0" htmlFor="callStatusSelect">Call Status:</label>
-              <select
-                id="callStatusSelect"
-                value={selectedFilter}
-                onChange={(e) => setSelectedFilter(e.target.value as any)}
-                className="form-select form-select-sm border cursor-pointer"
-                style={{ width: "150px", borderRadius: "50px", height: "36px", paddingLeft: "15px", paddingRight: "30px", fontWeight: "600" }}
-              >
-                <option value="all">All Calls</option>
-                <option value="missed">Missed</option>
-                <option value="connected">Connected</option>
-                <option value="converted">Converted</option>
-              </select>
-            </div>
+            {/* Status Dropdown - No label */}
+            <select
+              value={selectedFilter}
+              onChange={(e) => setSelectedFilter(e.target.value as any)}
+              className="form-select form-select-sm border cursor-pointer"
+              style={{ width: "150px", borderRadius: "50px", height: "36px", paddingLeft: "15px", paddingRight: "30px", fontWeight: "600" }}
+            >
+              <option value="all">All Calls</option>
+              <option value="missed">Missed</option>
+              <option value="connected">Connected</option>
+              <option value="converted">Converted</option>
+            </select>
+
+            {/* Agent Dropdown - No label */}
+            <select
+              value={selectedAgentId}
+              onChange={(e) => setSelectedAgentId(e.target.value)}
+              className="form-select form-select-sm border cursor-pointer"
+              style={{ width: "160px", borderRadius: "50px", height: "36px", paddingLeft: "15px", paddingRight: "30px", fontWeight: "600" }}
+            >
+              <option value="all">All Agents</option>
+              {agentsList.map(agent => (
+                <option key={agent.id} value={agent.id}>{agent.name}</option>
+              ))}
+            </select>
           </div>
 
           <div className="text-end flex-shrink-0">
@@ -161,7 +191,12 @@ export default function CallList({ logs }: { logs: any[] }) {
                   if (displayScore < 75) scoreColor = "text-danger";
 
                   return (
-                    <tr key={log.id}>
+                    <tr 
+                      key={log.id}
+                      onClick={() => router.push(`/admin/calls/${log.id}`)}
+                      className="cursor-pointer"
+                      style={{ cursor: "pointer", transition: "all 0.15s ease" }}
+                    >
                       <td className="small text-secondary" style={{ padding: "12px 16px" }}>{index + 1}</td>
                       <td style={{ padding: "12px 16px" }}>
                         <div className="d-flex flex-column text-secondary small">
@@ -201,14 +236,27 @@ export default function CallList({ logs }: { logs: any[] }) {
                       </td>
                       <td className="text-end" style={{ padding: "12px 16px" }}>
                         <div className="d-flex justify-content-end align-items-center gap-2">
-                          <Link href={`/admin/calls/${log.id}`} className="btn btn-sm btn-light border-0 text-primary" title="View Analysis">
+                          <Link 
+                            href={`/admin/calls/${log.id}`} 
+                            onClick={(e) => e.stopPropagation()}
+                            className="btn btn-sm btn-light border-0 text-primary" 
+                            title="View Analysis"
+                          >
                             <i className="bi bi-eye"></i>
                           </Link>
-                          <Link href={`/admin/calls/${log.id}/edit`} className="btn btn-sm btn-light border-0 text-info" title="Edit Log">
+                          <Link 
+                            href={`/admin/calls/${log.id}/edit`} 
+                            onClick={(e) => e.stopPropagation()}
+                            className="btn btn-sm btn-light border-0 text-info" 
+                            title="Edit Log"
+                          >
                             <i className="bi bi-pencil-square"></i>
                           </Link>
                           <button
-                            onClick={() => setDeleteId(log.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteId(log.id);
+                            }}
                             className="btn btn-sm btn-light border-0 text-danger"
                             title="Delete Log"
                           >
@@ -225,7 +273,7 @@ export default function CallList({ logs }: { logs: any[] }) {
         </div>
       </div>
 
-      {/* 100% React State-Driven Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal */}
       {deleteId && (
         <div 
           className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center animate-fade"
@@ -246,7 +294,7 @@ export default function CallList({ logs }: { logs: any[] }) {
             
             <h4 className="fw-bold text-dark mb-2">Delete Call Log?</h4>
             <p className="text-secondary small mb-4">
-              Are you sure you want to delete this call log? This action is permanent and will completely delete the recording, transcription, and audit scoring.
+              Are you sure you want to delete this call interaction log? This action is permanent and cannot be undone.
             </p>
 
             <div className="d-flex gap-3 justify-content-center">

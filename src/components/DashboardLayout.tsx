@@ -10,12 +10,15 @@ export default function DashboardLayout({ children, userRole = "ADMIN", userName
 
   const menuItems = [
     { title: "Dashboard", icon: "bi-grid", path: "/admin" },
-    { title: "Leads", icon: "bi-person-badge", path: "/admin/leads" },
-    { title: "Deals Pipeline", icon: "bi-kanban", path: "/admin/deals" },
+    { title: "Agents", icon: "bi-headset", path: "/admin/agents" },
+    { title: "Deals", icon: "bi-kanban", path: "/admin/deals" },
     { title: "Calls", icon: "bi-telephone-outbound", path: "/admin/calls" },
     ...(userRole === "ADMIN" ? [
-      { title: "Users", icon: "bi-people", path: "/admin/users" },
-      { title: "Sales Floor", icon: "bi-graph-up-arrow", path: "/admin/sales" }
+      { title: "Users", icon: "bi-people", path: "/admin/users" }
+    ] : []),
+    { title: "Leads", icon: "bi-person-badge", path: "/admin/leads" },
+    ...(userRole === "ADMIN" ? [
+      { title: "Sales", icon: "bi-graph-up-arrow", path: "/admin/sales" }
     ] : [])
   ];
 

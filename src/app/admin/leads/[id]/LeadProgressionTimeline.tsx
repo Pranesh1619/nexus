@@ -34,9 +34,21 @@ interface LeadProgressionTimelineProps {
     aiScore: number;
     analysis: string;
   } | null;
+  leadSource?: string;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+  calls?: { id: string; stage: string; createdAt: string | Date; duration: number | null; status: string; aiScore?: number | null; }[] | null;
 }
 
-export default function LeadProgressionTimeline({ leadId, leadStatus, latestCall }: LeadProgressionTimelineProps) {
+export default function LeadProgressionTimeline({ 
+  leadId, 
+  leadStatus, 
+  latestCall,
+  leadSource = "WEBSITE",
+  createdAt,
+  updatedAt,
+  calls = []
+}: LeadProgressionTimelineProps) {
   // Determine if we are tracking Call Logs or Lead Statuses
   const hasCall = latestCall !== null;
 
@@ -134,6 +146,75 @@ export default function LeadProgressionTimeline({ leadId, leadStatus, latestCall
       }
     }, 3200);
   };
+
+  const getStageDetails = () => {
+    const stage = LEAD_STAGES[selectedLeadIndex];
+    if (!stage) return null;
+
+    const isReached = selectedLeadIndex <= maxLeadIndex;
+
+    // Default fallbacks
+    let medium = "System Record";
+    let time = "—";
+    let notes = "This stage is currently pending in the pipeline.";
+
+    const formattedCreatedAt = createdAt ? new Date(createdAt).toLocaleString() : "—";
+    const formattedUpdatedAt = updatedAt ? new Date(updatedAt).toLocaleString() : "—";
+
+    if (stage.id === "NEW") {
+      medium = leadSource ? `Source: ${leadSource}` : "System Entry";
+      time = formattedCreatedAt;
+      notes = "Lead discovered and registered in the database. Initial tracking initiated.";
+    } else if (stage.id === "CONTACTED") {
+      if (isReached) {
+        const contactCall = calls && calls.find(c => c.status === "CONNECTED" || c.stage.includes("Contact") || c.stage.includes("Connected") || c.stage.includes("Attempted"));
+        medium = contactCall ? `Voice Call Log (Duration: ${contactCall.duration || 0}s)` : "Manual Status Update";
+        time = contactCall ? new Date(contactCall.createdAt).toLocaleString() : formattedUpdatedAt;
+        notes = "First-touch outreach completed successfully. Value proposition delivered.";
+      } else {
+        medium = "Awaiting Phone Outreach";
+        notes = "Awaiting the representative to make the initial phone call and log outcomes.";
+      }
+    } else if (stage.id === "QUALIFIED") {
+      if (isReached) {
+        const qualCall = calls && calls.find(c => c.stage.includes("Qualified") || c.stage.includes("Interested") || c.stage.includes("Engaged"));
+        medium = qualCall ? `AI-Analyzed Call (Score: ${qualCall.aiScore || 0}%)` : "Sales Agent Verification";
+        time = qualCall ? new Date(qualCall.createdAt).toLocaleString() : formattedUpdatedAt;
+        notes = "Lead qualifications verified. Client requirements align with our current BPO offerings.";
+      } else {
+        medium = "Awaiting Qualification Check";
+        notes = "Reviewing business requirements, size, and budget to qualify the lead.";
+      }
+    } else if (stage.id === "WON") {
+      if (leadStatus === "WON") {
+        medium = "Contract Execution / Closing Session";
+        time = formattedUpdatedAt;
+        notes = "Deal officially WON! Handed over to operations for onboarding and service delivery.";
+      } else {
+        medium = "Closing Phase Pipeline";
+        notes = "Proposal finalized. Reviewing contracts and awaiting final signature.";
+      }
+    } else if (stage.id === "LOST") {
+      if (leadStatus === "LOST") {
+        medium = "Representative Handled Closing Call";
+        time = formattedUpdatedAt;
+        notes = "Deal closed as LOST. Feedback logged for future pipeline optimization.";
+      } else {
+        medium = "Closing Phase Pipeline";
+        notes = "Standard closing review. Active unless explicitly closed as lost.";
+      }
+    }
+
+    return {
+      title: stage.title,
+      isReached,
+      medium,
+      time,
+      notes
+    };
+  };
+
+  const stageDetails = getStageDetails();
 
   return (
     <div className="w-100">
@@ -344,6 +425,56 @@ export default function LeadProgressionTimeline({ leadId, leadStatus, latestCall
             </div>
           </div>
         </div>
+
+        {/* Stage Details Insights Panel */}
+        {!hasCall && stageDetails && (
+          <div className="border-top bg-light bg-opacity-40 p-4 animate-fade">
+            <div className="d-flex align-items-center gap-2 mb-3">
+              <i className="bi bi-info-circle text-primary fs-5"></i>
+              <h6 className="fw-bold mb-0 text-dark" style={{ fontSize: "14px" }}>
+                {stageDetails.title} Phase Insights
+              </h6>
+              <span className={`badge px-2.5 py-1 rounded-pill ${stageDetails.isReached ? 'bg-success bg-opacity-10 text-success' : 'bg-secondary bg-opacity-10 text-secondary'} x-small fw-bold`}>
+                {stageDetails.isReached ? "Reached / Completed" : "Pipeline Queue"}
+              </span>
+            </div>
+            <div className="row g-3">
+              {/* Box 1: Medium/Reference */}
+              <div className="col-md-4">
+                <div className="bg-white p-4 rounded-3 shadow-sm border border-light h-100">
+                  <div className="text-secondary x-small fw-bold text-uppercase mb-2" style={{ fontSize: "10px", letterSpacing: "0.3px" }}>
+                    <i className="bi bi-compass text-primary me-1"></i> Medium / Reference
+                  </div>
+                  <div className="fw-bold text-dark small" style={{ fontSize: "13px" }}>
+                    {stageDetails.medium}
+                  </div>
+                </div>
+              </div>
+              {/* Box 2: Time reached */}
+              <div className="col-md-4">
+                <div className="bg-white p-4 rounded-3 shadow-sm border border-light h-100">
+                  <div className="text-secondary x-small fw-bold text-uppercase mb-2" style={{ fontSize: "10px", letterSpacing: "0.3px" }}>
+                    <i className="bi bi-clock text-primary me-1"></i> Logged Timestamp
+                  </div>
+                  <div className="fw-bold text-dark small" style={{ fontSize: "13px" }}>
+                    {stageDetails.time}
+                  </div>
+                </div>
+              </div>
+              {/* Box 3: Description Notes */}
+              <div className="col-md-4">
+                <div className="bg-white p-4 rounded-3 shadow-sm border border-light h-100">
+                  <div className="text-secondary x-small fw-bold text-uppercase mb-2" style={{ fontSize: "10px", letterSpacing: "0.3px" }}>
+                    <i className="bi bi-card-text text-primary me-1"></i> Phase Description
+                  </div>
+                  <div className="text-secondary small" style={{ fontSize: "12px", lineHeight: "1.4" }}>
+                    {stageDetails.notes}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <style jsx>{`

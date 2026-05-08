@@ -31,7 +31,7 @@ export default async function CallViewPage({ params }: { params: Promise<{ id: s
           <h3 className="fw-bold mb-0">{call.lead.name} Call Analysis</h3>
           <div className="d-flex align-items-center gap-2">
             <div className="bg-white border rounded-3 px-3 py-1.5 d-flex align-items-center gap-1.5 shadow-sm">
-              <span className="text-secondary fw-bold" style={{ fontSize: "11px" }}>OVERALL AI SCORE:</span>
+              <span className="text-secondary fw-bold" style={{ fontSize: "11px" , padding : "0.3rem"}}>OVERALL AI SCORE:</span>
               <span className={`fw-bold small ${dynamicOverallScore > 70 ? 'text-success' : 'text-warning'}`}>
                 {dynamicOverallScore}%
               </span>

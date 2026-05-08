@@ -11,6 +11,7 @@ export async function getLeads(userId?: string) {
         calls: {
           orderBy: { createdAt: "desc" },
         },
+        salesPerson: true,
       },
       orderBy: { createdAt: "desc" },
     });
@@ -20,6 +21,7 @@ export async function getLeads(userId?: string) {
       calls: {
         orderBy: { createdAt: "desc" },
       },
+      salesPerson: true,
     },
     orderBy: { createdAt: "desc" },
   });
