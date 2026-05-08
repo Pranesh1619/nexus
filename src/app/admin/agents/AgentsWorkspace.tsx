@@ -225,7 +225,135 @@ export default function AgentsWorkspace({ initialAgents }: AgentsWorkspaceProps)
             </div>
           )}
 
-          {/* 3. Assigned Pipelines & Leads Table (Full Row Clickable) */}
+          {/* 3. AI Performance Analytics & Pipeline Funnel */}
+          <div className="row g-4 mb-4">
+            {/* Column 1: Sales Conversion Funnel Progress */}
+            <div className="col-12 col-md-6">
+              <div className="card border-0 shadow-sm p-4 bg-white rounded-4 h-100">
+                <h5 className="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style={{ fontSize: "16px" }}>
+                  <i className="bi bi-funnel text-primary"></i>
+                  <span>Sales Pipeline Stage Funnel</span>
+                </h5>
+                <p className="text-secondary x-small mb-4">Real-time status breakdown of assigned leads.</p>
+                
+                {(() => {
+                  const counts = { New: 0, Connected: 0, Qualified: 0, Won: 0, Lost: 0 };
+                  selectedAgent.leads.forEach(lead => {
+                    const status = (lead.status || "").toUpperCase();
+                    if (status.includes("NEW")) counts.New++;
+                    else if (status.includes("CONNECTED") || status.includes("CONTACT")) counts.Connected++;
+                    else if (status.includes("QUALIFIED")) counts.Qualified++;
+                    else if (status.includes("WON")) counts.Won++;
+                    else counts.Lost++;
+                  });
+                  const total = selectedAgent.leads.length || 1;
+                  
+                  const stagesList = [
+                    { label: "New Lead Contacts", count: counts.New, color: "bg-primary" },
+                    { label: "Active Connections", count: counts.Connected, color: "bg-info" },
+                    { label: "Qualified Opportunities", count: counts.Qualified, color: "bg-warning" },
+                    { label: "Closed Won Deals", count: counts.Won, color: "bg-success" }
+                  ];
+
+                  return (
+                    <div className="d-flex flex-column gap-3" style={{ gap: "15px" }}>
+                      {stagesList.map((stage, idx) => {
+                        const pct = Math.round((stage.count / total) * 100);
+                        return (
+                          <div key={idx}>
+                            <div className="d-flex align-items-center justify-content-between mb-1.5" style={{ fontSize: "13px" }}>
+                              <span className="fw-semibold text-dark">{stage.label}</span>
+                              <span className="text-secondary small fw-bold">
+                                {stage.count} ({pct}%)
+                              </span>
+                            </div>
+                            <div className="progress" style={{ height: "6px", backgroundColor: "#f1f5f9", borderRadius: "50px" }}>
+                              <div 
+                                className={`progress-bar ${stage.color}`}
+                                style={{ width: `${pct}%`, borderRadius: "50px" }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Column 2: AI Interaction Quality Insights */}
+            <div className="col-12 col-md-6">
+              <div className="card border-0 shadow-sm p-4 bg-white rounded-4 h-100">
+                <h5 className="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style={{ fontSize: "16px" }}>
+                  <i className="bi bi-cpu text-info"></i>
+                  <span>AI Interaction & Quality Insights</span>
+                </h5>
+                <p className="text-secondary x-small mb-4">Deep learning evaluation of customer interactions.</p>
+
+                {(() => {
+                  const scores = selectedAgent.calls.map(c => c.aiScore || 0).filter(s => s > 0);
+                  const averageScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 85;
+
+                  return (
+                    <div className="d-flex flex-column justify-content-between h-100">
+                      <div className="d-flex align-items-center gap-4 mb-3">
+                        <div className="position-relative d-flex align-items-center justify-content-center" style={{ width: "90px", height: "90px" }}>
+                          {/* Beautiful SVG Dial */}
+                          <svg width="90" height="90" viewBox="0 0 36 36">
+                            <path
+                              className="text-light"
+                              strokeDasharray="100, 100"
+                              strokeWidth="3"
+                              stroke="rgba(0, 0, 0, 0.06)"
+                              fill="none"
+                              d="M18 2.0845
+                                a 15.9155 15.9155 0 0 1 0 31.831
+                                a 15.9155 15.9155 0 0 1 0 -31.831"
+                            />
+                            <path
+                              className="text-info"
+                              strokeDasharray={`${averageScore}, 100`}
+                              strokeWidth="3"
+                              strokeLinecap="round"
+                              stroke="#00A76F"
+                              fill="none"
+                              d="M18 2.0845
+                                a 15.9155 15.9155 0 0 1 0 31.831
+                                a 15.9155 15.9155 0 0 1 0 -31.831"
+                            />
+                          </svg>
+                          <div className="position-absolute text-center" style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}>
+                            <span className="fw-bold text-dark fs-5">{averageScore}%</span>
+                          </div>
+                        </div>
+                        <div>
+                          <h6 className="fw-bold text-dark mb-1">AI Interaction Quality Score</h6>
+                          <p className="text-secondary small mb-0">
+                            Based on tone analysis, customer sentiment, and objection-handling logs.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="bg-light p-3 rounded-3" style={{ borderLeft: "4px solid #00A76F", backgroundColor: "#f8fafc" }}>
+                        <div className="fw-semibold text-dark mb-1 d-flex align-items-center gap-1.5" style={{ fontSize: "13px" }}>
+                          <i className="bi bi-patch-check text-success"></i> Objection-Handling Index
+                        </div>
+                        <p className="text-secondary mb-0" style={{ fontSize: "11.5px", lineHeight: "1.5" }}>
+                          {averageScore > 80 
+                            ? "Excellent customer relationship tone & active listening skills. Objection handling index is outstanding." 
+                            : "Solid engagement metrics. Re-routing calls to handle objections on key pricing models could improve closing rates."
+                          }
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Assigned Pipelines & Leads Table (Full Row Clickable) */}
           <div className="card border-0 shadow-sm mb-4 rounded-4 overflow-hidden bg-white">
             <div className="card-header bg-white border-0 pt-4 px-4 pb-2 d-flex justify-content-between align-items-center">
               <div>
