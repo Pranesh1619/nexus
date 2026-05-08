@@ -516,7 +516,10 @@ export default function LeadProgressionTimeline({
                   </div>
                 </div>
                 <h5 className="fw-bold text-dark mb-1">Sync Successful!</h5>
-                <p className="text-secondary small mb-0">Lead status has been updated in Zoho CRM.</p>
+                <p className="text-secondary small mb-3">Lead status has been updated in Zoho CRM.</p>
+                <button onClick={() => setSyncStatus("idle")} className="btn btn-success w-100 fw-bold" style={{ borderRadius: "12px" }}>
+                  <i className="bi bi-check2 me-2"></i>Done
+                </button>
               </>
             )}
             {syncStatus === "error" && (
