@@ -166,9 +166,13 @@ export default function AgentsWorkspace({ initialAgents }: AgentsWorkspaceProps)
   }, [maxCallIndex]);
 
   useEffect(() => {
-    setActiveConsoleView("lead");
-    setActiveCallLog(null);
-  }, [localSelectedLeadId]);
+    if (activeLead && selectedAgent) {
+      const leadCalls = selectedAgent.calls.filter((c) => c.leadId === activeLead.id);
+      setActiveCallLog(leadCalls[0] || null);
+    } else {
+      setActiveCallLog(null);
+    }
+  }, [activeLead, selectedAgent]);
 
   const [isEditingLead, setIsEditingLead] = useState(false);
   const [isLoggingCall, setIsLoggingCall] = useState(false);
@@ -527,7 +531,7 @@ export default function AgentsWorkspace({ initialAgents }: AgentsWorkspaceProps)
               <div className="flex-grow-1">
                 <label className="form-label small fw-bold mb-2 d-flex align-items-center gap-2" style={{ fontSize: "11px", letterSpacing: "0.5px", color: "#475569" }}>
                   <i className="bi bi-person-badge text-primary" style={{ fontSize: "14px", color: "#3b82f6" }}></i>
-                  <span>AGENT SELECTION</span>
+                  <span>Agent Selection</span>
                 </label>
                 <select
                   value={selectedAgentId}
@@ -699,7 +703,7 @@ export default function AgentsWorkspace({ initialAgents }: AgentsWorkspaceProps)
                 {activeLead ? (
                   <div className="p-4 d-flex flex-column gap-4">
 
-                    {/* ALWAYS VISIBLE: Raw Unboxed Lead Header with Profile Data and the Toggle Button */}
+                    {/* ALWAYS VISIBLE: Raw Unboxed Lead Header with Profile Data */}
                     <div className="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3 pb-2 border-bottom border-light-subtle mb-4">
                       {/* Left Side: Lead Details with Round Profile Avatar Icon */}
                       <div className="d-flex align-items-center gap-3">
@@ -712,7 +716,7 @@ export default function AgentsWorkspace({ initialAgents }: AgentsWorkspaceProps)
                         </div>
 
                         <div>
-                          {/* Row 1: Name and inline Edit button (No status badge) */}
+                          {/* Row 1: Name and inline Edit button */}
                           <div className="d-flex align-items-center flex-wrap mb-2">
                             <h4 className="fw-bold text-dark mb-0" style={{ fontSize: "19px" }}>{activeLead.name}</h4>
                             <button
@@ -735,41 +739,23 @@ export default function AgentsWorkspace({ initialAgents }: AgentsWorkspaceProps)
                         </div>
                       </div>
 
-                      {/* Right Side: Clean simple toggle button using branded app colors */}
+                      {/* Right Side: Quick info showing call counts */}
                       <div>
-                        {activeConsoleView === "lead" ? (
-                          <button
-                            onClick={() => {
-                              if (activeLeadCalls.length > 0) {
-                                  setActiveCallLog(activeCallLog || activeLeadCalls[0]);
-                                  setActiveConsoleView("call");
-                              }
-                            }}
-                            disabled={activeLeadCalls.length === 0}
-                            className="btn btn-sm btn-custom-brand d-flex align-items-center gap-2 px-3 py-1.5 shadow-sm fw-bold animate-fade"
-                            style={{ borderRadius: "8px", fontSize: "12px", height: "35px" }}
-                          >
-                            <i className="bi bi-telephone-outbound-fill me-1"></i>
-                            <span>{activeLeadCalls.length > 0 ? "Switch to Call Workspace" : "No Call Logs Found"}</span>
-                          </button>
+                        {activeLeadCalls.length > 0 ? (
+                          <span className="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-1.5 small fw-semibold">
+                            <i className="bi bi-telephone-outbound-fill me-1.5"></i>
+                            {activeLeadCalls.length} Call Logs
+                          </span>
                         ) : (
-                          <button
-                            onClick={() => {
-                              setActiveConsoleView("lead");
-                              setActiveCallLog(null);
-                            }}
-                            className="btn btn-sm btn-custom-brand d-flex align-items-center gap-2 px-3 py-1.5 shadow-sm fw-bold animate-fade"
-                            style={{ borderRadius: "8px", fontSize: "12px", height: "35px" }}
-                          >
-                            <i className="bi bi-person-lines-fill me-1"></i>
-                            <span>Switch to Lead Workspace</span>
-                          </button>
+                          <span className="badge bg-secondary bg-opacity-10 text-secondary rounded-pill px-3 py-1.5 small fw-semibold">
+                            No Call Logs Found
+                          </span>
                         )}
                       </div>
                     </div>
 
-                    {activeConsoleView === "lead" ? (
-                      <>
+                    {/* Unified Lead & Call Workspace */}
+                    <div className="d-flex flex-column gap-4">
 
                         {/* Lead Lifecycle Timeline */}
                         <div className="card border-0 shadow-sm overflow-hidden bg-white">
@@ -862,10 +848,10 @@ export default function AgentsWorkspace({ initialAgents }: AgentsWorkspaceProps)
                             </div>
                           )}
                         </div>
-                      </>
-                    ) : (
-                      activeCallLog && (
-                        <div className="d-flex flex-column gap-4 animate-fade">
+
+                        {/* Call stage pipeline and transcript shown directly below */}
+                        {activeCallLog && (
+                          <div className="d-flex flex-column gap-4 animate-fade mt-1">
 
                           {/* Call stage pipeline */}
                           <div className="card border-0 shadow-sm overflow-hidden bg-white">
@@ -975,8 +961,8 @@ export default function AgentsWorkspace({ initialAgents }: AgentsWorkspaceProps)
                             </div>
                           </div>
                         </div>
-                      )
-                    )}
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="p-5 text-center my-auto text-secondary">

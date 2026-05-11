@@ -76,16 +76,23 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
+          <style>{`
+            .login-btn-custom {
+              font-size: 16px !important;
+              height: 48px !important;
+              border-radius: 10px !important;
+            }
+          `}</style>
 
           <button 
             type="submit" 
-            className="btn btn-primary w-100 py-2 mt-2"
+            className="btn btn-primary w-100 py-2.5 mt-3 fw-bold d-flex align-items-center justify-content-center gap-2 login-btn-custom"
             disabled={loading}
           >
             {loading ? (
-              <span className="spinner-border spinner-border-sm me-2"></span>
+              <span className="spinner-border spinner-border-sm"></span>
             ) : null}
-            Login
+            <span>Login</span>
           </button>
         </form>
 

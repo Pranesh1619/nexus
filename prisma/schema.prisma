@@ -53,3 +53,12 @@ model CallLog {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
 }
+
+model ZohoConfig {
+  id           String   @id @default("default_zoho_config")
+  clientId     String
+  clientSecret String
+  refreshToken String
+  accessToken  String
+  updatedAt    DateTime @updatedAt
+}

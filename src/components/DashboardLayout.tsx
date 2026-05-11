@@ -22,7 +22,8 @@ export default function DashboardLayout({ children, userRole = "ADMIN", userName
         { title: "Deals", icon: "bi-kanban", path: "/admin/deals" },
         ...(userRole === "ADMIN" ? [
           { title: "Users", icon: "bi-people", path: "/admin/users" }
-        ] : [])
+        ] : []),
+        { title: "Migration", icon: "bi-cloud-arrow-up", path: "/admin/migration" }
       ]
     }
   ];

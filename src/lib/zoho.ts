@@ -390,3 +390,84 @@ export async function updateZohoBiginStatus(leadPhone: string, status: string) {
     console.log(`[ZOHO SANDBOX] Intercepted status update. Updated contact with Phone: [${leadPhone}] inside Zoho Bigin to status: [${zStatus}].`);
   }
 }
+
+// Update Full Contact details inside Zoho Bigin when edited in our app
+export async function updateZohoBiginContact(leadPhone: string, leadData: {
+  name: string;
+  phone?: string;
+  email: string | null;
+  company: string | null;
+  status: string;
+}) {
+  if (!leadPhone) return;
+
+  const zohoStatusMap: Record<string, string> = {
+    WON: "Closed Won",
+    CLOSED_WON: "Closed Won",
+    LOST: "Closed Lost",
+    CLOSED_LOST: "Closed Lost",
+    QUALIFIED: "Qualified",
+    CONTACTED: "Contacted",
+    PROPOSAL: "Proposal",
+    NEGOTIATION: "Negotiation",
+    NEW: "New Lead",
+  };
+
+  const zStatus = zohoStatusMap[leadData.status.toUpperCase()] || "New Lead";
+  const nameSplit = leadData.name.trim().split(/\s+/);
+  const firstName = nameSplit.length > 1 ? nameSplit[0] : "";
+  const lastName = nameSplit.length > 1 ? nameSplit.slice(1).join(" ") : nameSplit[0] || "Contact";
+
+  if (isZohoConfigured()) {
+    try {
+      const accessToken = await getZohoAccessToken();
+      if (!accessToken) return;
+
+      const apiUrl = process.env.ZOHO_API_URL || "https://www.zohoapis.com";
+
+      // 1. Search Zoho Bigin ID of contact by phone number
+      const searchRes = await fetch(`${apiUrl}/bigin/v2/Contacts/search?phone=${leadPhone}`, {
+        headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
+      });
+
+      if (searchRes.ok && searchRes.status !== 204) {
+        const searchData = await searchRes.json();
+        if (searchData.data && searchData.data.length > 0) {
+          const zohoId = searchData.data[0].id;
+
+          // 2. Update contact in Zoho Bigin
+          const updateRes = await fetch(`${apiUrl}/bigin/v2/Contacts`, {
+            method: "PUT",
+            headers: {
+              Authorization: `Zoho-oauthtoken ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              data: [
+                {
+                  id: zohoId,
+                  First_Name: firstName,
+                  Last_Name: lastName,
+                  Phone: leadData.phone || leadPhone,
+                  Email: leadData.email || "",
+                  Company: leadData.company || "Independent",
+                  Contact_Status: zStatus,
+                },
+              ],
+            }),
+          });
+          if (updateRes.ok) {
+            console.log(`[ZOHO SYNC] Fully updated contact ${leadPhone} (New Phone: ${leadData.phone || leadPhone}) in Zoho Bigin`);
+          } else {
+            console.error(`[ZOHO SYNC] Full contact update rejected by Zoho:`, await updateRes.text());
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[ZOHO SYNC] Full contact update failed:", err);
+    }
+  } else {
+    // Sandbox Simulation Mode
+    console.log(`[ZOHO SANDBOX] Intercepted full contact update for Phone: [${leadPhone}] inside Zoho Bigin.`);
+  }
+}

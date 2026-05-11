@@ -205,20 +205,20 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
           >
             {isSyncing ? (
               <>
-                <span className="spinner-border spinner-border-sm me-1.5" role="status" aria-hidden="true" style={{ width: "12px", height: "12px" }}></span>
-                <span>Syncing...</span>
+                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" style={{ width: "12px", height: "12px" }}></span>
+                <span>Pulling...</span>
               </>
             ) : (
               <>
-                <i className="bi bi-cloud-lightning-fill me-1.5"></i>
-                <span>Migrate CRM</span>
+                <i className="bi bi-cloud-arrow-down-fill me-2"></i>
+                <span>Pull from Zoho Bigin</span>
               </>
             )}
           </button>
           
           <Link 
             href="/admin/leads/new" 
-            className="btn btn-success d-flex align-items-center gap-1.5 px-3.5 fw-bold shadow-sm text-decoration-none"
+            className="btn btn-success d-flex align-items-center gap-2 px-3.5 fw-bold shadow-sm text-decoration-none"
             style={{ 
               borderRadius: "8px", 
               backgroundColor: "#00a76f", 
