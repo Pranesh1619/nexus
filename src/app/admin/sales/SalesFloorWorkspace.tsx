@@ -260,25 +260,41 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
             </h4>
             <span className="text-secondary small fw-bold d-flex align-items-center gap-2">
               <span>{filteredAgents.length} Active Agents</span>
-              <span className="d-flex gap-1 ms-1">
-                <button
-                  type="button"
+              <span className="d-flex gap-2 ms-2">
+                <span
+                  role="button"
                   onClick={() => scrollAgents("left")}
-                  className="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center p-0 hover-shadow"
-                  style={{ width: "24px", height: "24px", borderRadius: "50%", border: "1px solid #ddd" }}
+                  className="d-flex align-items-center justify-content-center shadow-sm text-secondary"
+                  style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "50%",
+                    border: "1px solid var(--border-color)",
+                    cursor: "pointer",
+                    backgroundColor: "#ffffff",
+                    transition: "all 0.2s ease"
+                  }}
                   title="Scroll Left"
                 >
-                  <i className="bi bi-chevron-left" style={{ fontSize: "11px" }}></i>
-                </button>
-                <button
-                  type="button"
+                  <i className="bi bi-chevron-left" style={{ fontSize: "14px" }}></i>
+                </span>
+                <span
+                  role="button"
                   onClick={() => scrollAgents("right")}
-                  className="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center p-0 hover-shadow"
-                  style={{ width: "24px", height: "24px", borderRadius: "50%", border: "1px solid #ddd" }}
+                  className="d-flex align-items-center justify-content-center shadow-sm text-secondary"
+                  style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "50%",
+                    border: "1px solid var(--border-color)",
+                    cursor: "pointer",
+                    backgroundColor: "#ffffff",
+                    transition: "all 0.2s ease"
+                  }}
                   title="Scroll Right"
                 >
-                  <i className="bi bi-chevron-right" style={{ fontSize: "11px" }}></i>
-                </button>
+                  <i className="bi bi-chevron-right" style={{ fontSize: "14px" }}></i>
+                </span>
               </span>
             </span>
           </div>

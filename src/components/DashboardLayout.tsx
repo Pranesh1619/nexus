@@ -8,18 +8,23 @@ export default function DashboardLayout({ children, userRole = "ADMIN", userName
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  const menuItems = [
-    { title: "Dashboard", icon: "bi-grid", path: "/admin" },
-    { title: "Agents", icon: "bi-headset", path: "/admin/agents" },
-    { title: "Deals", icon: "bi-kanban", path: "/admin/deals" },
-    { title: "Calls", icon: "bi-telephone-outbound", path: "/admin/calls" },
-    ...(userRole === "ADMIN" ? [
-      { title: "Users", icon: "bi-people", path: "/admin/users" }
-    ] : []),
-    { title: "Leads", icon: "bi-person-badge", path: "/admin/leads" },
-    ...(userRole === "ADMIN" ? [
-      { title: "Sales", icon: "bi-graph-up-arrow", path: "/admin/sales" }
-    ] : [])
+  const sections = [
+    {
+      title: "MAIN MENU",
+      items: [
+        { title: "Dashboard", icon: "bi-grid", path: "/admin" },
+        { title: "Agents", icon: "bi-headset", path: "/admin/agents" },
+        { title: "Calls", icon: "bi-telephone-outbound", path: "/admin/calls" },
+        ...(userRole === "ADMIN" ? [
+          { title: "Sales", icon: "bi-graph-up-arrow", path: "/admin/sales" }
+        ] : []),
+        { title: "Leads", icon: "bi-person-badge", path: "/admin/leads" },
+        { title: "Deals", icon: "bi-kanban", path: "/admin/deals" },
+        ...(userRole === "ADMIN" ? [
+          { title: "Users", icon: "bi-people", path: "/admin/users" }
+        ] : [])
+      ]
+    }
   ];
 
   return (
@@ -51,19 +56,23 @@ export default function DashboardLayout({ children, userRole = "ADMIN", userName
           <span>Virpa</span>
         </Link>
 
-        <div className="nav-section">
-          <div className="nav-section-title">Main Menu</div>
-          {menuItems.map((item) => (
-            <Link
-              key={item.path}
-              href={item.path}
-              className={`nav-link ${pathname === item.path ? "active" : ""}`}
-            >
-              <i className={`bi ${item.icon}`}></i>
-              <span>{item.title}</span>
-            </Link>
-          ))}
-        </div>
+        {sections.map((section, idx) => (
+          section.items.length > 0 && (
+            <div className="nav-section" key={idx}>
+              <div className="nav-section-title">{section.title}</div>
+              {section.items.map((item) => (
+                <Link
+                  key={item.path}
+                  href={item.path}
+                  className={`nav-link ${pathname === item.path ? "active" : ""}`}
+                >
+                  <i className={`bi ${item.icon}`}></i>
+                  <span>{item.title}</span>
+                </Link>
+              ))}
+            </div>
+          )
+        ))}
 
         <div className="nav-section">
           <div className="nav-section-title">General</div>

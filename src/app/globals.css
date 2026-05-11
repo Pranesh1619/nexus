@@ -7,14 +7,14 @@
   --text-primary: #212B36;
   --text-secondary: #637381;
   --border-color: rgba(145, 158, 171, 0.2);
-  --sidebar-width: 320px;
+  --sidebar-width: 240px;
   --header-height: 72px;
 }
 
 body {
   background-color: var(--bg-body);
   color: var(--text-primary);
-  font-family: var(--font-roboto), sans-serif;
+  font-family: 'Roboto', 'Segoe UI', -apple-system, system-ui, sans-serif;
   margin: 0;
   padding: 0;
   overflow-x: hidden;
