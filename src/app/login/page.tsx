@@ -70,7 +70,7 @@ export default function LoginPage() {
                 type="button"
                 className="btn btn-link position-absolute end-0 top-50 translate-middle-y text-secondary text-decoration-none py-0 px-3"
                 onClick={() => setShowPassword(!showPassword)}
-                style={{ zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" }}
+                style={{ zIndex: 10, display: "flex",  alignItems: "center", justifyContent: "center" }}
               >
                 <i className={`bi ${showPassword ? "bi-eye-slash-fill" : "bi-eye-fill"}`} style={{ fontSize: "1.1rem" }}></i>
               </button>
