@@ -2,7 +2,6 @@
 
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 
 export async function updateUserInfo(formData: FormData) {
   const userId = formData.get("userId") as string;
@@ -45,7 +44,7 @@ export async function updatePassword(formData: FormData) {
     });
     revalidatePath("/admin/settings");
     return { success: true };
-  } catch (error) {
+  } catch {
     return { error: "Failed to update password" };
   }
 }
@@ -57,7 +56,7 @@ export async function deleteUserAccount(userId: string) {
     });
     // In a real app, clear session here
     return { success: true };
-  } catch (error) {
+  } catch {
     return { error: "Failed to delete account" };
   }
 }

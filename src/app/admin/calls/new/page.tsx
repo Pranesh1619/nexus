@@ -76,9 +76,12 @@ function NewCallContent() {
             </div>
             <div className="mt-3">
               <div className="d-flex justify-content-center gap-1">
-                {[...Array(10)].map((_, i) => (
-                  <div key={i} className="bg-primary" style={{ width: 4, height: Math.random() * 40 + 10, borderRadius: 2 }}></div>
-                ))}
+                {[...Array(10)].map((_, i) => {
+                  const pseudoHeight = ((i * 7 + 13) % 40) + 10;
+                  return (
+                    <div key={i} className="bg-primary" style={{ width: 4, height: pseudoHeight, borderRadius: 2 }}></div>
+                  );
+                })}
               </div>
               <div className="small text-secondary mt-2">AI Voice Activity Detected</div>
             </div>

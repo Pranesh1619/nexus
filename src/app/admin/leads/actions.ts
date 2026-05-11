@@ -1,8 +1,9 @@
 "use server";
 
+
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { syncWithZoho, updateZohoLeadStatus } from "@/lib/zoho";
+import { syncWithZoho, updateZohoBiginStatus } from "@/lib/zoho";
 
 export async function getLeads(userId?: string) {
   if (userId) {
@@ -65,7 +66,7 @@ export async function updateLeadStatus(id: string, status: string) {
 
   if (lead && lead.phone) {
     try {
-      await updateZohoLeadStatus(lead.phone, status);
+      await updateZohoBiginStatus(lead.phone, status);
     } catch (e) {
       console.error("[ZOHO SYNC] Error syncing lead status:", e);
     }
@@ -107,7 +108,7 @@ export async function updateLead(id: string, formData: FormData) {
 
   if (lead && lead.phone) {
     try {
-      await updateZohoLeadStatus(lead.phone, status);
+      await updateZohoBiginStatus(lead.phone, status);
     } catch (e) {
       console.error("[ZOHO SYNC] Error syncing lead status during full update:", e);
     }

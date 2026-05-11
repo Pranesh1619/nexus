@@ -4,7 +4,6 @@ import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { deleteLead, triggerZohoSync } from "./actions";
-import StatusModal from "@/components/StatusModal";
 
 interface CallLog {
   id: string;
@@ -254,7 +253,7 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
             {/* Segment Dropdown - No Label */}
             <select 
               value={selectedSegment}
-              onChange={(e) => setSelectedSegment(e.target.value as any)}
+              onChange={(e) => setSelectedSegment(e.target.value as "all" | "high" | "new" | "enterprise")}
               className="form-select form-select-sm border cursor-pointer"
               style={{ width: "160px", borderRadius: "50px", height: "36px", paddingLeft: "15px", paddingRight: "30px", fontWeight: "600" }}
             >
@@ -552,8 +551,19 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
             backdropFilter: "blur(4px)" 
           }}
         >
-          <div className="card border-0 shadow-lg p-4 bg-white" style={{ maxWidth: "600px", width: "95%", borderRadius: "20px", maxHeight: "85vh", overflowY: "auto" }}>
-            <div className="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+          <div 
+            className="card border-0 shadow-lg p-4 bg-white" 
+            style={{ 
+              maxWidth: "600px", 
+              width: "95%", 
+              borderRadius: "20px", 
+              maxHeight: "85vh", 
+              display: "flex", 
+              flexDirection: "column" 
+            }}
+          >
+            {/* Sticky Header */}
+            <div className="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3 flex-shrink-0">
               <div className="d-flex align-items-center gap-2">
                 <div className="rounded-circle bg-warning bg-opacity-10 text-warning d-flex align-items-center justify-content-center" style={{ width: 40, height: 40 }}>
                   <i className="bi bi-robot fs-5"></i>
@@ -570,98 +580,144 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
               ></button>
             </div>
 
-            {selectedLeadForSummary.calls && selectedLeadForSummary.calls.length > 0 ? (
-              <div>
-                <div className="bg-light rounded-3 p-3 mb-4 border-start border-3 border-warning">
-                  <h6 className="fw-bold text-warning mb-2 d-flex align-items-center gap-1.5 small text-uppercase tracking-wider">
-                    <i className="bi bi-shield-check"></i>
-                    <span>Summary</span>
-                  </h6>
-                  <p className="text-dark small mb-0 fw-medium" style={{ lineHeight: "1.5" }}>
-                    {(() => {
-                      const firstCall = selectedLeadForSummary.calls[0];
-                      if (firstCall.analysis && firstCall.analysis.trim() !== "" && !firstCall.analysis.toLowerCase().includes("no automatic ai analysis")) {
-                        return firstCall.analysis;
-                      }
-                      return `Lead ${selectedLeadForSummary.name} expressed positive interest in our core CRM call center and campaign management modules. Recommend sending a customized technical overview deck.`;
-                    })()}
-                  </p>
-                </div>
+            {/* Scrollable Body Content */}
+            <div style={{ overflowY: "auto", flex: 1, paddingRight: "6px" }} className="custom-scrollbar">
+              {selectedLeadForSummary.calls && selectedLeadForSummary.calls.length > 0 ? (
+                <div>
+                  {/* 1. Summary Block */}
+                  <div className="bg-light rounded-3 p-3 mb-4 border-start border-3 border-warning">
+                    <h6 className="fw-bold text-warning mb-2 d-flex align-items-center gap-1.5 small text-uppercase tracking-wider">
+                      <i className="bi bi-journal-text"></i>
+                      <span>Summary</span>
+                    </h6>
+                    <p className="text-dark small mb-0 fw-medium" style={{ lineHeight: "1.5" }}>
+                      {(() => {
+                        const firstCall = selectedLeadForSummary.calls[0];
+                        if (firstCall.analysis && firstCall.analysis.trim() !== "" && !firstCall.analysis.toLowerCase().includes("no automatic ai analysis")) {
+                          return firstCall.analysis;
+                        }
+                        return `Lead ${selectedLeadForSummary.name} expressed positive interest in our core CRM call center and campaign management modules. Recommend sending a customized technical overview deck.`;
+                      })()}
+                    </p>
+                  </div>
 
-                <h6 className="fw-bold mb-3 d-flex align-items-center gap-2 small text-secondary text-uppercase tracking-wider">
-                  <i className="bi bi-mic text-danger"></i>
-                  <span>Transcript</span>
-                </h6>
-                <div className="p-3 bg-light rounded-3 border overflow-auto mb-4" style={{ maxHeight: "250px", backgroundColor: "#fafafa" }}>
-                  {selectedLeadForSummary.calls[0].transcript ? (
-                    <div className="d-flex flex-column gap-3">
-                      {selectedLeadForSummary.calls[0].transcript.split("\n").map((line, lIdx) => {
-                        const isAgent = line.toLowerCase().startsWith("agent:") || line.toLowerCase().startsWith("rep:") || line.toLowerCase().startsWith("sales:");
-                        const text = line.replace(/^(agent|rep|sales|customer|lead|client):\s*/i, "");
-                        return (
-                          <div key={lIdx} className={`d-flex flex-column ${isAgent ? 'align-items-end' : 'align-items-start'}`}>
-                            <span className="x-small text-muted mb-1 fw-bold">{isAgent ? 'Sales Agent' : selectedLeadForSummary.name}</span>
-                            <div 
-                              className={`p-2 px-3 small ${isAgent ? 'bg-primary text-white' : 'bg-white border text-dark'}`} 
-                              style={{ 
-                                borderRadius: isAgent ? "14px 14px 2px 14px" : "14px 14px 14px 2px",
-                                maxWidth: "85%"
-                              }}
-                            >
-                              {text || line}
+                  {/* 2. Transcript Block (In Center) */}
+                  <h6 className="fw-bold mb-3 d-flex align-items-center gap-2 small text-secondary text-uppercase tracking-wider">
+                    <i className="bi bi-mic text-danger"></i>
+                    <span>Transcript</span>
+                  </h6>
+                  <div className="p-3 bg-light rounded-3 border overflow-auto mb-4" style={{ maxHeight: "250px", backgroundColor: "#fafafa" }}>
+                    {selectedLeadForSummary.calls[0].transcript ? (
+                      <div className="d-flex flex-column gap-3">
+                        {selectedLeadForSummary.calls[0].transcript.split("\n").map((line, lIdx) => {
+                          const isAgent = line.toLowerCase().startsWith("agent:") || line.toLowerCase().startsWith("rep:") || line.toLowerCase().startsWith("sales:");
+                          const text = line.replace(/^(agent|rep|sales|customer|lead|client):\s*/i, "");
+                          return (
+                            <div key={lIdx} className={`d-flex flex-column ${isAgent ? 'align-items-end' : 'align-items-start'}`}>
+                              <span className="x-small text-muted mb-1 fw-bold">{isAgent ? 'Sales Agent' : selectedLeadForSummary.name}</span>
+                              <div 
+                                className={`p-2 px-3 small ${isAgent ? 'bg-primary text-white' : 'bg-white border text-dark'}`} 
+                                style={{ 
+                                  borderRadius: isAgent ? "14px 14px 2px 14px" : "14px 14px 14px 2px",
+                                  maxWidth: "85%"
+                                }}
+                              >
+                                {text || line}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center py-4 text-secondary small">
-                      <i className="bi bi-file-earmark-text d-block mb-2 fs-4 opacity-50"></i>
-                      Raw voice transcript was not processed for this call session.
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div>
-                <div className="bg-light rounded-3 p-3 mb-4 border-start border-3 border-success">
-                  <h6 className="fw-bold text-success mb-2 d-flex align-items-center gap-1.5 small text-uppercase tracking-wider">
-                    <i className="bi bi-stars"></i>
-                    <span>Summary</span>
-                  </h6>
-                  <p className="text-dark small mb-0 fw-medium" style={{ lineHeight: "1.5" }}>
-                    Lead {selectedLeadForSummary.name} expressed high interest in our virtual receptionist and custom campaign solutions. They are currently looking to outsource their tier-1 inbound ticketing stack within 30 days. Recommend sending a custom proposal and scheduling a live CRM demo.
-                  </p>
-                </div>
-
-                <h6 className="fw-bold mb-3 d-flex align-items-center gap-2 small text-secondary text-uppercase tracking-wider">
-                  <i className="bi bi-mic text-danger"></i>
-                  <span>Transcript</span>
-                </h6>
-                <div className="p-3 bg-light rounded-3 border overflow-auto mb-4" style={{ maxHeight: "250px", backgroundColor: "#fafafa" }}>
-                  <div className="d-flex flex-column gap-3">
-                    <div className="d-flex flex-column align-items-start">
-                      <span className="x-small text-muted mb-1 fw-bold">{selectedLeadForSummary.name}</span>
-                      <div className="p-2 px-3 small bg-white border text-dark" style={{ borderRadius: "14px 14px 14px 2px", maxWidth: "85%" }}>
-                        Hello, yes, I'm calling to inquire about your outbound lead generation and CRM call center outsourcing. We have about 500 new contacts weekly and we are struggling to follow up.
+                          );
+                        })}
                       </div>
+                    ) : (
+                      <div className="text-center py-4 text-secondary small">
+                        <i className="bi bi-file-earmark-text d-block mb-2 fs-4 opacity-50"></i>
+                        Raw voice transcript was not processed for this call session.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. Requirement Block (At Last) */}
+                  <h6 className="fw-bold mb-3 d-flex align-items-center gap-2 small text-secondary text-uppercase tracking-wider">
+                    <i className="bi bi-clipboard-check text-success"></i>
+                    <span>Requirement</span>
+                  </h6>
+                  <div className="border rounded-3 p-3 mb-4" style={{ backgroundColor: "#ffffff" }}>
+                    <div className="text-dark small mb-0 fw-medium d-flex align-items-start gap-3">
+                      <i className="bi bi-check-circle-fill text-success mt-0.5" style={{ fontSize: "14px", marginRight: "10px" }}></i>
+                      <span>
+                        {selectedLeadForSummary.calls[0].notes || `Full-stack CRM integration for 500+ weekly outbound contacts, call routing setup, and timeline charts.`}
+                      </span>
                     </div>
-                    <div className="d-flex flex-column align-items-end">
-                      <span className="x-small text-muted mb-1 fw-bold">Sales Agent</span>
-                      <div className="p-2 px-3 small bg-primary text-white" style={{ borderRadius: "14px 14px 2px 14px", maxWidth: "85%" }}>
-                        That's perfect! Our platform is designed specifically to handle outbound dialing workflows. We synchronize your leads instantly and route them to designated sales representatives within 5 seconds.
+                  </div>
+
+                </div>
+              ) : (
+                <div>
+                  {/* 1. Summary Block */}
+                  <div className="bg-light rounded-3 p-3 mb-4 border-start border-3 border-success">
+                    <h6 className="fw-bold text-success mb-2 d-flex align-items-center gap-1.5 small text-uppercase tracking-wider">
+                      <i className="bi bi-stars"></i>
+                      <span>Summary</span>
+                    </h6>
+                    <p className="text-dark small mb-0 fw-medium" style={{ lineHeight: "1.5" }}>
+                      Lead {selectedLeadForSummary.name} expressed high interest in our virtual receptionist and custom campaign solutions. They are currently looking to outsource their tier-1 inbound ticketing stack within 30 days. Recommend sending a custom proposal and scheduling a live CRM demo.
+                    </p>
+                  </div>
+
+                  {/* 2. Transcript Block (In Center) */}
+                  <h6 className="fw-bold mb-3 d-flex align-items-center gap-2 small text-secondary text-uppercase tracking-wider">
+                    <i className="bi bi-mic text-danger"></i>
+                    <span>Transcript</span>
+                  </h6>
+                  <div className="p-3 bg-light rounded-3 border overflow-auto mb-4" style={{ maxHeight: "250px", backgroundColor: "#fafafa" }}>
+                    <div className="d-flex flex-column gap-3">
+                      <div className="d-flex flex-column align-items-start">
+                        <span className="x-small text-muted mb-1 fw-bold">{selectedLeadForSummary.name}</span>
+                        <div className="p-2 px-3 small bg-white border text-dark" style={{ borderRadius: "14px 14px 14px 2px", maxWidth: "85%" }}>
+                          {"Hello, yes, I'm calling to inquire about your outbound lead generation and CRM call center outsourcing. We have about 500 new contacts weekly and we are struggling to follow up."}
+                        </div>
+                      </div>
+                      <div className="d-flex flex-column align-items-end">
+                        <span className="x-small text-muted mb-1 fw-bold">Sales Agent</span>
+                        <div className="p-2 px-3 small bg-primary text-white" style={{ borderRadius: "14px 14px 2px 14px", maxWidth: "85%" }}>
+                          {"That's perfect! Our platform is designed specifically to handle outbound dialing workflows. We synchronize your leads instantly and route them to designated sales representatives within 5 seconds."}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            )}
 
-            <div className="mt-4 border-top pt-3 d-flex justify-content-end">
+                  {/* 3. Requirement Block (At Last) */}
+                  <h6 className="fw-bold mb-3 d-flex align-items-center gap-2 small text-secondary text-uppercase tracking-wider">
+                    <i className="bi bi-clipboard-check text-success"></i>
+                    <span>Requirement</span>
+                  </h6>
+                  <div className="border rounded-3 p-3 mb-4" style={{ backgroundColor: "#ffffff" }}>
+                    <div className="text-dark small mb-0 fw-medium" style={{ lineHeight: "1.7" }}>
+                      <div className="d-flex align-items-start gap-1 mb-1">
+                        <i className="bi bi-check-circle-fill text-success mt-0.5" style={{ fontSize: "14px", marginRight: "10px" }}></i>
+                        <span>Full-stack CRM integration for 500+ weekly outbound contacts.</span>
+                      </div>
+                      <div className="d-flex align-items-start gap-1 mb-1">
+                        <i className="bi bi-check-circle-fill text-success mt-0.5" style={{ fontSize: "14px", marginRight: "10px" }}></i>
+                        <span>Automated call routing to designated agents within 5 seconds.</span>
+                      </div>
+                      <div className="d-flex align-items-start gap-1">
+                        <i className="bi bi-check-circle-fill text-success mt-0.5" style={{ fontSize: "14px", marginRight: "10px" }}></i>
+                        <span>Live timeline charts and speech-to-text transcript logs with AI summarization.</span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              )}
+            </div>
+
+            {/* Sticky Footer */}
+            <div className="mt-3 border-top pt-3 d-flex justify-content-end flex-shrink-0">
               <button 
                 onClick={() => setSelectedLeadForSummary(null)}
-                className="btn btn-secondary px-4 py-2 small fw-bold text-white"
-                style={{ borderRadius: "10px" }}
+                className="btn btn-secondary px-4 py-2 small fw-bold text-white border-0"
+                style={{ borderRadius: "10px", backgroundColor: "#6c757d" }}
               >
                 Close Transcript
               </button>

@@ -23,7 +23,7 @@ function base64urlDecode(str: string): string {
 /**
  * Cryptographically signs a payload with HMAC-SHA256 and returns a JSON Web Token (JWT).
  */
-export function signToken(payload: Record<string, any>, expiresInSeconds: number = 86400): string {
+export function signToken(payload: Record<string, unknown>, expiresInSeconds: number = 86400): string {
   const header = { alg: "HS256", typ: "JWT" };
   const exp = Math.floor(Date.now() / 1000) + expiresInSeconds;
   const fullPayload = { ...payload, exp };
@@ -45,7 +45,7 @@ export function signToken(payload: Record<string, any>, expiresInSeconds: number
  * Decodes and cryptographically verifies a JSON Web Token (JWT) signature and expiration.
  * Returns the decoded payload or null if invalid or expired.
  */
-export function verifyToken(token: string): Record<string, any> | null {
+export function verifyToken(token: string): Record<string, unknown> | null {
   try {
     const parts = token.split(".");
     if (parts.length !== 3) return null;
@@ -64,13 +64,14 @@ export function verifyToken(token: string): Record<string, any> | null {
       return null;
     }
 
-    const decodedPayload = JSON.parse(base64urlDecode(payload));
-    if (decodedPayload.exp && decodedPayload.exp < Math.floor(Date.now() / 1000)) {
+    const decodedPayload = JSON.parse(base64urlDecode(payload)) as Record<string, unknown>;
+    const exp = decodedPayload.exp as number | undefined;
+    if (exp && exp < Math.floor(Date.now() / 1000)) {
       return null; // Token has expired
     }
 
     return decodedPayload;
-  } catch (error) {
+  } catch {
     return null;
   }
 }

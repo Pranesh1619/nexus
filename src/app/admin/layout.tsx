@@ -17,7 +17,7 @@ export default async function AdminLayout({
     redirect("/login");
   }
 
-  const payload = verifyToken(token);
+  const payload = verifyToken(token) as any;
   if (!payload) {
     // Clear invalid cookies
     cookieStore.delete("auth_token");

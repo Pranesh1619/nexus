@@ -80,7 +80,7 @@ export default async function CallViewPage({ params }: { params: Promise<{ id: s
                         <span className="fw-bold small text-success">Lead: {call.lead.name}</span>
                         <span className="x-small text-secondary">00:12</span>
                       </div>
-                      <p className="small mb-0 text-dark">Hi, I'm interested in scaling our customer support team and heard you provide managed services for the tech sector.</p>
+                      <p className="small mb-0 text-dark">{"Hi, I'm interested in scaling our customer support team and heard you provide managed services for the tech sector."}</p>
                     </div>
                   </div>
 

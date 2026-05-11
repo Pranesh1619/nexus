@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/db";
-import { updateUserInfo } from "./actions";
 import SettingsClient from "./SettingsClient";
 import ProfileClient from "./ProfileClient";
 

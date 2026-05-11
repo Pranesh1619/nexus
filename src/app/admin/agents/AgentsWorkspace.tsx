@@ -49,11 +49,11 @@ type Agent = {
 };
 
 interface AgentsWorkspaceProps {
-  initialAgents: any[]; // will cast to Agent[]
+  initialAgents: Agent[];
 }
 
 export default function AgentsWorkspace({ initialAgents }: AgentsWorkspaceProps) {
-  const agents = initialAgents as Agent[];
+  const agents = initialAgents;
   const router = useRouter();
 
   // Always pre-select the first agent in the list
@@ -361,7 +361,7 @@ export default function AgentsWorkspace({ initialAgents }: AgentsWorkspaceProps)
                   <i className="bi bi-person-workspace text-primary"></i>
                   <span>Assigned Pipelines & Leads</span>
                 </h5>
-                <p className="text-secondary x-small mb-0">Click any row to open that lead's full detail profile.</p>
+                <p className="text-secondary x-small mb-0">{"Click any row to open that lead's full detail profile."}</p>
               </div>
               <span className="badge bg-primary bg-opacity-10 text-primary rounded-pill px-2.5 py-1 small fw-bold">
                 {selectedAgent.leads.length} Records
@@ -473,7 +473,7 @@ export default function AgentsWorkspace({ initialAgents }: AgentsWorkspaceProps)
                   <i className="bi bi-telephone-outbound-fill text-info"></i>
                   <span>Interactive Call logs & Analysis</span>
                 </h5>
-                <p className="text-secondary x-small mb-0">Click any row to open that call's AI transcript and quality analysis.</p>
+                <p className="text-secondary x-small mb-0">{"Click any row to open that call's AI transcript and quality analysis."}</p>
               </div>
               <span className="badge bg-info bg-opacity-10 text-info rounded-pill px-2.5 py-1 small fw-bold">
                 {selectedAgent.calls.length} Interactions

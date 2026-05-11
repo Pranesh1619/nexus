@@ -65,7 +65,7 @@ export async function resetPasswordDirect(formData: FormData) {
 
     revalidatePath("/login");
     return { success: true };
-  } catch (error) {
+  } catch {
     return { error: "Failed to update password" };
   }
 }

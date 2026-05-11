@@ -3,11 +3,30 @@
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import StatusModal from "@/components/StatusModal";
 import { deleteCallLog } from "./actions";
 
+export interface CallLogListItem {
+  id: string;
+  createdAt: string | Date;
+  status: string;
+  stage: string;
+  duration: number | null;
+  aiScore: number | null;
+  userId: string;
+  lead: {
+    id: string;
+    name: string;
+    phone: string;
+    status: string;
+  };
+  user: {
+    id: string;
+    name: string;
+  };
+}
+
 // Consistent scoring logic for the list view
-function getDisplayScore(log: any) {
+function getDisplayScore(log: CallLogListItem) {
   if (log.aiScore && log.aiScore > 0) return log.aiScore;
 
   // Dynamic fallback based on stage if score not in DB
@@ -35,7 +54,7 @@ function getCallOutcome(status: string, stage: string, leadStatus?: string) {
   return { label: "Contact Successful", class: "bg-opacity-10 text-primary" };
 }
 
-export default function CallList({ logs }: { logs: any[] }) {
+export default function CallList({ logs }: { logs: CallLogListItem[] }) {
   const router = useRouter();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -123,7 +142,7 @@ export default function CallList({ logs }: { logs: any[] }) {
             {/* Status Dropdown - No label */}
             <select
               value={selectedFilter}
-              onChange={(e) => setSelectedFilter(e.target.value as any)}
+              onChange={(e) => setSelectedFilter(e.target.value as "all" | "missed" | "connected" | "converted")}
               className="form-select form-select-sm border cursor-pointer"
               style={{ width: "150px", borderRadius: "50px", height: "36px", paddingLeft: "15px", paddingRight: "30px", fontWeight: "600" }}
             >

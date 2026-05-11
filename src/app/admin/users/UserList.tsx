@@ -3,7 +3,6 @@
 import React, { useState, useTransition } from "react";
 import Link from "next/link";
 import { deleteUser } from "./actions";
-import StatusModal from "@/components/StatusModal";
 
 interface User {
   id: string;

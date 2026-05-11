@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition, useMemo, useEffect, useRef } from "react";
+import React, { useState, useTransition, useMemo, useRef } from "react";
 import { assignLeadToUser } from "./actions";
 
 type User = {
@@ -44,11 +44,12 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
 
   // Local client state for instant, blistering-fast responsive Drag & Drop (Optimistic UI)
   const [leadsState, setLeadsState] = useState<Lead[]>(leads);
+  const [prevLeads, setPrevLeads] = useState<Lead[]>(leads);
 
-  // Sync client state instantly if server props change
-  useEffect(() => {
+  if (leads !== prevLeads) {
     setLeadsState(leads);
-  }, [leads]);
+    setPrevLeads(leads);
+  }
 
   // Dropdown-driven lead assignment state variables (highly mobile/touch responsive)
   const [selectedLeadForAssign, setSelectedLeadForAssign] = useState<Lead | null>(null);
@@ -95,7 +96,7 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
   // Client-Side Search Filters for high scale (1000+ records)
   const [agentSearch, setAgentSearch] = useState("");
   const [unassignedLeadsSearch, setUnassignedLeadsSearch] = useState("");
-  const [agentLeadsSearch, setAgentLeadsSearch] = useState<{ [userId: string]: string }>({});
+
 
   // 1. Memoized calculation of unassigned pool
   const unassignedLeads = useMemo(() => {
@@ -407,13 +408,13 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
                 <div className="card border-0 shadow-sm p-5 text-center bg-white" style={{ borderRadius: "16px" }}>
                   <i className="bi bi-people fs-1 text-muted mb-3"></i>
                   <h5 className="fw-bold text-dark">No Agents Found</h5>
-                  <p className="text-secondary small mb-0">No sales agents matched your current search query "{agentSearch}".</p>
+                  <p className="text-secondary small mb-0">{"No sales agents matched your current search query \""}{agentSearch}{"\"."}</p>
                 </div>
               </div>
             ) : (
               filteredAgents.map((agent) => {
                 const agentLeads = leadsState.filter(l => l.assignedTo === agent.id);
-                const searchVal = agentLeadsSearch[agent.id] || "";
+                const searchVal = "";
                 const filteredAgentLeads = agentLeads.filter(lead =>
                   lead.name.toLowerCase().includes(searchVal.toLowerCase()) ||
                   (lead.company || "").toLowerCase().includes(searchVal.toLowerCase()) ||
@@ -565,7 +566,7 @@ export default function SalesFloorWorkspace({ agents, leads }: SalesFloorWorkspa
                 <i className="bi bi-person-check fs-3"></i>
               </div>
               <h5 className="fw-bold mb-1">Assign Representative</h5>
-              <p className="text-secondary small">Route <strong>{selectedLeadForAssign.name}</strong> to an active representative's pipeline.</p>
+              <p className="text-secondary small">{"Route "}<strong>{selectedLeadForAssign.name}</strong>{" to an active representative's pipeline."}</p>
             </div>
 
             <div className="mb-3">

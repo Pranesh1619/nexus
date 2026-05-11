@@ -28,7 +28,8 @@ export default function LeadAssignWrapper({ leadId, currentAssignedTo, agents, m
 
   // Safely handle client-side rendering to prevent server-side hydration mismatches during portal rendering
   useEffect(() => {
-    setMounted(true);
+    const timer = setTimeout(() => setMounted(true), 0);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleAssign = () => {

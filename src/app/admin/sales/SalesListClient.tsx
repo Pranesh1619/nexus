@@ -5,7 +5,13 @@ import Link from "next/link";
 import DeleteButton from "@/components/DeleteButton";
 import { deleteUser } from "./actions";
 
-export default function SalesListClient({ users }: { users: any[] }) {
+interface SalesAgent {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export default function SalesListClient({ users }: { users: SalesAgent[] }) {
   return (
     <div className="card border-0 shadow-sm">
       <div className="table-responsive">

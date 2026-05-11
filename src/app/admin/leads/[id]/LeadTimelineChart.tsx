@@ -33,7 +33,8 @@ export default function LeadTimelineChart({ calls }: LeadTimelineChartProps) {
   // Hydration state check to prevent server-side measuring warnings
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => {
-    setIsMounted(true);
+    const timer = setTimeout(() => setIsMounted(true), 0);
+    return () => clearTimeout(timer);
   }, []);
 
   // Chronological sorted calls

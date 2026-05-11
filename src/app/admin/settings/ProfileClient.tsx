@@ -4,7 +4,15 @@ import React, { useState } from "react";
 import { updateUserInfo } from "./actions";
 import StatusModal from "@/components/StatusModal";
 
-export default function ProfileClient({ user }: { user: any }) {
+interface ProfileUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+}
+
+export default function ProfileClient({ user }: { user: ProfileUser }) {
   const [success, setSuccess] = useState(false);
 
   async function handleSubmit(formData: FormData) {

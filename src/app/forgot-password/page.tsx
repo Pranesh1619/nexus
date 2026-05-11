@@ -18,7 +18,7 @@ export default function ForgotPasswordPage() {
         <div className="text-center mb-4">
           <i className="bi bi-intersect text-success fs-1"></i>
           <h2 className="fw-bold mt-2">Forgot password?</h2>
-          <p className="text-secondary small">Enter your email and we'll send you a link.</p>
+          <p className="text-secondary small">{"Enter your email and we'll send you a link."}</p>
         </div>
 
         {!submitted ? (
@@ -43,7 +43,7 @@ export default function ForgotPasswordPage() {
           <div className="text-center py-4">
             <i className="bi bi-check-circle text-success fs-1 mb-3"></i>
             <h5 className="fw-bold">Check your email</h5>
-            <p className="text-secondary small">We've sent a password reset link to <strong>{email}</strong>.</p>
+            <p className="text-secondary small">{"We've sent a password reset link to "}<strong>{email}</strong>.</p>
           </div>
         )}
 

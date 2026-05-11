@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useTransition, useEffect } from "react";
+import React, { useState, useMemo, useTransition } from "react";
 import Link from "next/link";
 import { updateLeadStatus } from "../leads/actions";
 
@@ -30,13 +30,14 @@ const STAGES = [
 ];
 
 export default function DealsPipelineClient({ initialLeads }: DealsPipelineClientProps) {
-  const [leadsState, setLeadsState] = useState<Lead[]>(initialLeads);
   const [isPending, startTransition] = useTransition();
+  const [leadsState, setLeadsState] = useState<Lead[]>(initialLeads);
+  const [prevInitialLeads, setPrevInitialLeads] = useState<Lead[]>(initialLeads);
 
-  // Sync client state instantly if server props change
-  useEffect(() => {
+  if (initialLeads !== prevInitialLeads) {
     setLeadsState(initialLeads);
-  }, [initialLeads]);
+    setPrevInitialLeads(initialLeads);
+  }
 
   // 1. View Mode and Drag-and-Drop States
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
@@ -363,8 +364,6 @@ export default function DealsPipelineClient({ initialLeads }: DealsPipelineClien
               </thead>
               <tbody>
                 {activeDeals.map((deal) => {
-                  const stageObj = STAGES.find(s => s.id === deal.status) || STAGES[0];
-                  
                   // Interactive Stage color presets
                   let stageBg = "rgba(13, 110, 253, 0.1)";
                   let stageColor = "#0d6efd";

@@ -5,20 +5,17 @@ import Link from "next/link";
 import { 
   AreaChart,
   Area,
-  BarChart, 
-  Bar, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  ResponsiveContainer,
-  Cell
+  ResponsiveContainer
 } from "recharts";
 
-type CallLogWithRelations = {
+export type CallLogWithRelations = {
   id: string;
-  startTime: Date;
-  endTime: Date | null;
+  startTime: Date | string;
+  endTime: Date | string | null;
   duration: number | null;
   status: string;
   stage: string;
@@ -28,7 +25,7 @@ type CallLogWithRelations = {
   notes: string | null;
   leadId: string;
   userId: string;
-  createdAt: Date;
+  createdAt: Date | string;
   lead: {
     id: string;
     name: string;
@@ -44,16 +41,16 @@ type CallLogWithRelations = {
   };
 };
 
-type Lead = {
+export type Lead = {
   id: string;
   name: string;
   phone: string;
   status: string;
   source: string | null;
-  createdAt: Date;
+  createdAt: Date | string;
 };
 
-type User = {
+export type User = {
   id: string;
   name: string;
   email: string;
@@ -67,7 +64,7 @@ interface DashboardClientProps {
   initialUsers: User[];
 }
 
-export default function DashboardClient({ initialCalls, initialLeads, initialUsers }: DashboardClientProps) {
+export default function DashboardClient({ initialCalls }: DashboardClientProps) {
   // 1. Top Filters State
   const [activeModule, setActiveModule] = useState<"all" | "sales" | "support" | "leads">("all");
   const [timePeriod, setTimePeriod] = useState<"7days" | "30days" | "thisyear">("7days");
@@ -129,7 +126,7 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
         status: "CONNECTED",
         stage: activeModule === "support" ? "Technical Support" : "Qualified",
         aiScore: 92,
-        createdAt: new Date()
+        createdAt: new Date("2026-05-11T04:00:00Z")
       },
       {
         id: "mock2",
@@ -139,7 +136,7 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
         status: "CONNECTED",
         stage: activeModule === "support" ? "Billing Inquiry" : "Interested",
         aiScore: 84,
-        createdAt: new Date(Date.now() - 3600000)
+        createdAt: new Date("2026-05-11T03:00:00Z")
       },
       {
         id: "mock3",
@@ -149,7 +146,7 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
         status: "MISSED",
         stage: "Attempted Contact",
         aiScore: 0,
-        createdAt: new Date(Date.now() - 7200000)
+        createdAt: new Date("2026-05-11T02:00:00Z")
       },
       {
         id: "mock4",
@@ -159,7 +156,7 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
         status: "CONNECTED",
         stage: activeModule === "support" ? "Incident Resolved" : "New Lead",
         aiScore: 78,
-        createdAt: new Date(Date.now() - 14400000)
+        createdAt: new Date("2026-05-11T00:00:00Z")
       }
     ];
 
@@ -552,9 +549,9 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
                       <td className="text-center">
                         {call.status === "CONNECTED" ? (
                           <span className={`fw-bold small ${
-                            call.aiScore >= 85 ? "text-success" : call.aiScore >= 75 ? "text-warning" : "text-danger"
+                            (call.aiScore ?? 0) >= 85 ? "text-success" : (call.aiScore ?? 0) >= 75 ? "text-warning" : "text-danger"
                           }`}>
-                            {call.aiScore}%
+                            {call.aiScore ?? 0}%
                           </span>
                         ) : (
                           <span className="text-muted small">—</span>

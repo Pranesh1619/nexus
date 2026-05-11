@@ -36,7 +36,7 @@ export async function getUsers(role: string = "SALES") {
 
   // Auto-provision 2 sales agent personas if fewer than 2 exist
   if (users.length < 2) {
-    const john = await prisma.user.upsert({
+    await prisma.user.upsert({
       where: { email: "john@virpa.com" },
       update: {},
       create: {
@@ -47,7 +47,7 @@ export async function getUsers(role: string = "SALES") {
       }
     });
 
-    const jane = await prisma.user.upsert({
+    await prisma.user.upsert({
       where: { email: "jane@virpa.com" },
       update: {},
       create: {

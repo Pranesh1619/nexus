@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
 import React from "react";
 import { getLeads } from "./actions";
-import Link from "next/link";
 import LeadList from "./LeadList";
 import StatusModal from "@/components/StatusModal";
 

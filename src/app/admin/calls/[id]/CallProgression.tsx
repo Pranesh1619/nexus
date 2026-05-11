@@ -126,10 +126,15 @@ export default function CallProgression({ callId, currentStage, aiScore, analysi
         <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center text-center animate-fade" style={{ zIndex: 9999, backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}>
           {/* Pure CSS Confetti Particles */}
           {Array.from({ length: 60 }).map((_, idx) => {
-            const left = Math.random() * 100;
-            const delay = Math.random() * 2.5;
-            const color = ["#00A76F", "#ffc107", "#0d6efd", "#e91e63", "#9c27b0"][Math.floor(Math.random() * 5)];
-            const size = Math.random() * 8 + 6;
+            const pseudoRandom = (seed: number) => {
+              const x = Math.sin(seed) * 10000;
+              return x - Math.floor(x);
+            };
+            const left = pseudoRandom(idx + 1) * 100;
+            const delay = pseudoRandom(idx + 2) * 2.5;
+            const size = pseudoRandom(idx + 3) * 8 + 6;
+            const colorsList = ["#00A76F", "#ffc107", "#0d6efd", "#e91e63", "#9c27b0"];
+            const color = colorsList[Math.floor(pseudoRandom(idx + 4) * colorsList.length)];
             return (
               <div 
                 key={idx} 
@@ -180,8 +185,8 @@ export default function CallProgression({ callId, currentStage, aiScore, analysi
 
             <div className="display-3 mb-3 animate-bounce">💪 ❤️ 🤝</div>
             <h2 className="fw-bold text-dark mb-2">Keep Pushing!</h2>
-            <p className="lead fw-semibold text-danger mb-3" style={{ fontSize: "1.3rem" }}>Every 'No' brings us closer to a 'Yes'!</p>
-            <p className="text-secondary small mb-0">Recording outcome and updating sales logs. We'll win the next one!</p>
+            <p className="lead fw-semibold text-danger mb-3" style={{ fontSize: "1.3rem" }}>{"Every 'No' brings us closer to a 'Yes'!"}</p>
+            <p className="text-secondary small mb-0">{"Recording outcome and updating sales logs. We'll win the next one!"}</p>
           </div>
         </div>
       )}

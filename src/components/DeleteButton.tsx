@@ -12,7 +12,6 @@ interface DeleteButtonProps {
 }
 
 export default function DeleteButton({ 
-  id, 
   onDelete, 
   label = "Delete", 
   className = "btn btn-light border text-danger px-3 py-1 small",

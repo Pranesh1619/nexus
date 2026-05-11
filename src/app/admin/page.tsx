@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import React from "react";
 import { prisma } from "@/lib/db";
-import DashboardClient from "./DashboardClient";
+import DashboardClient, { CallLogWithRelations, Lead, User } from "./DashboardClient";
 
 export const dynamic = "force-dynamic";
 
@@ -63,9 +63,9 @@ export default async function AdminDashboardPage() {
 
   return (
     <DashboardClient 
-      initialCalls={serializedCalls as any} 
-      initialLeads={serializedLeads as any} 
-      initialUsers={serializedUsers as any} 
+      initialCalls={serializedCalls as unknown as CallLogWithRelations[]} 
+      initialLeads={serializedLeads as unknown as Lead[]} 
+      initialUsers={serializedUsers as unknown as User[]} 
     />
   );
 }

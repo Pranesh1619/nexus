@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useTransition } from "react";
 import { updateLead } from "../../actions";
 import { useRouter } from "next/navigation";
 import Link from "next/link";

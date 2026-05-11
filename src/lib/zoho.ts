@@ -1,6 +1,5 @@
 import { prisma } from "./db";
 
-// Structure of a Zoho Lead
 export interface ZohoLead {
   id?: string;
   name: string;
@@ -9,6 +8,19 @@ export interface ZohoLead {
   company: string | null;
   source: string | null;
   status: string; // NEW, CONTACTED, QUALIFIED, WON, LOST
+}
+
+export interface ZohoApiLead {
+  id?: string | null;
+  Phone?: string | null;
+  Mobile?: string | null;
+  Email?: string | null;
+  First_Name?: string | null;
+  Last_Name?: string | null;
+  Company?: string | null;
+  Lead_Source?: string | null;
+  Lead_Status?: string | null;
+  Contact_Status?: string | null;
 }
 
 // Check if credentials are set
@@ -59,7 +71,7 @@ export async function syncWithZoho() {
 
   // 1. Verify if Zoho API is configured in environment variables
   if (isZohoConfigured()) {
-    logs.push(`[CONFIG] Real Zoho CRM environment variables detected. Accessing OAuth2 server...`);
+    logs.push(`[CONFIG] Real Zoho Bigin environment variables detected. Accessing OAuth2 server...`);
     const accessToken = await getZohoAccessToken();
     if (!accessToken) {
       logs.push(`[ERROR] OAuth token exchange failed. Verify client credentials inside .env.`);
@@ -71,16 +83,21 @@ export async function syncWithZoho() {
     try {
       const apiUrl = process.env.ZOHO_API_URL || "https://www.zohoapis.com";
 
-      // A. Pull leads from Zoho
-      logs.push(`[PULL] Querying Zoho CRM: GET /crm/v2/Leads...`);
-      const getLeadsResponse = await fetch(`${apiUrl}/crm/v2/Leads`, {
+      // A. Pull leads from Zoho Bigin
+      logs.push(`[PULL] Querying Zoho Bigin: GET /bigin/v2/Contacts?fields=First_Name,Last_Name,Email,Phone,Lead_Source,Contact_Status,Company...`);
+      const getLeadsResponse = await fetch(`${apiUrl}/bigin/v2/Contacts?fields=First_Name,Last_Name,Email,Phone,Lead_Source,Contact_Status,Company`, {
         headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
       });
 
       if (getLeadsResponse.ok) {
-        const payload = await getLeadsResponse.json();
-        const zohoLeadsList = (payload.data || []) as any[];
-        logs.push(`[PULL] Fetched ${zohoLeadsList.length} leads from Zoho. Evaluating uniqueness...`);
+        let zohoLeadsList: ZohoApiLead[] = [];
+        if (getLeadsResponse.status === 204) {
+          logs.push(`[PULL] No existing contacts found in Zoho Bigin (Empty List).`);
+        } else {
+          const payload = await getLeadsResponse.json();
+          zohoLeadsList = (payload.data || []) as ZohoApiLead[];
+          logs.push(`[PULL] Fetched ${zohoLeadsList.length} leads from Zoho. Evaluating uniqueness...`);
+        }
 
         for (const zLead of zohoLeadsList) {
           const zPhone = zLead.Phone || zLead.Mobile || "";
@@ -88,11 +105,13 @@ export async function syncWithZoho() {
           const zName = `${zLead.First_Name || ""} ${zLead.Last_Name || ""}`.trim() || "Zoho Contact";
           const zCompany = zLead.Company || "Independent";
           const zSource = zLead.Lead_Source || "WEBSITE";
+          
+          const zStatusField = zLead.Contact_Status || zLead.Lead_Status || "";
           let zStatus = "NEW";
-          if (zLead.Lead_Status === "Closed Won" || zLead.Lead_Status === "Won") zStatus = "WON";
-          else if (zLead.Lead_Status === "Closed Lost" || zLead.Lead_Status === "Lost") zStatus = "LOST";
-          else if (zLead.Lead_Status === "Qualified") zStatus = "QUALIFIED";
-          else if (zLead.Lead_Status === "Contacted") zStatus = "CONTACTED";
+          if (zStatusField === "Closed Won" || zStatusField === "Won") zStatus = "WON";
+          else if (zStatusField === "Closed Lost" || zStatusField === "Lost") zStatus = "LOST";
+          else if (zStatusField === "Qualified") zStatus = "QUALIFIED";
+          else if (zStatusField === "Contacted") zStatus = "CONTACTED";
 
           if (!zPhone) {
             logs.push(`[SKIP] Skip Zoho Lead "${zName}": Phone number field is blank.`);
@@ -101,18 +120,36 @@ export async function syncWithZoho() {
           }
 
           // Uniqueness Check (uniqueness on email or phone)
+          const orConditions: any[] = [{ phone: zPhone }];
+          if (zEmail) {
+            orConditions.push({ email: zEmail });
+          }
+
           const existingLead = await prisma.lead.findFirst({
             where: {
-              OR: [
-                { phone: zPhone },
-                zEmail ? { email: zEmail } : undefined,
-              ].filter(Boolean) as any,
+              OR: orConditions,
             },
           });
 
           if (existingLead) {
-            logs.push(`[CHECK] Uniqueness: Match found for "${zName}" (Phone: ${zPhone}). Skip import.`);
-            skippedCount++;
+            // Check if status or company has changed in Zoho Bigin, if so, update locally!
+            const statusChanged = existingLead.status !== zStatus;
+            const companyChanged = existingLead.company !== zCompany && zCompany !== "Independent";
+            
+            if (statusChanged || companyChanged) {
+              await prisma.lead.update({
+                where: { id: existingLead.id },
+                data: {
+                  status: zStatus,
+                  ...(companyChanged ? { company: zCompany } : {}),
+                },
+              });
+              logs.push(`[UPDATE] Updated Lead "${zName}" locally to match Zoho Bigin changes (Status: ${zStatus}, Company: ${zCompany}).`);
+              importedCount++;
+            } else {
+              logs.push(`[CHECK] Uniqueness: Match found for "${zName}" (Phone: ${zPhone}). Skip import.`);
+              skippedCount++;
+            }
           } else {
             // Import unique Zoho lead locally
             await prisma.lead.create({
@@ -125,12 +162,13 @@ export async function syncWithZoho() {
                 status: zStatus,
               },
             });
-            logs.push(`[IMPORT] Created unique lead: "${zName}" successfully synced from Zoho CRM.`);
+            logs.push(`[IMPORT] Created unique lead: "${zName}" successfully synced from Zoho Bigin.`);
             importedCount++;
           }
         }
       } else {
-        logs.push(`[WARN] Failed to fetch leads from Zoho API. Skip pulling.`);
+        const errText = await getLeadsResponse.text();
+        logs.push(`[WARN] Failed to fetch leads from Zoho API. Status: ${getLeadsResponse.status}, Error: ${errText}`);
       }
 
       // B. Push local leads to Zoho
@@ -139,8 +177,8 @@ export async function syncWithZoho() {
       logs.push(`[PUSH] Found ${localLeads.length} total local leads. Synchronizing exports...`);
 
       for (const lead of localLeads) {
-        // Evaluate if lead exists in Zoho CRM (by phone lookup)
-        const checkZohoResponse = await fetch(`${apiUrl}/crm/v2/Leads/search?phone=${lead.phone}`, {
+        // Evaluate if lead exists in Zoho Bigin (by phone lookup)
+        const checkZohoResponse = await fetch(`${apiUrl}/bigin/v2/Contacts/search?phone=${lead.phone}`, {
           headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
         });
 
@@ -153,9 +191,9 @@ export async function syncWithZoho() {
         }
 
         if (!existsInZoho) {
-          logs.push(`[EXPORT] Unique Lead: "${lead.name}" is not on Zoho. Creating in Zoho CRM...`);
-          // Post lead to Zoho CRM
-          const postResponse = await fetch(`${apiUrl}/crm/v2/Leads`, {
+          logs.push(`[EXPORT] Unique Lead: "${lead.name}" is not on Zoho. Creating in Zoho Bigin...`);
+          // Post lead to Zoho Bigin Contacts
+          const postResponse = await fetch(`${apiUrl}/bigin/v2/Contacts`, {
             method: "POST",
             headers: {
               Authorization: `Zoho-oauthtoken ${accessToken}`,
@@ -168,25 +206,28 @@ export async function syncWithZoho() {
                   First_Name: lead.name.split(" ")[0],
                   Phone: lead.phone,
                   Email: lead.email || "",
-                  Company: lead.company || "Independent",
                   Lead_Source: lead.source || "WEBSITE",
-                  Lead_Status: lead.status === "WON" ? "Closed Won" : lead.status === "LOST" ? "Closed Lost" : "New Lead",
+                  Contact_Status: lead.status === "WON" ? "Closed Won" : lead.status === "LOST" ? "Closed Lost" : "New Lead",
+                  // If you create a custom text field named "Company" (as text), you can pass:
+                  Company: lead.company || "Independent",
                 },
               ],
             }),
           });
 
           if (postResponse.ok) {
-            logs.push(`[EXPORT] Successfully created "${lead.name}" in Zoho CRM.`);
+            logs.push(`[EXPORT] Successfully created "${lead.name}" in Zoho Bigin.`);
             exportedCount++;
           } else {
-            logs.push(`[WARN] Export failed for "${lead.name}".`);
+            const errText = await postResponse.text();
+            logs.push(`[WARN] Export failed for "${lead.name}". Status: ${postResponse.status}, Error: ${errText}`);
           }
         }
       }
 
-    } catch (apiError: any) {
-      logs.push(`[ERROR] Sync terminated with API exception: ${apiError.message}`);
+    } catch (apiError: unknown) {
+      const errorMessage = apiError instanceof Error ? apiError.message : String(apiError);
+      logs.push(`[ERROR] Sync terminated with API exception: ${errorMessage}`);
       return { success: false, logs, importedCount, skippedCount, exportedCount };
     }
 
@@ -196,7 +237,7 @@ export async function syncWithZoho() {
 
   // 2. Fallback to Simulated/Sandbox Mode (Elegant Live Demonstration)
   logs.push(`[CONFIG] Zoho API variables not configured in .env. Running in Interactive Sandbox Mode.`);
-  logs.push(`[SANDBOX] Authenticating with simulated Zoho CRM sandbox...`);
+  logs.push(`[SANDBOX] Authenticating with simulated Zoho Bigin sandbox...`);
   logs.push(`[OAUTH] Mock OAuth Token generated: Zoho-oauthtoken sandbox_session_active.`);
 
   // Simulated Zoho Database
@@ -235,18 +276,20 @@ export async function syncWithZoho() {
     },
   ];
 
-  logs.push(`[PULL] Querying Zoho CRM: GET /crm/v2/Leads...`);
+  logs.push(`[PULL] Querying Zoho Bigin: GET /bigin/v2/Contacts...`);
   logs.push(`[PULL] Received ${mockZohoLeads.length} leads. Running duplicate checking against our database...`);
 
   for (const zLead of mockZohoLeads) {
     logs.push(`[CHECK] Uniqueness: Checking if Email: [${zLead.email}] or Phone: [${zLead.phone}] exists...`);
 
+    const orConditions: any[] = [{ phone: zLead.phone }];
+    if (zLead.email) {
+      orConditions.push({ email: zLead.email });
+    }
+
     const existingLead = await prisma.lead.findFirst({
       where: {
-        OR: [
-          { phone: zLead.phone },
-          zLead.email ? { email: zLead.email } : undefined,
-        ].filter(Boolean) as any,
+        OR: orConditions,
       },
     });
 
@@ -270,18 +313,18 @@ export async function syncWithZoho() {
     }
   }
 
-  // Push local leads to Zoho CRM
-  logs.push(`[PUSH] Scanning local database for unsynced leads to export to Zoho...`);
+  // Push local leads to Zoho Bigin
+  logs.push(`[PUSH] Scanning local database for unsynced leads to export to Zoho Bigin...`);
   const localLeads = await prisma.lead.findMany();
   logs.push(`[PUSH] Evaluated ${localLeads.length} local leads. Commencing Zoho synchronization...`);
 
   for (const lead of localLeads) {
     const isMockSource = mockZohoLeads.some(m => m.phone === lead.phone);
     if (!isMockSource) {
-      logs.push(`[EXPORT] Lead "${lead.name}" is unique to local. Exported to Zoho CRM successfully as Record ZC-${Math.floor(100000 + Math.random() * 900000)}.`);
+      logs.push(`[EXPORT] Lead "${lead.name}" is unique to local. Exported to Zoho Bigin successfully as Record ZB-${Math.floor(100000 + Math.random() * 900000)}.`);
       exportedCount++;
     } else {
-      logs.push(`[EXPORT] Lead "${lead.name}" already exists in Zoho CRM. Skipped.`);
+      logs.push(`[EXPORT] Lead "${lead.name}" already exists in Zoho Bigin. Skipped.`);
     }
   }
 
@@ -289,8 +332,8 @@ export async function syncWithZoho() {
   return { success: true, logs, importedCount, skippedCount, exportedCount };
 }
 
-// Update Lead Status inside Zoho CRM when Closed Won / Lost in our app
-export async function updateZohoLeadStatus(leadPhone: string, status: string) {
+// Update Contact Status inside Zoho Bigin when Closed Won / Lost in our app
+export async function updateZohoBiginStatus(leadPhone: string, status: string) {
   if (!leadPhone) return;
 
   const zohoStatusMap: Record<string, string> = {
@@ -310,8 +353,8 @@ export async function updateZohoLeadStatus(leadPhone: string, status: string) {
 
       const apiUrl = process.env.ZOHO_API_URL || "https://www.zohoapis.com";
 
-      // 1. Search Zoho ID of lead by phone number
-      const searchRes = await fetch(`${apiUrl}/crm/v2/Leads/search?phone=${leadPhone}`, {
+      // 1. Search Zoho Bigin ID of contact by phone number
+      const searchRes = await fetch(`${apiUrl}/bigin/v2/Contacts/search?phone=${leadPhone}`, {
         headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
       });
 
@@ -320,8 +363,8 @@ export async function updateZohoLeadStatus(leadPhone: string, status: string) {
         if (searchData.data && searchData.data.length > 0) {
           const zohoId = searchData.data[0].id;
 
-          // 2. Update status of lead by Zoho ID
-          await fetch(`${apiUrl}/crm/v2/Leads`, {
+          // 2. Update status of Contact by Zoho Bigin ID
+          await fetch(`${apiUrl}/bigin/v2/Contacts`, {
             method: "PUT",
             headers: {
               Authorization: `Zoho-oauthtoken ${accessToken}`,
@@ -331,12 +374,12 @@ export async function updateZohoLeadStatus(leadPhone: string, status: string) {
               data: [
                 {
                   id: zohoId,
-                  Lead_Status: zStatus,
+                  Contact_Status: zStatus,
                 },
               ],
             }),
           });
-          console.log(`[ZOHO SYNC] Updated status of ${leadPhone} in Zoho CRM to ${zStatus}`);
+          console.log(`[ZOHO SYNC] Updated status of ${leadPhone} in Zoho Bigin to ${zStatus}`);
         }
       }
     } catch (err) {
@@ -344,6 +387,6 @@ export async function updateZohoLeadStatus(leadPhone: string, status: string) {
     }
   } else {
     // Sandbox Simulation Mode
-    console.log(`[ZOHO SANDBOX] Intercepted status update. Updated lead with Phone: [${leadPhone}] inside Zoho CRM to status: [${zStatus}].`);
+    console.log(`[ZOHO SANDBOX] Intercepted status update. Updated contact with Phone: [${leadPhone}] inside Zoho Bigin to status: [${zStatus}].`);
   }
 }
