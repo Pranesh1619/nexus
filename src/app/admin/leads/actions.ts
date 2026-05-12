@@ -108,3 +108,27 @@ export async function triggerZohoSync() {
   revalidatePath("/admin/agents");
   return result;
 }
+
+export async function checkCrmConnectionStatus() {
+  try {
+    const dbConfig = await prisma.zohoConfig.findUnique({
+      where: { id: "default_zoho_config" }
+    });
+    if (dbConfig && dbConfig.clientId && dbConfig.clientSecret && dbConfig.refreshToken) {
+      return { connected: true, type: "DATABASE" };
+    }
+  } catch (err) {
+    console.warn("[ZOHO SYNC] Database unreachable during CRM connection status check. Falling back to env...", err);
+  }
+
+  try {
+    const { isZohoConfigured } = await import("@/lib/zoho");
+    if (isZohoConfigured()) {
+      return { connected: true, type: "ENV" };
+    }
+  } catch (err) {
+    console.warn("[ZOHO SYNC] Error checking environment variable fallback:", err);
+  }
+
+  return { connected: false };
+}

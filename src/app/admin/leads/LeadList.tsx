@@ -65,6 +65,7 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
     importedCount: number;
     skippedCount: number;
     exportedCount: number;
+    notConfigured?: boolean;
   } | null>(null);
 
   // 1. Delete handler
@@ -756,83 +757,108 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
               )}
             </div>
 
-            {/* Sync Progress Statistics Row */}
-            <div className="row g-3 mb-3">
-              <div className="col-4">
-                <div className="bg-light p-3 rounded-3 text-center border">
-                  <span className="x-small text-secondary text-uppercase fw-bold block" style={{ fontSize: "10px", letterSpacing: "0.3px" }}>Imported (Unique)</span>
-                  <h3 className="fw-bold text-success mb-0 mt-1">
-                    {isSyncing ? "..." : syncResult?.importedCount ?? 0}
-                  </h3>
+            {syncResult?.notConfigured ? (
+              <div className="text-center py-4 px-3 my-2 border rounded-3 bg-light bg-opacity-50">
+                <div className="bg-warning bg-opacity-10 text-warning rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style={{ width: "60px", height: "60px" }}>
+                  <i className="bi bi-shield-exclamation fs-2"></i>
                 </div>
+                <h5 className="fw-bold text-dark mb-2">Zoho Bigin Connection Required</h5>
+                <p className="text-secondary small mx-auto mb-4" style={{ maxWidth: "420px", fontSize: "13px", lineHeight: "1.6" }}>
+                  To start pulling real customer contacts from Zoho Bigin, you need to configure your API keys (Client ID, Secret, and Refresh Token) first.
+                </p>
+                <button 
+                  onClick={() => {
+                    setShowSyncModal(false);
+                    router.push("/admin/migration");
+                  }}
+                  className="btn btn-success text-white fw-bold px-4 py-2.5 small d-inline-flex align-items-center gap-2"
+                  style={{ borderRadius: "10px", backgroundColor: "#00A76F", borderColor: "#00A76F" }}
+                >
+                  <i className="bi bi-cloud-arrow-up-fill"></i>
+                  <span>Go to CRM Sync</span>
+                </button>
               </div>
-              <div className="col-4">
-                <div className="bg-light p-3 rounded-3 text-center border">
-                  <span className="x-small text-secondary text-uppercase fw-bold block" style={{ fontSize: "10px", letterSpacing: "0.3px" }}>Skipped (Duplicates)</span>
-                  <h3 className="fw-bold text-warning mb-0 mt-1">
-                    {isSyncing ? "..." : syncResult?.skippedCount ?? 0}
-                  </h3>
-                </div>
-              </div>
-              <div className="col-4">
-                <div className="bg-light p-3 rounded-3 text-center border">
-                  <span className="x-small text-secondary text-uppercase fw-bold block" style={{ fontSize: "10px", letterSpacing: "0.3px" }}>Exported to Zoho</span>
-                  <h3 className="fw-bold text-primary mb-0 mt-1">
-                    {isSyncing ? "..." : syncResult?.exportedCount ?? 0}
-                  </h3>
-                </div>
-              </div>
-            </div>
-
-            {/* Terminal Console Logs Area */}
-            <h6 className="small fw-bold text-secondary text-uppercase mb-2 d-flex align-items-center gap-2">
-              <i className="bi bi-terminal-fill text-dark"></i>
-              <span>Live Sync Engine Terminal</span>
-              {isSyncing && <span className="spinner-grow spinner-grow-sm text-primary" role="status"></span>}
-            </h6>
-            
-            <div 
-              className="p-3 font-monospace rounded-3 text-start mb-4 shadow-inner" 
-              style={{ 
-                height: "240px", 
-                backgroundColor: "#0d1117", 
-                color: "#c9d1d9", 
-                overflowY: "auto",
-                fontSize: "12px",
-                lineHeight: "1.6",
-                border: "1px solid #30363d"
-              }}
-            >
-              {isSyncing && (
-                <div className="text-info animate-pulse mb-2">
-                  [SYSTEM] Communicating with external Zoho servers... Connecting...
-                </div>
-              )}
-              {syncResult ? (
-                syncResult.logs.map((log, idx) => {
-                  let color = "#c9d1d9";
-                  if (log.startsWith("[IMPORT]")) color = "#4caf50";
-                  else if (log.startsWith("[CHECK]")) color = "#ffeb3b";
-                  else if (log.startsWith("[SKIP]")) color = "#ff9800";
-                  else if (log.startsWith("[EXPORT]")) color = "#2196f3";
-                  else if (log.startsWith("[ERROR]")) color = "#f44336";
-                  else if (log.startsWith("[SYSTEM]")) color = "#00bcd4";
-                  
-                  return (
-                    <div key={idx} style={{ color }}>
-                      {log}
+            ) : (
+              <>
+                {/* Sync Progress Statistics Row */}
+                <div className="row g-3 mb-3">
+                  <div className="col-4">
+                    <div className="bg-light p-3 rounded-3 text-center border">
+                      <span className="x-small text-secondary text-uppercase fw-bold block" style={{ fontSize: "10px", letterSpacing: "0.3px" }}>Imported (Unique)</span>
+                      <h3 className="fw-bold text-success mb-0 mt-1">
+                        {isSyncing ? "..." : syncResult?.importedCount ?? 0}
+                      </h3>
                     </div>
-                  );
-                })
-              ) : (
-                isSyncing && <div className="text-secondary">[PENDING] Fetching records...</div>
-              )}
-            </div>
+                  </div>
+                  <div className="col-4">
+                    <div className="bg-light p-3 rounded-3 text-center border">
+                      <span className="x-small text-secondary text-uppercase fw-bold block" style={{ fontSize: "10px", letterSpacing: "0.3px" }}>Skipped (Duplicates)</span>
+                      <h3 className="fw-bold text-warning mb-0 mt-1">
+                        {isSyncing ? "..." : syncResult?.skippedCount ?? 0}
+                      </h3>
+                    </div>
+                  </div>
+                  <div className="col-4">
+                    <div className="bg-light p-3 rounded-3 text-center border">
+                      <span className="x-small text-secondary text-uppercase fw-bold block" style={{ fontSize: "10px", letterSpacing: "0.3px" }}>Exported to Zoho</span>
+                      <h3 className="fw-bold text-primary mb-0 mt-1">
+                        {isSyncing ? "..." : syncResult?.exportedCount ?? 0}
+                      </h3>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Terminal Console Logs Area */}
+                <h6 className="small fw-bold text-secondary text-uppercase mb-2 d-flex align-items-center gap-2">
+                  <i className="bi bi-terminal-fill text-dark"></i>
+                  <span>Live Sync Engine Terminal</span>
+                  {isSyncing && <span className="spinner-grow spinner-grow-sm text-primary" role="status"></span>}
+                </h6>
+                
+                <div 
+                  className="p-3 font-monospace rounded-3 text-start mb-4 shadow-inner" 
+                  style={{ 
+                    height: "240px", 
+                    backgroundColor: "#0d1117", 
+                    color: "#c9d1d9", 
+                    overflowY: "auto",
+                    fontSize: "12px",
+                    lineHeight: "1.6",
+                    border: "1px solid #30363d"
+                  }}
+                >
+                  {isSyncing && (
+                    <div className="text-info animate-pulse mb-2">
+                      [SYSTEM] Communicating with external Zoho servers... Connecting...
+                    </div>
+                  )}
+                  {syncResult ? (
+                    syncResult.logs.map((log, idx) => {
+                      let color = "#c9d1d9";
+                      if (log.startsWith("[IMPORT]")) color = "#4caf50";
+                      else if (log.startsWith("[CHECK]")) color = "#ffeb3b";
+                      else if (log.startsWith("[SKIP]")) color = "#ff9800";
+                      else if (log.startsWith("[EXPORT]")) color = "#2196f3";
+                      else if (log.startsWith("[ERROR]")) color = "#f44336";
+                      else if (log.startsWith("[SYSTEM]")) color = "#00bcd4";
+                      
+                      return (
+                        <div key={idx} style={{ color }}>
+                          {log}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    isSyncing && <div className="text-secondary">[PENDING] Fetching records...</div>
+                  )}
+                </div>
+              </>
+            )}
 
             <div className="border-top pt-3 d-flex justify-content-between align-items-center">
               <span className="x-small text-secondary d-flex align-items-center gap-1.5 fw-semibold">
-                <span className={`rounded-circle ${isSyncing ? 'bg-warning animate-pulse' : 'bg-success'}`} style={{ width: "8px", height: "8px", display: "inline-block" }}></span>
-                {isSyncing ? "Migration in progress..." : "Database is fully in-sync with Zoho CRM"}
+                <span className={`rounded-circle ${isSyncing ? 'bg-warning animate-pulse' : syncResult?.notConfigured ? 'bg-danger' : 'bg-success'}`} style={{ width: "8px", height: "8px", display: "inline-block" }}></span>
+                {isSyncing ? "Migration in progress..." : syncResult?.notConfigured ? "Configuration Required" : "Database is fully in-sync with Zoho Bigin"}
               </span>
               <button 
                 onClick={() => {
@@ -843,7 +869,7 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
                 className="btn btn-primary px-4 py-2 small fw-bold"
                 style={{ borderRadius: "10px" }}
               >
-                Close & Refresh
+                Close
               </button>
             </div>
           </div>

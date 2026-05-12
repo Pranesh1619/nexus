@@ -23,13 +23,77 @@ export interface ZohoApiLead {
   Contact_Status?: string | null;
 }
 
-// Check if credentials are set
+// Check if credentials are set in environment variables
 export function isZohoConfigured(): boolean {
   return !!(
     process.env.ZOHO_CLIENT_ID &&
     process.env.ZOHO_CLIENT_SECRET &&
     process.env.ZOHO_REFRESH_TOKEN
   );
+}
+
+// Get Zoho Config from Database
+export async function getDbConfig() {
+  try {
+    const config = await prisma.zohoConfig.findUnique({
+      where: { id: "default_zoho_config" },
+    });
+    if (config && config.clientId && config.clientSecret && config.refreshToken) {
+      return config;
+    }
+  } catch (err) {
+    console.error("Failed to read Zoho config from DB:", err);
+  }
+  return null;
+}
+
+// Refresh token helper for DB credentials
+export async function refreshZohoToken(clientId: string, clientSecret: string, refreshToken: string): Promise<string | null> {
+  const regionalUrls = ["https://accounts.zoho.in", "https://accounts.zoho.com"];
+  for (const url of regionalUrls) {
+    try {
+      const response = await fetch(
+        `${url}/oauth/v2/token?grant_type=refresh_token&client_id=${clientId}&client_secret=${clientSecret}&refresh_token=${refreshToken}`,
+        { method: "POST" }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        if (data.access_token) {
+          return data.access_token;
+        }
+      }
+    } catch (e) {
+      console.warn(`Token refresh failed on ${url}:`, e);
+    }
+  }
+  return null;
+}
+
+// Get Active Access Token (from DB config or fall back to .env)
+export async function getActiveZohoAccessToken(): Promise<string | null> {
+  const dbConfig = await getDbConfig();
+  if (dbConfig) {
+    const accessToken = await refreshZohoToken(dbConfig.clientId, dbConfig.clientSecret, dbConfig.refreshToken);
+    if (accessToken) {
+      try {
+        await prisma.zohoConfig.update({
+          where: { id: "default_zoho_config" },
+          data: { accessToken }
+        });
+      } catch (dbErr) {
+        console.warn("Could not cache refreshed accessToken to DB:", dbErr);
+      }
+      return accessToken;
+    }
+  }
+  return await getZohoAccessToken();
+}
+
+// Check if Zoho Bigin is connected (either DB or Env)
+export async function isZohoConnected(): Promise<boolean> {
+  const dbConfig = await getDbConfig();
+  if (dbConfig) return true;
+  return isZohoConfigured();
 }
 
 // Get Access Token from Zoho OAuth
@@ -60,7 +124,6 @@ async function getZohoAccessToken(): Promise<string | null> {
     }
 }
 
-// Actual sync with Zoho API
 export async function syncWithZoho() {
   const logs: string[] = [];
   let importedCount = 0;
@@ -69,18 +132,48 @@ export async function syncWithZoho() {
 
   logs.push(`[SYSTEM] Starting CRM synchronization flow...`);
 
-  // 1. Verify if Zoho API is configured in environment variables
-  if (isZohoConfigured()) {
-    logs.push(`[CONFIG] Real Zoho Bigin environment variables detected. Accessing OAuth2 server...`);
-    const accessToken = await getZohoAccessToken();
-    if (!accessToken) {
-      logs.push(`[ERROR] OAuth token exchange failed. Verify client credentials inside .env.`);
-      return { success: false, logs, importedCount, skippedCount, exportedCount };
-    }
+  // Self-heal legacy anomalously-mapped statuses if present
+  try {
+    await prisma.lead.updateMany({
+      where: { status: "CLOSED_WON" },
+      data: { status: "WON" }
+    });
+    await prisma.lead.updateMany({
+      where: { status: "CLOSED_LOST" },
+      data: { status: "LOST" }
+    });
+  } catch (err) {
+    console.warn("Self-healing legacy lead statuses skipped:", err);
+  }
 
-    logs.push(`[OAUTH] Successfully authenticated. Session Token: Zoho-oauthtoken valid.`);
+  // Check connection status
+  const connected = await isZohoConnected();
+  if (!connected) {
+    logs.push(`[ERROR] Zoho Bigin is not connected.`);
+    return {
+      success: false,
+      notConfigured: true,
+      logs: [
+        `[ERROR] Zoho Bigin is not connected.`,
+        `[ACTION REQUIRED] Please configure your Client ID, Client Secret, and Refresh Token first on the 'CRM Sync' page.`
+      ],
+      importedCount,
+      skippedCount,
+      exportedCount
+    };
+  }
 
-    try {
+  // Get active access token (updates database cache if needed)
+  const accessToken = await getActiveZohoAccessToken();
+  if (!accessToken) {
+    logs.push(`[ERROR] Failed to obtain an active Zoho access token.`);
+    return { success: false, logs, importedCount, skippedCount, exportedCount };
+  }
+
+  logs.push(`[OAUTH] Successfully authenticated. Session Token is active.`);
+
+  try {
+
       const apiUrl = process.env.ZOHO_API_URL || "https://www.zohoapis.com";
 
       // A. Pull leads from Zoho Bigin
@@ -233,7 +326,6 @@ export async function syncWithZoho() {
 
     logs.push(`[SYSTEM] Sync finished successfully!`);
     return { success: true, logs, importedCount, skippedCount, exportedCount };
-  }
 
   // 2. Fallback to Simulated/Sandbox Mode (Elegant Live Demonstration)
   logs.push(`[CONFIG] Zoho API variables not configured in .env. Running in Interactive Sandbox Mode.`);
@@ -346,9 +438,10 @@ export async function updateZohoBiginStatus(leadPhone: string, status: string) {
 
   const zStatus = zohoStatusMap[status.toUpperCase()] || "New Lead";
 
-  if (isZohoConfigured()) {
+  const isConnected = await isZohoConnected();
+  if (isConnected) {
     try {
-      const accessToken = await getZohoAccessToken();
+      const accessToken = await getActiveZohoAccessToken();
       if (!accessToken) return;
 
       const apiUrl = process.env.ZOHO_API_URL || "https://www.zohoapis.com";
@@ -418,9 +511,10 @@ export async function updateZohoBiginContact(leadPhone: string, leadData: {
   const firstName = nameSplit.length > 1 ? nameSplit[0] : "";
   const lastName = nameSplit.length > 1 ? nameSplit.slice(1).join(" ") : nameSplit[0] || "Contact";
 
-  if (isZohoConfigured()) {
+  const isConnected = await isZohoConnected();
+  if (isConnected) {
     try {
-      const accessToken = await getZohoAccessToken();
+      const accessToken = await getActiveZohoAccessToken();
       if (!accessToken) return;
 
       const apiUrl = process.env.ZOHO_API_URL || "https://www.zohoapis.com";

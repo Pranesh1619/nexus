@@ -1,12 +1,28 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { checkCrmConnectionStatus } from "@/app/admin/leads/actions";
 
 export default function DashboardLayout({ children, userRole = "ADMIN", userName = "Administrator" }: { children: React.ReactNode; userRole?: string; userName?: string }) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCrmConnected, setIsCrmConnected] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    async function fetchCrmStatus() {
+      try {
+        const res = await checkCrmConnectionStatus();
+        setIsCrmConnected(!!res.connected);
+      } catch (err) {
+        console.error("Failed to check CRM connection status:", err);
+        setIsCrmConnected(false);
+      }
+    }
+    fetchCrmStatus();
+  }, [pathname]); // Refresh when page changes to keep status fresh
+
 
   const sections = [
     {
@@ -23,7 +39,7 @@ export default function DashboardLayout({ children, userRole = "ADMIN", userName
         ...(userRole === "ADMIN" ? [
           { title: "Users", icon: "bi-people", path: "/admin/users" }
         ] : []),
-        { title: "Migration", icon: "bi-cloud-arrow-up", path: "/admin/migration" }
+        { title: "CRM Sync", icon: "bi-cloud-arrow-up", path: "/admin/migration" }
       ]
     }
   ];
@@ -107,11 +123,25 @@ export default function DashboardLayout({ children, userRole = "ADMIN", userName
             <i className="bi bi-list fs-4 text-dark"></i>
           </button>
 
-          <div className="search-box d-none d-md-flex">
-            <i className="bi bi-search text-secondary"></i>
-            <input type="text" placeholder="Search..." />
-            <span className="badge bg-white text-dark border ms-auto">⌘ K</span>
-          </div>
+          {isCrmConnected !== null && (
+            <div className="d-flex align-items-center gap-2 px-3 py-1.5 rounded-pill border" style={{ 
+              backgroundColor: isCrmConnected ? "rgba(0, 167, 111, 0.08)" : "rgba(108, 117, 125, 0.08)",
+              borderColor: isCrmConnected ? "rgba(0, 167, 111, 0.2)" : "rgba(108, 117, 125, 0.2)"
+            }}>
+              <span className={`rounded-circle ${isCrmConnected ? "animate-pulse" : ""}`} style={{ 
+                width: "8px", 
+                height: "8px", 
+                backgroundColor: isCrmConnected ? "#00A76F" : "#6c757d",
+                display: "inline-block"
+              }} />
+              <span className="fw-bold" style={{ 
+                fontSize: "12px", 
+                color: isCrmConnected ? "#00A76F" : "#6c757d" 
+              }}>
+                {isCrmConnected ? "Bigin Connected" : "Bigin Disconnected"}
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="header-actions">

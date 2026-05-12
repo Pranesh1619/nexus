@@ -153,6 +153,20 @@ export async function exchangeZohoRefreshToken(clientId: string, clientSecret: s
  * Pushes any local unique leads back to Zoho Bigin.
  */
 export async function performZohoSync(accessToken: string) {
+  // Self-heal legacy anomalously-mapped statuses if present
+  try {
+    await prisma.lead.updateMany({
+      where: { status: "CLOSED_WON" },
+      data: { status: "WON" }
+    });
+    await prisma.lead.updateMany({
+      where: { status: "CLOSED_LOST" },
+      data: { status: "LOST" }
+    });
+  } catch (err) {
+    console.warn("Self-healing legacy lead statuses skipped:", err);
+  }
+
   let activeToken = accessToken;
 
   // Dynamically refresh the access token from DB first to guarantee it is always fresh and never 401!
@@ -210,8 +224,8 @@ export async function performZohoSync(accessToken: string) {
   // Map Zoho Bigin Status to Local Status
   const mapZohoStatusToLocal = (zStatus: string) => {
     const s = (zStatus || "").trim().toLowerCase();
-    if (s === "closed won" || s === "won") return "CLOSED_WON";
-    if (s === "closed lost" || s === "lost") return "CLOSED_LOST";
+    if (s === "closed won" || s === "won") return "WON";
+    if (s === "closed lost" || s === "lost") return "LOST";
     if (s === "qualified") return "QUALIFIED";
     if (s === "contacted") return "CONTACTED";
     if (s === "proposal") return "PROPOSAL";

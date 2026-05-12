@@ -174,7 +174,7 @@ export default function MigrationPage() {
                   <i className="bi bi-shield-lock-fill fs-5"></i>
                 </div>
                 <div>
-                  <h5 className="fw-bold text-dark mb-0.5" style={{ fontSize: "15.5px" }}>Zoho API Authentication</h5>
+                  <h5 className="fw-bold text-dark mb-0.5" style={{ fontSize: "15.5px" }}>Bigin Zoho API Authentication</h5>
                   <p className="text-secondary mb-0" style={{ fontSize: "12px" }}>Provide developer console client credentials and handshake keys.</p>
                 </div>
               </div>
@@ -324,11 +324,11 @@ export default function MigrationPage() {
           className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center animate-fade" 
           style={{ 
             zIndex: 9999, 
-            backgroundColor: "rgba(15, 23, 42, 0.8)", 
-            backdropFilter: "blur(12px)" 
+            backgroundColor: "rgba(15, 23, 42, 0.5)", 
+            backdropFilter: "blur(6px)" 
           }}
         >
-          <div className="card border-0 shadow-lg p-4 bg-white text-dark animate-fade" style={{ maxWidth: "720px", width: "95%", borderRadius: "20px" }}>
+          <div className="card border-0 shadow-lg p-4 bg-white text-dark" style={{ maxWidth: "700px", width: "95%", borderRadius: "20px" , height : "95vh" }}>
             <div className="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
               <div className="d-flex align-items-center gap-2">
                 <div className="rounded-circle bg-success bg-opacity-10 text-success d-flex align-items-center justify-content-center animate-bounce" style={{ width: 40, height: 40 }}>
