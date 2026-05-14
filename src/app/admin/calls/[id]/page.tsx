@@ -55,46 +55,84 @@ export default async function CallViewPage({ params }: { params: Promise<{ id: s
       <div className="row g-4">
         {/* Left Column: Transcript */}
         <div className="col-lg-8">
-          <div className="card border-0 shadow-sm">
+          <div className="card border-0 shadow-sm mb-4">
             <div className="card-body p-4">
               <h5 className="fw-bold mb-4 d-flex align-items-center gap-2">
-                <i className="bi bi-card-text text-secondary"></i> Interactive Transcript
+                <i className="bi bi-card-text text-secondary"></i> Interactive Transcript & Translation
               </h5>
-              <div className="transcript-wrapper pe-2" style={{ maxHeight: "450px", overflowY: "auto" }}>
-                <div className="d-flex flex-column gap-4">
-                  <div className="d-flex gap-3 align-items-start">
-                    <div className="bg-primary text-white rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center shadow-sm" style={{ width: 36, height: 36, fontSize: 14 }}>A</div>
-                    <div className="bg-light p-3 rounded-4 flex-grow-1 shadow-sm border">
-                      <div className="d-flex justify-content-between mb-1">
-                        <span className="fw-bold small text-primary">Agent: {call.user.name}</span>
-                        <span className="x-small text-secondary">00:05</span>
-                      </div>
-                      <p className="small mb-0 text-dark">Hello, thank you for reaching out to Virpa Intelligent Sales Agent support. How can I assist you with your business needs today?</p>
-                    </div>
-                  </div>
-                  
-                  <div className="d-flex gap-3 align-items-start flex-row-reverse">
-                    <div className="bg-success text-white rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center shadow-sm" style={{ width: 36, height: 36, fontSize: 14 }}>L</div>
-                    <div className="bg-success bg-opacity-10 p-3 rounded-4 flex-grow-1 shadow-sm border border-success border-opacity-10 text-end">
-                      <div className="d-flex justify-content-between flex-row-reverse mb-1">
-                        <span className="fw-bold small text-success">Lead: {call.lead.name}</span>
-                        <span className="x-small text-secondary">00:12</span>
-                      </div>
-                      <p className="small mb-0 text-dark">{"Hi, I'm interested in scaling our customer support team and heard you provide managed services for the tech sector."}</p>
-                    </div>
-                  </div>
 
-                  <div className="d-flex gap-3 align-items-start">
-                    <div className="bg-primary text-white rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center shadow-sm" style={{ width: 36, height: 36, fontSize: 14 }}>A</div>
-                    <div className="bg-light p-3 rounded-4 flex-grow-1 shadow-sm border">
-                      <div className="d-flex justify-content-between mb-1">
-                        <span className="fw-bold small text-primary">Agent</span>
-                        <span className="x-small text-secondary">00:45</span>
+              {call.detectedVoiceLanguage && (
+                <div className="d-flex flex-wrap gap-3 mb-4 p-3 bg-light rounded-3 border">
+                  <div>
+                    <span className="text-secondary small fw-bold me-2">Detected Language:</span>
+                    <span className="badge bg-primary rounded-pill px-3 py-1.5 capitalize">{call.detectedVoiceLanguage}</span>
+                  </div>
+                  <div>
+                    <span className="text-secondary small fw-bold me-2">Translated To:</span>
+                    <span className="badge bg-success rounded-pill px-3 py-1.5 capitalize">{call.translatedLanguage || "English"}</span>
+                  </div>
+                  {call.wordCount !== null && call.wordCount > 0 && (
+                    <div>
+                      <span className="text-secondary small fw-bold me-2">Word Count:</span>
+                      <span className="fw-bold small">{call.wordCount} words</span>
+                    </div>
+                  )}
+                  {call.duration !== null && (
+                    <div>
+                      <span className="text-secondary small fw-bold me-2">Duration:</span>
+                      <span className="fw-bold small">{call.duration}s</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="transcript-wrapper pe-2" style={{ maxHeight: "450px", overflowY: "auto" }}>
+                {call.translatedText || call.transcript ? (
+                  <div className="bg-light p-4 rounded-4 border shadow-sm mb-3">
+                    <div className="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                      <span className="fw-bold small text-primary">Call Audio Transcript / Translated Text</span>
+                      <span className="x-small text-secondary">{new Date(call.createdAt).toLocaleTimeString()}</span>
+                    </div>
+                    <p className="small mb-0 text-dark" style={{ lineHeight: "1.6" }}>
+                      {call.translatedText || call.transcript}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="d-flex flex-column gap-4">
+                    <div className="d-flex gap-3 align-items-start">
+                      <div className="bg-primary text-white rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center shadow-sm" style={{ width: 36, height: 36, fontSize: 14 }}>A</div>
+                      <div className="bg-light p-3 rounded-4 flex-grow-1 shadow-sm border">
+                        <div className="d-flex justify-content-between mb-1">
+                          <span className="fw-bold small text-primary">Agent: {call.user.name}</span>
+                          <span className="x-small text-secondary">00:05</span>
+                        </div>
+                        <p className="small mb-0 text-dark">Hello, thank you for reaching out to Virpa Intelligent Sales Agent support. How can I assist you with your business needs today?</p>
                       </div>
-                      <p className="small mb-0 text-dark">Absolutely! We specialize in tech-focused support with 24/7 coverage. We can certainly help you scale while maintaining high quality.</p>
+                    </div>
+                    
+                    <div className="d-flex gap-3 align-items-start flex-row-reverse">
+                      <div className="bg-success text-white rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center shadow-sm" style={{ width: 36, height: 36, fontSize: 14 }}>L</div>
+                      <div className="bg-success bg-opacity-10 p-3 rounded-4 flex-grow-1 shadow-sm border border-success border-opacity-10 text-end">
+                        <div className="d-flex justify-content-between flex-row-reverse mb-1">
+                          <span className="fw-bold small text-success">Lead: {call.lead.name}</span>
+                          <span className="x-small text-secondary">00:12</span>
+                        </div>
+                        <p className="small mb-0 text-dark">{"Hi, I'm interested in scaling our customer support team and heard you provide managed services for the tech sector."}</p>
+                      </div>
+                    </div>
+
+                    <div className="d-flex gap-3 align-items-start">
+                      <div className="bg-primary text-white rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center shadow-sm" style={{ width: 36, height: 36, fontSize: 14 }}>A</div>
+                      <div className="bg-light p-3 rounded-4 flex-grow-1 shadow-sm border">
+                        <div className="d-flex justify-content-between mb-1">
+                          <span className="fw-bold small text-primary">Agent</span>
+                          <span className="x-small text-secondary">00:45</span>
+                        </div>
+                        <p className="small mb-0 text-dark">Absolutely! We specialize in tech-focused support with 24/7 coverage. We can certainly help you scale while maintaining high quality.</p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
@@ -118,6 +156,24 @@ export default async function CallViewPage({ params }: { params: Promise<{ id: s
                   <span className="small text-secondary">Phone</span>
                   <span className="small fw-bold">{call.lead.phone}</span>
                 </div>
+                {call.callerPhone && (
+                  <div className="d-flex justify-content-between py-2 border-bottom border-light">
+                    <span className="small text-secondary">Caller Phone</span>
+                    <span className="small fw-bold text-primary">{call.callerPhone}</span>
+                  </div>
+                )}
+                {call.receiverPhone && (
+                  <div className="d-flex justify-content-between py-2 border-bottom border-light">
+                    <span className="small text-secondary">Receiver Phone</span>
+                    <span className="small fw-bold text-success">{call.receiverPhone}</span>
+                  </div>
+                )}
+                {call.jobId && (
+                  <div className="d-flex justify-content-between py-2 border-bottom border-light">
+                    <span className="small text-secondary">Job ID</span>
+                    <span className="small text-truncate ms-3 fw-mono text-muted" style={{ maxWidth: '150px' }}>{call.jobId}</span>
+                  </div>
+                )}
                 <div className="d-flex justify-content-between py-2 border-bottom border-light">
                   <span className="small text-secondary">Email</span>
                   <span className="small fw-bold text-truncate ms-3" style={{ maxWidth: '150px' }}>{call.lead.email || "N/A"}</span>
@@ -137,31 +193,6 @@ export default async function CallViewPage({ params }: { params: Promise<{ id: s
               </Link>
             </div>
           </div>
-
-{/* <div className="card border-0 shadow-sm bg-dark text-white overflow-hidden">
-            <div className="card-body p-4">
-              <h5 className="fw-bold mb-4 d-flex align-items-center gap-2">
-                <i className="bi bi-mic text-danger"></i> Call Recording
-              </h5>
-              <div className="bg-white bg-opacity-10 rounded-4 p-4 text-center border border-white border-opacity-10">
-                <div className="recording-wave d-flex justify-content-center gap-1 mb-4">
-                  {[1,2,3,4,5,6,7].map(i => <div key={i} className="bg-danger rounded-pill" style={{width: 4, height: 15 + Math.random() * 25}}></div>)}
-                </div>
-                <div className="mb-4">
-                  <div className="fw-bold small mb-1">Rec_{call.id.slice(-6)}.mp3</div>
-                  <div className="text-white-50 x-small">Length: {call.duration || "00:00"}s • 2.4 MB</div>
-                </div>
-                <div className="d-flex gap-2 justify-content-center">
-                  <button className="btn btn-danger btn-sm px-4 rounded-pill">
-                    <i className="bi bi-play-fill me-1"></i> Play
-                  </button>
-                  <button className="btn btn-outline-light btn-sm px-3 rounded-pill">
-                    <i className="bi bi-download"></i>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div> */}
         </div>
       </div>
     </div>
