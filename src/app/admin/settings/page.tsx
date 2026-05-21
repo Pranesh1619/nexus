@@ -1,12 +1,15 @@
 import { prisma } from "@/lib/db";
 import SettingsClient from "./SettingsClient";
 import ProfileClient from "./ProfileClient";
+import SipTrunkSettingsClient from "./SipTrunkSettingsClient";
+import { getSipTrunkConfig } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   // Mocking "current user" for demo purposes
   const user = await prisma.user.findFirst();
+  const sipConfig = await getSipTrunkConfig();
 
   if (!user) {
     return (
@@ -17,11 +20,11 @@ export default async function SettingsPage() {
   return (
     <div className="page-container">
       <div className="mb-4">
-        <h3 className="fw-bold mb-1">Account & Security</h3>
-        <p className="text-secondary x-small">Manage your administrative profile and authentication protocols.</p>
+        <h3 className="fw-bold mb-1">Account & Settings</h3>
+        <p className="text-secondary x-small">Manage your administrative profile, security settings, and VoIP telephony configurations.</p>
       </div>
 
-      <div className="row g-4">
+      <div className="row g-4 mb-4">
         <div className="col-lg-7">
           <div className="card border-0 shadow-sm h-100">
             <div className="card-body p-4">
@@ -39,6 +42,13 @@ export default async function SettingsPage() {
           <SettingsClient userId={user.id} />
         </div>
       </div>
+
+      <div className="row">
+        <div className="col-12">
+          {sipConfig && <SipTrunkSettingsClient initialConfig={sipConfig} />}
+        </div>
+      </div>
     </div>
   );
 }
+
