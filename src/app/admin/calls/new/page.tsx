@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { saveCallLog, getActiveSipConfig, placeRealTwilioCall } from "./actions";
+import { saveCallLog, getActiveSipConfig, placeRealTwilioCall, syncSipCallLog, getCallLogStatus, endTwilioCall, getTwilioCallStatus } from "./actions";
 import { getLeadById } from "@/app/admin/leads/actions";
+import { generateConversation } from "@/lib/transcription";
 
 type LeadType = {
   id: string;
@@ -40,6 +41,12 @@ function NewCallContent() {
 
   const [showOutcome, setShowOutcome] = useState(false);
   const [selectedStage, setSelectedStage] = useState("Interested");
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Advanced speech transcription states
+  const [callLanguage, setCallLanguage] = useState("English");
+  const [liveTurns, setLiveTurns] = useState<{ speaker: string; text: string; translation?: string; time: string }[]>([]);
+  const [callSid, setCallSid] = useState<string | null>(null);
 
   // SIP Terminal state
   const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
@@ -115,6 +122,56 @@ function NewCallContent() {
     return () => clearInterval(interval);
   }, [calling]);
 
+  // Poll Twilio call status to automatically disconnect when customer hangs up their phone
+  useEffect(() => {
+    if (!calling || dialMode !== "SIP" || !callSid) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const liveStatus = await getTwilioCallStatus(callSid);
+        if (liveStatus && ["completed", "failed", "busy", "no-answer", "canceled"].includes(liveStatus)) {
+          logToTerminal(`[SYSTEM] Call disconnected by remote party (Twilio Status: ${liveStatus})`);
+          handleEndCall();
+        }
+      } catch (error) {
+        console.error("Error checking live Twilio call status:", error);
+      }
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [calling, dialMode, callSid]);
+
+  // Live conversation streaming based on timer ticks
+  useEffect(() => {
+    if (!calling || !pipelineConnected) return;
+
+    const simulatedConv = generateConversation(
+      lead?.name || "Customer",
+      lead?.company || "Independent Entity",
+      "Agent",
+      callLanguage,
+      "Interested"
+    );
+    
+    let parsedTurns: any[] = [];
+    try {
+      parsedTurns = JSON.parse(simulatedConv.transcript);
+    } catch (e) {
+      console.error(e);
+    }
+
+    const currentTurns: any[] = [];
+    parsedTurns.forEach((turn) => {
+      const parts = turn.time.split(":");
+      const turnSeconds = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+      if (timer >= turnSeconds) {
+        currentTurns.push(turn);
+      }
+    });
+
+    setLiveTurns(currentTurns);
+  }, [timer, calling, pipelineConnected, callLanguage, lead]);
+
   // Scroll to bottom of terminal
   useEffect(() => {
     if (consoleEndRef.current) {
@@ -146,6 +203,8 @@ function NewCallContent() {
     setCalling(true);
     setTimer(0);
     setPipelineConnected(false);
+    setLiveTurns([]);
+    setCallSid(null);
 
     const destPhone = lead ? lead.phone : "Unknown Destination";
     const sipUser = sipConfig ? sipConfig.username : "guest";
@@ -159,13 +218,15 @@ function NewCallContent() {
       logToTerminal(`[CALL] Initiating live outbound call via Twilio Trunk...`);
 
       // Trigger the real Twilio voice outbound call
-      placeRealTwilioCall(leadId).then((res) => {
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      placeRealTwilioCall(leadId, origin, callLanguage).then((res) => {
         if (res.error) {
           logToTerminal(`[ERROR] Twilio Trunk rejected request: ${res.error}`);
           setStatus("Failed to connect");
           setSipStatus("Registered");
           setCalling(false);
         } else {
+          setCallSid(res.callSid || null);
           logToTerminal(`[SYSTEM] Twilio session established. Call SID: ${res.callSid}`);
           logToTerminal(`[SYSTEM] Dispatching SIP INVITE request packet...`);
         }
@@ -254,6 +315,17 @@ function NewCallContent() {
       logToTerminal(`     From: "${sipUser}" <sip:${sipUser}@${sipDom}>;tag=hangup`);
       logToTerminal(`     To: <sip:${destPhone}@${sipDom}>`);
       
+      if (callSid) {
+        logToTerminal(`[SYSTEM] Hanging up active Twilio call Session: ${callSid}...`);
+        endTwilioCall(callSid).then((res) => {
+          if (res?.success) {
+            logToTerminal(`[SYSTEM] Live Twilio Call successfully disconnected.`);
+          } else {
+            console.warn("Twilio call disconnect result:", res?.error);
+          }
+        });
+      }
+      
       setTimeout(() => {
         logToTerminal(`[RX] SIP/2.0 200 OK (BYE Processed)`);
         logToTerminal(`[MEDIA] WebRTC connection terminated.`);
@@ -267,24 +339,73 @@ function NewCallContent() {
   };
 
   const saveOutcome = async () => {
+    setIsSyncing(true);
     setStatus("AI Analysis & Sync in progress...");
-    
-    const result = await saveCallLog({
-      leadId,
-      userId: "placeholder",
-      duration: timer,
-      status: selectedStage === "Not Interested" ? "FAILED" : "CONNECTED",
-      stage: selectedStage, 
-      transcript: dialMode === "SIP" 
-        ? `[SIP CALL - ${sipConfig?.codec || "OPUS"}] Connected via trunk ${sipConfig?.domain}. Lead answered and discussed requirements. Classified: ${selectedStage}.`
-        : `[AI SIMULATED CALL] Auto voice dialog. Lead: I am interested in ${selectedStage}.`,
-      analysis: `Call completed using ${dialMode === "SIP" ? `SIP Trunk (${sipConfig?.domain})` : "Simulated AI dialer"}. Classification: ${selectedStage}.`
-    });
+
+    let result;
+    if (dialMode === "SIP" && callSid) {
+      // Sync the real call via its callSid, either updating the callback data or establishing a placeholder
+      result = await syncSipCallLog({
+        leadId,
+        callSid,
+        duration: timer,
+        stage: selectedStage,
+        userId: "placeholder"
+      });
+    } else {
+      // Generate the final conversation matching the selected outcome stage and language (AI Simulator fallback)
+      const finalConv = generateConversation(
+        lead?.name || "Customer",
+        lead?.company || "Independent Entity",
+        "Agent",
+        callLanguage,
+        selectedStage
+      );
+      
+      result = await saveCallLog({
+        leadId,
+        userId: "placeholder",
+        duration: timer,
+        status: selectedStage === "Not Interested" ? "FAILED" : "CONNECTED",
+        stage: selectedStage, 
+        transcript: finalConv.transcript,
+        translatedText: finalConv.translatedText,
+        detectedVoiceLanguage: finalConv.detectedVoiceLanguage,
+        translatedLanguage: finalConv.translatedLanguage,
+        wordCount: finalConv.wordCount,
+        analysis: finalConv.analysis,
+        aiScore: finalConv.aiScore,
+        ...(callSid ? { jobId: callSid } : {})
+      });
+    }
+
+    if (result && result.id && dialMode === "SIP" && callSid) {
+      let isReal = false;
+      let attempts = 0;
+      const maxAttempts = 15; // Wait up to 22.5 seconds total for Twilio + Groq to finish
+      
+      while (!isReal && attempts < maxAttempts) {
+        // Wait 1.5 seconds between status checks
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        attempts++;
+        
+        try {
+          const freshLog = await getCallLogStatus(result.id);
+          if (freshLog && freshLog.transcript && !freshLog.transcript.includes("Recording is being processed by Twilio")) {
+            isReal = true;
+            result = freshLog;
+          }
+        } catch (error) {
+          console.error("Polling status error:", error);
+        }
+      }
+    }
 
     if (result && result.id) {
       router.push(`/admin/calls/${result.id}`);
     } else {
       router.push("/admin/calls");
+      setIsSyncing(false);
     }
   };
 
@@ -387,6 +508,38 @@ function NewCallContent() {
               </div>
             )}
 
+            {/* Speech & Translation Settings */}
+            <div className="card bg-light border-0 mb-4" style={{ borderRadius: "12px" }}>
+              <div className="card-body p-3">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <span className="small text-secondary fw-bold text-uppercase"><i className="bi bi-translate text-success me-2"></i>Speech & Language Analysis</span>
+                  <span className="badge bg-success bg-opacity-10 text-success x-small fw-bold">Live Translation</span>
+                </div>
+                <div className="row g-2">
+                  <div className="col-12">
+                    <label className="x-small text-secondary fw-bold mb-1">Target Call Language</label>
+                    <select
+                      className="form-select form-select-sm border-0 bg-white"
+                      value={callLanguage}
+                      onChange={(e) => {
+                        setCallLanguage(e.target.value);
+                        logToTerminal(`[SYSTEM] Target Call Language updated to: ${e.target.value}`);
+                      }}
+                      disabled={calling}
+                      style={{ fontSize: "12px", borderRadius: "8px", height: "34px" }}
+                    >
+                      <option value="English">English (United States / UK)</option>
+                      <option value="Spanish">Español (Spain / Latin America)</option>
+                      <option value="Hindi">हिन्दी (India)</option>
+                      <option value="Tamil">தமிழ் (India / Sri Lanka)</option>
+                      <option value="French">Français (France)</option>
+                      <option value="German">Deutsch (Germany)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Pipeline Flow Visualization */}
             {calling && (
               <div className="mb-4 text-center">
@@ -439,6 +592,52 @@ function NewCallContent() {
               </div>
             )}
 
+            {/* Live Transcript Streaming Display (Only for AI Simulator) */}
+            {dialMode === "AI" && (calling || showOutcome || liveTurns.length > 0) && (
+              <div className="mb-4 animate-fade">
+                <div className="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom">
+                  <span className="small text-secondary fw-bold text-uppercase">
+                    <i className="bi bi-chat-text text-primary me-2"></i>Live Speech Transcript
+                  </span>
+                  <span className="x-small text-muted font-monospace">{callLanguage} ({liveTurns.length} turns)</span>
+                </div>
+                <div 
+                  className="bg-light p-3 rounded-3 border overflow-auto" 
+                  style={{ maxHeight: "200px", minHeight: "120px", display: "flex", flexDirection: "column", gap: "10px" }}
+                >
+                  {liveTurns.length === 0 ? (
+                    <div className="text-secondary opacity-50 x-small text-center py-4">
+                      <span className="spinner-grow spinner-grow-sm text-primary me-1.5" role="status"></span>
+                      Listening for speech...
+                    </div>
+                  ) : (
+                    liveTurns.map((turn, idx) => {
+                      const isAgent = turn.speaker === "Agent";
+                      return (
+                        <div key={idx} className={`d-flex flex-column ${isAgent ? "align-items-start" : "align-items-end"}`}>
+                          <div className={`p-2.5 rounded-3 px-3 shadow-sm x-small ${
+                            isAgent 
+                              ? "bg-white text-dark border-start border-primary border-3" 
+                              : "bg-success bg-opacity-10 text-dark border-end border-success border-3 text-end"
+                          }`} style={{ maxWidth: "85%" }}>
+                            <div className="fw-bold mb-0.5" style={{ fontSize: "10px", color: isAgent ? "#0d6efd" : "#198754" }}>
+                              {isAgent ? "Agent" : (lead?.name || "Customer")} • {turn.time}
+                            </div>
+                            <div className="text-dark fw-medium">{turn.text}</div>
+                            {turn.translation && turn.translation !== turn.text && (
+                              <div className="mt-1 pt-1 border-top border-secondary border-opacity-10 text-muted x-small style-italic" style={{ fontSize: "9px" }}>
+                                <span className="fw-bold text-secondary">EN:</span> {turn.translation}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Dialer Call Buttons */}
             <div className="d-flex gap-3 justify-content-center mt-auto">
               {!calling && !showOutcome && (
@@ -447,9 +646,18 @@ function NewCallContent() {
                     dialMode === "SIP" ? "btn-primary" : "btn-success"
                   }`} 
                   onClick={startCall}
+                  disabled={dialMode === "SIP" && sipStatus !== "Registered"}
                 >
-                  <i className="bi bi-telephone-outbound-fill"></i>
-                  <span>{dialMode === "SIP" ? "Initiate Trunk Call" : "Launch AI Call"}</span>
+                  {dialMode === "SIP" && sipStatus !== "Registered" ? (
+                    <span className="spinner-border spinner-border-sm me-1.5" role="status" aria-hidden="true"></span>
+                  ) : (
+                    <i className="bi bi-telephone-outbound-fill"></i>
+                  )}
+                  <span>
+                    {dialMode === "SIP" 
+                      ? (sipStatus === "Registered" ? "Initiate Trunk Call" : "Registering SIP softphone...") 
+                      : "Launch AI Call"}
+                  </span>
                 </button>
               )}
               
@@ -465,6 +673,13 @@ function NewCallContent() {
 
               {showOutcome && (
                 <div className="w-100 animate-fade">
+                  <div className="alert alert-danger bg-danger bg-opacity-10 border-danger border-opacity-10 d-flex align-items-center gap-2 mb-3 py-2.5 rounded-3 animate-pulse">
+                    <i className="bi bi-telephone-x-fill text-danger fs-5"></i>
+                    <div>
+                      <div className="fw-bold small text-danger">Call Disconnected</div>
+                      <div className="x-small text-secondary">The voice session has ended. Choose the call outcome stage below.</div>
+                    </div>
+                  </div>
                   <div className="mb-3">
                     <label className="form-label small fw-bold text-secondary text-uppercase mb-1">Call Outcome / Next Stage</label>
                     <select 
@@ -555,6 +770,25 @@ function NewCallContent() {
           </div>
         </div>
       </div>
+
+      {isSyncing && (
+        <div 
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center bg-black bg-opacity-75 animate-fade"
+          style={{ backdropFilter: "blur(4px)", zIndex: 9999 }}
+        >
+          <div className="card text-center p-4 shadow-lg border-0 bg-dark text-white animate-bounce-in" style={{ borderRadius: "16px", maxWidth: "420px" }}>
+            <div className="card-body">
+              <div className="spinner-border text-info fs-3 mb-3" role="status" style={{ width: "3.5rem", height: "3.5rem" }}>
+                <span className="visually-hidden">Syncing...</span>
+              </div>
+              <h5 className="fw-bold mb-2 text-white"><i className="bi bi-cloud-arrow-down-fill text-info me-2 animate-pulse"></i>Syncing Call Logs & Analysis</h5>
+              <p className="text-secondary small mb-0">
+                Downloading voice recording, transcribing using Groq Whisper, and running translation and CRM analysis. Please wait...
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         .pulse-dialer-active {

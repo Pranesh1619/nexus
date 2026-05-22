@@ -54,6 +54,7 @@ model CallLog {
   analysis              String?  // AI Analysis summary
   aiScore               Int?     @default(0) // 0-100 score
   notes                 String?
+  audioUrl              String?
   leadId                String
   userId                String
   lead                  Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)

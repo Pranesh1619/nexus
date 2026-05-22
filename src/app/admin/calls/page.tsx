@@ -11,7 +11,14 @@ export default async function CallLogsPage() {
   const userId = cookieStore.get("user_id")?.value;
   const userRole = cookieStore.get("user_role")?.value;
 
-  const logs = await getCallLogs(userRole === "SALES" ? userId : undefined);
+  let logs: any[] = [];
+  let dbError = false;
+  try {
+    logs = await getCallLogs(userRole === "SALES" ? userId : undefined);
+  } catch (err) {
+    console.error("Database connection failure in CallLogsPage:", err);
+    dbError = true;
+  }
 
   return (
     <div className="page-container">
@@ -24,6 +31,23 @@ export default async function CallLogsPage() {
           <i className="bi bi-telephone-plus me-2"></i> New Call
         </Link>
       </div>
+
+      {dbError && (
+        <div className="alert alert-danger d-flex align-items-start gap-3 p-4 mb-4 shadow-sm" role="alert" style={{ borderRadius: "12px" }}>
+          <i className="bi bi-exclamation-triangle-fill fs-4 text-danger flex-shrink-0"></i>
+          <div>
+            <h6 className="alert-heading fw-bold mb-1">Database Connection Unreachable</h6>
+            <p className="small mb-2 text-secondary" style={{ lineHeight: "1.5" }}>
+              The application is unable to connect to your PostgreSQL database host on Supabase.
+            </p>
+            <hr className="my-2 border-danger border-opacity-20" />
+            <ul className="small mb-0 text-muted ps-3">
+              <li>Check if your project is **Paused** in the <a href="https://supabase.com" target="_blank" rel="noreferrer" className="alert-link text-decoration-underline text-danger fw-semibold">Supabase Dashboard</a> (click "Restore project").</li>
+              <li>Verify that your local internet or firewall doesn't block outgoing database ports.</li>
+            </ul>
+          </div>
+        </div>
+      )}
 
       <div className="row g-4 mb-4">
         <div className="col-md-3">
