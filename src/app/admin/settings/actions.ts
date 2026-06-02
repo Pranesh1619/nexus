@@ -75,7 +75,8 @@ export async function getSipTrunkConfig() {
         password: "",
         callerId: "",
         codec: "OPUS",
-        isActive: false
+        isActive: false,
+        mockTwilioUrl: ""
       };
     }
     return config;
@@ -93,6 +94,7 @@ export async function saveSipTrunkConfig(data: {
   callerId: string;
   codec: string;
   isActive: boolean;
+  mockTwilioUrl?: string | null;
 }) {
   try {
     const existing = await prisma.sipTrunkConfig.findUnique({
@@ -106,6 +108,7 @@ export async function saveSipTrunkConfig(data: {
       callerId: data.callerId,
       codec: data.codec,
       isActive: data.isActive,
+      mockTwilioUrl: data.mockTwilioUrl || ""
     };
 
     if (data.password !== undefined && data.password !== "") {
@@ -123,6 +126,37 @@ export async function saveSipTrunkConfig(data: {
       },
       update: payload
     });
+
+    // Auto-propagate SIP settings to the self-hosted mock Twilio gateway if configured
+    if (config.mockTwilioUrl) {
+      try {
+        const nextJsUrl = process.env.APP_URL || "http://localhost:3000";
+        const bodyParams = new URLSearchParams();
+        bodyParams.append("sipDomain", config.domain);
+        bodyParams.append("sipUser", config.username);
+        bodyParams.append("sipPass", payload.password || existing?.password || "");
+        bodyParams.append("appUrl", nextJsUrl);
+        // Default to Asterisk mode if enabled, otherwise Simulator. 
+        // Note: The user can still update Telnyx specific variables manually or in the wrapper dashboard.
+        bodyParams.append("telephonyMode", config.isActive ? "asterisk" : "simulator");
+
+        fetch(`${config.mockTwilioUrl.replace(/\/$/, "")}/api/settings`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          body: bodyParams.toString()
+        }).then((res) => {
+          if (res.ok) {
+            console.log(`[SIP SYNC] Successfully synced settings to mock Twilio gateway at ${config.mockTwilioUrl}`);
+          }
+        }).catch(err => {
+          console.warn("[SIP SYNC] Background sync to mock Twilio gateway failed:", err.message);
+        });
+      } catch (urlErr: any) {
+        console.warn("[SIP SYNC] Invalid mockTwilioUrl format. Sync skipped:", urlErr.message);
+      }
+    }
 
     revalidatePath("/admin/settings");
     revalidatePath("/admin/calls/new");

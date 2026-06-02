@@ -1,7 +1,8 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules/
+**/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -17,8 +18,14 @@
 /.next/
 /out/
 
-# production
+# production & build outputs
 /build
+dist/
+**/dist/
+
+# recordings
+twilio/recordings/
+**/recordings/*.wav
 
 # misc
 .DS_Store
@@ -31,7 +38,10 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
-.env*
+.env
+.env.*
+**/.env
+**/.env.*
 
 # vercel
 .vercel
@@ -43,4 +53,3 @@ next-env.d.ts
 /src/generated/prisma
 *.db
 *.db-journal
-.env

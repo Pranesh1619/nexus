@@ -80,6 +80,7 @@ model SipTrunkConfig {
   callerId      String   // Outbound caller ID number (e.g. +1234567890)
   codec         String   @default("OPUS") // OPUS, G711_ULAW, G711_ALAW
   isActive      Boolean  @default(true)
+  mockTwilioUrl String?  // Optional self-hosted mock Twilio server URL (e.g. http://localhost:5050)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }

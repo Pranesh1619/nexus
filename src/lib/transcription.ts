@@ -206,6 +206,42 @@ const DIALOGUES_DATA: Record<
       analysis: (leadName, companyName) => `German call. Lead ${leadName} was busy, stated they manage support in-house, and requested to block further calls.`,
       aiScore: 14
     }
+  },
+  Tamil: {
+    positive: {
+      turns: (leadName, companyName, agentName) => [
+        { speaker: "Agent", time: "00:02", text: `வணக்கம், விர் பேனிக்ஸ் நிறுவனத்திலிருந்து ${agentName} பேசுகிறேன். ${leadName} அவர்களிடம் பேசலாமா?`, translation: `Hello, this is ${agentName} from Virpanix. May I speak with ${leadName}?` },
+        { speaker: "Lead", time: "00:08", text: `ஆமாம், நான் தான் ${leadName} பேசுகிறேன். இது எதைப் பற்றியது?`, translation: `Yes, this is ${leadName} speaking. What is this regarding?` },
+        { speaker: "Agent", time: "00:15", text: `வணக்கம் ${leadName}, நாங்கள் வாடிக்கையாளர் சேவை செயல்பாடுகளை நிர்வகிக்க உதவுகிறோம். இந்த காலாண்டில் உங்கள் வாடிக்கையாளர் ஆதரவை மேம்படுத்த திட்டமிட்டுள்ளீர்களா?`, translation: `Hi ${leadName}, we help scale customer support operations. Are you looking to optimize your support this quarter?` },
+        { speaker: "Lead", time: "00:26", text: `உண்மையில், அது சரியான நேரம். எங்கள் நிறுவனத்தில் வாடிக்கையாளர் டிக்கெட்டுகள் அதிகமாக உள்ளன. உங்கள் சேவைகள் மற்றும் கட்டணங்கள் பற்றிய விவரங்களைப் பகிர முடியுமா?`, translation: `Actually, that is timely. We have high ticket volumes at our company and are looking at outsourcing options. Can you share details and pricing?` },
+        { speaker: "Agent", time: "00:38", text: `நிச்சயமாக! நாங்கள் 24/7 ஆதரவை வழங்குகிறோம். அடுத்த செவ்வாய்க்கிழமை காலை 10 மணிக்கு ஒரு டெமோ விளக்கக்காட்சியை ஏற்பாடு செய்யலாமா?`, translation: `Absolutely! We provide 24/7 support. Can I arrange a demo presentation next Tuesday at 10 AM?` },
+        { speaker: "Lead", time: "00:48", text: `ஆம், அது சரியாக இருக்கும். செவ்வாய்க்கிழமை காலை 10 மணிக்கு செய்யலாம். எனக்கு மின்னஞ்சலில் அழைப்பை அனுப்பவும்.`, translation: `Yes, that sounds perfect. Let's do Tuesday at 10 AM. Send me the invite over email.` }
+      ],
+      analysis: (leadName, companyName) => `Call conducted in Tamil. Lead ${leadName} from ${companyName || "independent firm"} showed high interest due to ticket load. Scheduled Tuesday demo at 10 AM.`,
+      aiScore: 92
+    },
+    neutral: {
+      turns: (leadName, companyName, agentName) => [
+        { speaker: "Agent", time: "00:02", text: `வணக்கம், விர் பேனிக்ஸ் ஆதரவிலிருந்து ${agentName} பேசுகிறேன். நான் உங்களுக்கு எப்படி உதவ முடியும்?`, translation: `Hello, I am ${agentName} from Virpanix Support. How can I assist you today?` },
+        { speaker: "Lead", time: "00:07", text: `வணக்கம், நான் உங்கள் இணையதளத்தைப் பார்த்தேன். உங்களிடம் தமிழ் மற்றும் ஆங்கிலம் இருமொழி ஆதரவு உள்ளதா?`, translation: `Hello, I checked your website. Do you have bilingual support for Tamil and English?` },
+        { speaker: "Agent", time: "00:15", text: `ஆம், எங்களிடம் தமிழ் மற்றும் ஆங்கிலம் பேசக்கூடிய வாடிக்கையாளர் சேவை முகவர்கள் உள்ளனர். உங்களுக்கு எத்தனை பேர் தேவைப்படுவார்கள்?`, translation: `Yes, we have support agents speaking Tamil and English. How many agents would you need?` },
+        { speaker: "Lead", time: "00:23", text: `நாங்கள் இப்போது சிறிய அளவில் தொடங்குகிறோம், சுமார் 2 பேர் தேவைப்படலாம். பட்ஜெட் பற்றி மேலாளருடன் பேச வேண்டும்.`, translation: `We are starting small right now, maybe just 2 agents. I need to discuss the budget with my manager.` },
+        { speaker: "Agent", time: "00:33", text: `புரிந்துகொண்டேன். நான் எங்கள் விலைப்பட்டியலை உங்களுக்கு மின்னஞ்சல் செய்கிறேன், அது உங்கள் மேலாளருடன் விவாதிக்க உதவும்.`, translation: `Understood. I will email you our pricing sheet so you have the details for your manager.` },
+        { speaker: "Lead", time: "00:41", text: `மிகவும் நன்றி. நல்ல நாள் அமையட்டும்.`, translation: `Thank you very much. Have a good day.` }
+      ],
+      analysis: (leadName, companyName) => `Tamil call. Lead ${leadName} enquired about Tamil-English bilingual capabilities. Small team size (2 agents). Shared pricing details over email.`,
+      aiScore: 68
+    },
+    negative: {
+      turns: (leadName, companyName, agentName) => [
+        { speaker: "Agent", time: "00:02", text: `வணக்கம், விர் பேனிக்ஸ் நிறுவனத்திலிருந்து ${agentName} பேசுகிறேன். ${leadName} அவர்களிடம் பேசலாமா?`, translation: `Hello, this is ${agentName} from Virpanix. May I speak with ${leadName}?` },
+        { speaker: "Lead", time: "00:06", text: `நான் இப்போது பிஸியாக இருக்கிறேன். இது எதைப் பற்றியது?`, translation: `I am busy right now. What is this about?` },
+        { speaker: "Agent", time: "00:11", text: `மன்னிக்கவும். உங்கள் நிறுவனத்திற்கான வாடிக்கையாளர் சேவை திட்டங்களைப் பற்றிப் பேச அழைத்தேன்.`, translation: `Apologies. I called to share customer support solutions for your company.` },
+        { speaker: "Lead", time: "00:18", text: `இல்லை, எங்களுக்குத் தேவையில்லை. எங்களிடம் சொந்த ஆதரவு குழு உள்ளது. மீண்டும் அழைக்க வேண்டாம். விடைபெறுகிறேன்.`, translation: `No, we don't need this. We have our own support team. Please do not call again. Goodbye.` }
+      ],
+      analysis: (leadName, companyName) => `Tamil call. Lead ${leadName} was busy and declined services claiming they have an in-house team. Requested to opt-out.`,
+      aiScore: 12
+    }
   }
 };
 
@@ -265,8 +301,11 @@ function findBoundarySplitIndex(rawTranscript: string): { index: number; boundar
     "raccrochez lorsque vous avez termine",
     "legen sie auf wenn sie fertig sind",
     "முடித்ததும் போனை தொங்கவிடவும்",
+    "முடித்ததும் போனை தொங்க விடவும்",
     "போனை தொங்கவிடவும்",
-    "தொங்கவிடவும்"
+    "போனை தொங்க விடவும்",
+    "தொங்கவிடவும்",
+    "தொங்க விடவும்"
   ];
 
   for (const phrase of boundaryPhrases) {
@@ -280,6 +319,154 @@ function findBoundarySplitIndex(rawTranscript: string): { index: number; boundar
   }
 
   return { index: -1, boundaryLength: 0 };
+}
+
+/**
+ * Returns the exact system greeting (text in native script and translation in English)
+ * based on the target language of the call.
+ */
+function getStaticAgentTurn(language: string, leadName: string): { text: string; translation: string } {
+  const normLang = language.toLowerCase();
+  if (normLang === "spanish") {
+    return {
+      text: `Hola ${leadName}. Bienvenido a la consola de ventas de Virpanix. Por favor hable después del tono y grabaremos su mensaje. Cuelgue cuando termine.`,
+      translation: `Hello ${leadName}. Welcome to the Virpanix Sales Console. Please speak your message after the beep, and we will record it. Hang up when you are finished.`
+    };
+  }
+  if (normLang === "hindi") {
+    return {
+      text: `नमस्ते ${leadName} जी। विरपैनिक्स सेल्स कंसोल में आपका स्वागत है। कृपया बीप के बाद अपना संदेश बोलें और हम इसे रिकॉर्ड करेंगे। पूरा होने पर फोन काट दें।`,
+      translation: `Hello ${leadName}. Welcome to the Virpanix Sales Console. Please speak your message after the beep, and we will record it. Hang up when you are finished.`
+    };
+  }
+  if (normLang === "french") {
+    return {
+      text: `Bonjour ${leadName}. Bienvenue sur la console de vente Virpanix. Veuillez parler après le signal sonore et nous enregistrerons votre message. Raccrochez lorsque vous avez terminé.`,
+      translation: `Hello ${leadName}. Welcome to the Virpanix Sales Console. Please speak your message after the beep, and we will record it. Hang up when you are finished.`
+    };
+  }
+  if (normLang === "german") {
+    return {
+      text: `Hallo ${leadName}. Willkommen bei der Virpanix-Verkaufskonsole. Bitte sprechen Sie Ihre Nachricht nach dem Signalton und wir werden sie aufzeichnen. Legen Sie auf, wenn Sie fertig sind.`,
+      translation: `Hello ${leadName}. Welcome to the Virpanix Sales Console. Please speak your message after the beep, and we will record it. Hang up when you are finished.`
+    };
+  }
+  if (normLang === "tamil") {
+    return {
+      text: `வணக்கம் ${leadName}. விர் பேனிக்ஸ் விற்பனை கன்சோலுக்கு உங்களை வரவேற்கிறோம். தயவுசெய்து பீப் ஒலிக்குப் பிறகு உங்கள் செய்தியைப் பேசுங்கள், நாங்கள் அதை பதிவு செய்வோம். நீங்கள் முடித்ததும் போனை தொங்கவிடவும்.`,
+      translation: `Welcome ${leadName}. We welcome you to the Virpanix Sales Console. Please speak your message after the beep, and we will record it. Hang up when you are finished.`
+    };
+  }
+  // Default to English
+  return {
+    text: `Hello ${leadName}. Welcome to the Virpanix Sales Console. Please speak your message after the beep, and we will transcribe it. Hang up when you are finished.`,
+    translation: `Hello ${leadName}. Welcome to the Virpanix Sales Console. Please speak your message after the beep, and we will transcribe it. Hang up when you are finished.`
+  };
+}
+
+/**
+ * Clean automated greeting phrases from the raw Whisper transcript.
+ */
+function cleanGreetingPhrases(rawTranscript: string, leadName: string): string {
+  let cleaned = rawTranscript;
+
+  const patterns = [
+    // Trial warnings / system messages
+    /you\s+can\s+remove\s+this\s+message\s+at\s+any\s+time/gi,
+    /you\s+have\s+a\s+trial\s+account/gi,
+    /please\s+press\s+any\s+key\s+to\s+execute\s+your\s+twiml/gi,
+    /\b(signal)\b/gi,
+
+    // English greetings (flexible names & spelling variants)
+    /hello\s+.*?\s*welcome\s+to\s+the\s+(?:vir|vi|virpe|vipa)nix\s+sales\s+console/gi,
+    /welcome\s+to\s+the\s+(?:vir|vi|virpe|vipa)nix\s+sales\s+console/gi,
+    /welcome\s+to\s+(?:vir|vi|virpe|vipa)nix/gi,
+    /hello\s+.*?\s*welcome/gi,
+    /hello\s+customer/gi,
+    /please\s+speak\s+your\s+message\s+after\s+the\s+beep/gi,
+    /please\s+tell\s+me\s+about\s+your\s+message/gi,
+    /we\s+will\s+record\s+it/gi,
+    /and\s+we\s+will\s+transcribe\s+it/gi,
+    /and\s+we\s+will\s+record\s+it/gi,
+    /hang\s+up\s+when\s+you\s+are\s+finished/gi,
+    /you\s+can\s+hang\s+up\s+the\s+phone\s+when\s+you\s+are\s+finished/gi,
+
+    // Tamil greetings (flexible names & spelling variants)
+    /வணக்கம்\s+.*?\s*விர்\s+பேனிக்ஸ்\s+விற்பனை\s+கன்சோலுக்கு\s+உங்களை\s+வரவேற்கிறோம்/g,
+    /வணக்கம்\s+.*?\s*விர்பெனிக்ஸ்\s+கன்சோல்\s+உங்களை\s+வரவேற்கிறோம்/g,
+    /வணக்கம்\s+.*?\s*விர்பெனிக்ஸ்\s+கன்சோலுக்கு\s+உங்களை\s+வரவேற்கிறோம்/g,
+    /வணக்கம்\s+.*?\s*உங்களை\s+வரவேற்கிறோம்/g,
+    /விர்\s+பேனிக்ஸ்\s+விற்பனை\s+கன்சோலுக்கு\s+உங்களை\s+வரவேற்கிறோம்/g,
+    /விர்பெனிக்ஸ்\s+கன்சோல்\s+உங்களை\s+வரவேற்கிறோம்/g,
+    /விர்பெனிக்ஸ்\s+கன்சோலுக்கு\s+உங்களை\s+வரவேற்கிறோம்/g,
+    /விர்\s+பேனிக்ஸ்\s+விற்பனை\s+கன்சோலுக்கு/g,
+    /உங்களை\s+வரவேற்கிறோம்/g,
+    /தயவுசெய்து\s+பீப்\s+ஒலிக்குப்\s+பிறகு\s+உங்கள்\s+செய்தியைப்\s+பேசுங்கள்/g,
+    /தயவுசெய்து\s+பீப்\s+ஒலிக்குப்\s+பிறகு/g,
+    /தயவு\s+செய்து\s+பீப்\s+ஒலிக்கு\s+பிறகு/g,
+    /பீப்\s+ஒலிக்குப்\s+பிறகு/g,
+    /பீப்\s+ஒலிக்கு\s+பிறகு/g,
+    /தயவு\s+செய்து\s+பி[.\s]+போலிக்கு\s+பெருகு\s+உங்கள்\s+செய்தியை\s+பேசுங்கள்/g,
+    /தயவு\s+செய்து\s+பி[.\s]+போலிகு\s+பெருகு\s+உங்கள்\s+செய்தியை\s+பேசுங்கள்/g,
+    /தயவு\s+செய்து\s+பி[.\s]+போலிக்கு/g,
+    /தயவு\s+செய்து\s+பி[.\s]+போலிகு/g,
+    /பெருகு\s+உங்கள்\s+செய்தியை\s+பேசுங்கள்/g,
+    /உங்கள்\s+செய்தியைப்\s+பேசுங்கள்/g,
+    /செய்தியைப்\s+பேசுங்கள்/g,
+    /நாங்கள்\s+அதை\s+பதிவு\s+செய்வோம்/g,
+    /பதிவு\s+செய்வோம்/g,
+    /நீங்கள்\s+முடித்ததும்\s+போனை\s+தொங்கவிடவும்/g,
+    /நீங்கள்\s+முடித்ததும்\s+போனை\s+தொங்க\s+விடவும்/g,
+    /நீங்கள்\s+முடித்ததும்\s+போனி\s+தொங்கவிடவும்/g,
+    /நீங்கள்\s+முடித்ததும்\s+போனி\s+தொங்க\s+விடவும்/g,
+    /போனை\s+தொங்கவிடவும்/g,
+    /போனை\s+தொங்க\s+விடவும்/g,
+    /போனி\s+தொங்கவிடவும்/g,
+    /போனி\s+தொங்க\s+விடவும்/g,
+    /தொங்கவிடவும்/g,
+    /தொங்க\s+விடவும்/g,
+
+    // Spanish greetings
+    /hola\s+.*?\s*bienvenido\s+a\s+la\s+consola/gi,
+    /hola/gi,
+    /bienvenido\s+a\s+la\s+consola\s+de\s+ventas\s+de\s+virpanix/gi,
+    /por\s+favor\s+hable\s+después\s+del\s+tono\s+y\s+grabaremos\s+su\s+mensaje/gi,
+    /cuelgue\s+cuando\s+termine/gi,
+
+    // Hindi greetings
+    /नमस्ते\s+.*?\s*जी\s*विरपैनिक्स\s+सेल्स\s+कंसोल\s+में\s+आपका\s+स्वागत\s+है/g,
+    /नमस्ते/g,
+    /विरपैनिक्स\s+सेल्स\s+कंसोल\s+में\s+आपका\s+स्वागत\s+है/g,
+    /कृपया\s+बीप\s+के\s+बाद\s+अपना\s+संदेश\s+बोलें\s+और\s+हम\s+इसे\s+रिकॉर्ड\s+करेंगे/g,
+    /पूरा\s+होने\s+पर\s+फोन\s+काट\s+दें/g,
+
+    // French greetings
+    /bonjour\s+.*?\s*bienvenue\s+sur\s+la\s+console/gi,
+    /bonjour/gi,
+    /bienvenue\s+sur\s+la\s+console\s+de\s+vente\s+virpanix/gi,
+    /veuillez\s+parler\s+après\s+le\s+signal\s+sonore\s+et\s+nous\s+enregistrerons\s+votre\s+message/gi,
+    /raccrochez\s+lorsque\s+vous\s+avez\s+terminé/gi,
+
+    // German greetings
+    /hallo\s+.*?\s*willkommen/gi,
+    /hallo/gi,
+    /willkommen\s+bei\s+der\s+virpanix-verkaufskonsole/gi,
+    /bitte\s+sprechen\s+sie\s+ihre\s+nachricht\s+nach\s+dem\s+signalton\s+und\s+wir\s+werden\s+sie\s+aufzeichnen/gi,
+    /legen\s+sie\s+auf\s+wenn\s+sie\s+fertig\s+sind/gi
+  ];
+
+  for (const pattern of patterns) {
+    cleaned = cleaned.replace(pattern, "");
+  }
+
+  // Clean up any remaining leading/trailing punctuation and double spaces
+  cleaned = cleaned
+    .replace(/^[\s.,\/#!$%\^&\*;:{}=\-_`~()?]+/, "")
+    .replace(/[\s.,\/#!$%\^&\*;:{}=\-_`~()?]+$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return cleaned;
 }
 
 /**
@@ -322,6 +509,18 @@ export async function transcribeAndAnalyzeRecording(
     whisperFormData.append("file", fileBlob, "call_recording.wav");
     whisperFormData.append("model", whisperModel);
 
+    // Force Whisper to transcribe in the native language/script by providing the ISO 639-1 language code
+    const langMap: Record<string, string> = {
+      English: "en",
+      Spanish: "es",
+      Hindi: "hi",
+      French: "fr",
+      German: "de",
+      Tamil: "ta"
+    };
+    const whisperLang = langMap[targetLanguage] || "en";
+    whisperFormData.append("language", whisperLang);
+
     // Provide a rich multilingual prompt so Whisper transcribes whichever language is spoken (English, Tamil, Hindi, Spanish, French, German) in its native script
     const whisperPrompt = `தமிழ்: இது ஒரு வாடிக்கையாளர் அழைப்பு. நான் தமிழ் பேசுகிறேன். நீங்கள் எப்படி இருக்கிறீர்கள்?
 हिन्दी: यह एक ग्राहक कॉल है। मैं हिंदी बोलता हूँ। आप कैसे हैं?
@@ -345,54 +544,115 @@ English: This is a customer call. You have a trial account.`;
     }
 
     const whisperData = await whisperRes.json();
-    const rawTranscript = whisperData.text;
+    let rawTranscript = whisperData.text || "";
     console.log(`[Whisper] Raw Transcription: "${rawTranscript}"`);
 
-    // Deterministically pre-split the raw transcription into Agent (automated system greeting) and Lead turns.
-    const { index: boundaryIndex, boundaryLength } = findBoundarySplitIndex(rawTranscript);
-    let preSplitTranscript = null;
-
-    if (boundaryIndex !== -1) {
-      const boundaryEnd = boundaryIndex + boundaryLength;
-      const agentText = rawTranscript.slice(0, boundaryEnd).trim();
-      let leadText = rawTranscript.slice(boundaryEnd).trim();
-
-      // Clean leading punctuation and spaces from leadText
-      leadText = leadText.replace(/^[\s.,\/#!$%\^&\*;:{}=\-_`~()?]+/, "");
-
-      const turns = [
-        { speaker: "Agent", text: agentText, translation: "", time: "00:02" }
-      ];
-      if (leadText) {
-        turns.push({ speaker: "Lead", text: leadText, translation: "", time: "00:08" });
-      }
-      preSplitTranscript = turns;
-      console.log(`[Parser] Deterministically pre-split transcription into Agent and Lead turns. Lead text: "${leadText}"`);
-    } else {
-      console.log(`[Parser] No system greeting boundary found. Falling back to LLM-based turn parsing.`);
+    // Clean up common Whisper silence hallucinations (e.g. Spanish/English phrases or subtitle credits during silence)
+    const hallucinations = [
+      /subtitles\s+by\s+amara\.org/i,
+      /thank\s+you\s+for\s+watching/i,
+      /please\s+subscribe/i,
+      /y\s+as[ií]/i,
+      /¿?\s*c[oó]mo\s+est[aá]s\s*\??/i,
+      /¿?\s*qu[eé]\s+haces\s*\??/i,
+      /todos\s+los\s+derechos/i,
+      /gracias\s+por\s+ver/i,
+      /gracias/i,
+      /¿?\s*cómo\s+estás\s*\??/i,
+      // Spanish silence hallucinations:
+      /¿?\s*t[uú]\s+puedes\s+trabajar\s*\??/gi,
+      /¿?\s*no\s+puedes\s+trabajar\s*\??/gi,
+      /¿?\s*s[oó]lo\s+r[aá]pido\s*\??/gi,
+      /¿?\s*s[oó]\s+r[aá]pido\s*\??/gi,
+      /¿?\s*c[oó]mo\s+te\s+encuentras\s+ahora\s+despu[eé]s\s+de\s+un\s+tiempo\s+de\s+trabajo\s*\??/gi,
+      /¿?\s*c[oó]mo\s+te\s+encuentras\s*\??/gi,
+      /¿?\s*despu[eé]s\s+de\s+un\s+tiempo\s+de\s+trabajo\s*\??/gi,
+      /¿?\s*bien\s*\??/gi,
+      /¿?\s*as[ií]\s*\??/gi
+    ];
+    for (const regex of hallucinations) {
+      rawTranscript = rawTranscript.replace(regex, "");
     }
+    rawTranscript = rawTranscript.trim();
+    console.log(`[Whisper] Cleaned Transcription: "${rawTranscript}"`);
+
+    // Find and strip automated greeting by boundary first
+    const boundary = findBoundarySplitIndex(rawTranscript);
+    if (boundary.index !== -1) {
+      const splitPoint = boundary.index + boundary.boundaryLength;
+      console.log(`[Parser] Located greeting boundary at index ${boundary.index}. Slicing off system greeting.`);
+      rawTranscript = rawTranscript.substring(splitPoint).trim();
+    } else {
+      console.log(`[Parser] Greeting boundary not found. Falling back to phrase-based cleaning.`);
+    }
+
+    // Clean all automated system greeting phrases from the raw transcript so they do not contaminate the Lead's speech
+    rawTranscript = cleanGreetingPhrases(rawTranscript, leadName);
+    console.log(`[Whisper] Post-Greeting Cleaned Transcription: "${rawTranscript}"`);
+
+    // If there is no speech left after removing the greeting, return a standard "No message left" call log directly
+    if (!rawTranscript) {
+      const staticAgent = getStaticAgentTurn(targetLanguage, leadName);
+      const finalTurns = [
+        {
+          speaker: "Agent",
+          text: staticAgent.text,
+          translation: staticAgent.translation,
+          time: "00:02"
+        }
+      ];
+      return {
+        detectedVoiceLanguage: targetLanguage,
+        translatedLanguage: "English",
+        transcript: JSON.stringify(finalTurns),
+        translatedText: `Agent: ${staticAgent.translation}`,
+        wordCount: 0,
+        analysis: "The call was answered, but the lead hung up without leaving a message.",
+        aiScore: 10,
+      };
+    }
+
+    // Since we've cleaned the greeting, the remaining rawTranscript is entirely the Lead's speech.
+    // We can pre-split this programmatically.
+    let preSplitTranscript = null;
+    let leadText = rawTranscript;
+
+    const staticAgent = getStaticAgentTurn(targetLanguage, leadName);
+    const turns = [
+      { speaker: "Agent", text: staticAgent.text, translation: staticAgent.translation, time: "00:02" }
+    ];
+    if (leadText) {
+      turns.push({ speaker: "Lead", text: leadText, translation: "", time: "00:08" });
+    }
+    preSplitTranscript = turns;
+    console.log(`[Parser] Deterministically set transcription to Agent and Lead turns. Lead text: "${leadText}"`);
 
     let prompt = "";
     if (preSplitTranscript) {
-      prompt = `You are a CRM call analyzer. We have a pre-split transcription of a phone call between Agent "${agentName}" and Lead "${leadName}".
-The primary language of the call is "${targetLanguage}".
-Here is the JSON array representing the dialogue turns:
-${JSON.stringify(preSplitTranscript, null, 2)}
+      const staticAgent = getStaticAgentTurn(targetLanguage, leadName);
+      prompt = `You are a CRM call analyzer. The phone call consists of:
+1. An automated system greeting in language "${targetLanguage}":
+   - Original Speech: "${staticAgent.text}"
+   - English Translation: "${staticAgent.translation}"
+2. A recording of the Lead's speech in language "${targetLanguage}":
+   - Original Speech: "${leadText}"
 
 Please perform the following operations:
-1. For each turn in the JSON array, translate the "text" key into English if it is in a foreign language (such as Tamil, Hindi, Spanish, French, German). Populate the "translation" key with this English translation. If the text is already in English, copy it exactly into the "translation" key.
-   CRITICAL RULE: Under NO circumstances should you translate or modify the "text" key. The "text" key must preserve the original language and script exactly as provided.
-2. Detect the primary language of the Lead's speech and populate the "detectedVoiceLanguage" key (e.g., "Tamil", "Hindi", "English", "Spanish", etc.).
-3. Write a professional CRM call analysis summarizing the discussion, client objections, and proposed follow-up steps.
-4. Calculate a quality score (0 to 100) representing the lead's level of interest or business qualification.
+1. Translate the Lead's speech into fluent English. Save this translation under the "translatedLeadText" key.
+   - PHONETIC & CONTEXT CORRECTION: Whisper transcriptions of regional languages often contain garbled words, homophones, or phonetic transcription errors due to accent/audio quality (e.g. transcribing "மாப்பிள்ளை" as "வப்பில்" or "கூப்பிட்டாய்/அழைத்தாய்" as "அழைத்துவிட்டோய்"). You MUST use the conversational context of the call to correct these minor transcription anomalies so the English translation is accurate, natural, logical, and captures the true intended meaning.
+2. Transliterate/convert the Lead's speech to its proper native script under the "nativeLeadText" key:
+   - If the Lead's speech is in a foreign language (Tamil, Hindi, Spanish, French, German) but transcribed in Romanized/Latin script (e.g. "kaise ho" or "post pönitinkilä"), you MUST convert/transliterate it into its proper native script (e.g. Hindi Devanagari "कैसे हो" or Tamil script "போஸ்ட் பண்ணிட்டீங்களா").
+   - If the Lead's speech is already in its native script or is English, copy it exactly as is, but correct any minor phonetic spelling errors or garbled words to their proper native words (e.g., correcting "வப்பில்" to "மாப்பிள்ளை" or "அழைத்துவிட்டோய்" to "அழைத்தாய்").
+   - Do NOT translate this key to English; it must represent the spoken words in the native language's script.
+3. Detect the primary language of the Lead's speech and populate the "detectedVoiceLanguage" key (e.g., "Tamil", "Hindi", "English", "Spanish", etc.).
+4. Write a professional CRM call analysis summarizing the discussion, client objections, and proposed follow-up steps.
+5. Calculate a quality score (0 to 100) representing the lead's level of interest or business qualification.
 
 Return ONLY a raw JSON object (do not wrap in markdown fences like \`\`\`json) matching the following TypeScript interface:
 {
   "detectedVoiceLanguage": string,
-  "translatedLanguage": "English",
-  "transcript": string, // JSON string representation of the updated transcript array (with filled "translation" fields)
-  "translatedText": string, // Text paragraph of the English-translated dialogue
-  "wordCount": number, // total words in transcription
+  "translatedLeadText": string, // English translation of the Lead's speech
+  "nativeLeadText": string, // Lead's speech in its proper native script
   "analysis": string,
   "aiScore": number
 }`;
@@ -408,10 +668,16 @@ Please perform the following operations:
    CRITICAL SPEAKER ASSIGNMENT RULES:
    - The automated Agent's system speech (trial warning and system greeting) ALWAYS ends with the phrase "Hang up when you are finished" or its translation in other languages (such as "தொங்கவிடவும்", "cuelgue cuando termine", "फोन काट दें", "raccrochez lorsque vous avez terminé", "legen Sie auf, wenn Sie fertig sind"). You MUST assign this system warning and greeting to the "Agent".
    - Every single word, sentence, and phrase in the raw transcription that occurs AFTER "Hang up when you are finished" (or its translation) is spoken by the "Lead" (the caller). You MUST assign ALL of these subsequent turns to the "Lead". Under no circumstances should you assign any of the speech after the automated greeting ends to the "Agent".
-2. Populate the "text" key with the EXACT original words and script (whether English, Tamil, Hindi, Spanish, etc.) as they appear in the raw transcription for that dialogue turn. Under NO circumstances should you translate or convert the script of the raw transcription into a different language for the "text" key.
-3. Detect the language of the turn. If it is in a foreign language (like Tamil, Hindi, Spanish, French, German, etc.), provide an accurate English translation for that turn under the "translation" key. If the turn is already in English, copy the text exactly into the "translation" key.
-4. Write a professional CRM call analysis summarizing the discussion, client objections, and proposed follow-up steps.
-5. Calculate a quality score (0 to 100) representing the lead's level of interest or business qualification.
+2. Populate the "text" key with the spoken words in their proper native script:
+   - If any spoken words are in a foreign language (such as Tamil or Hindi) but transcribed in Romanized/Latin characters (e.g., 'kaise ho' or 'post pönitinkilä'), you MUST convert/transliterate them into their proper native script (e.g., Devanagari 'कैसे हो' or Tamil 'போஸ்ட் பண்ணிட்டீங்களா') for the "text" key.
+   - If the Lead's speech contains minor phonetic spelling errors, typos, or garbled words due to accent/audio quality (e.g. transcribing "மாப்பிள்ளை" as "வப்பில்" or "கூப்பிட்டாய்/அழைத்தாய்" as "அழைத்துவிட்டோய்"), correct them to their proper native words.
+   - Under NO circumstances should you translate the "text" key to English.
+3. Detect the language of the turn. If it is in a foreign language (like Tamil, Hindi, Spanish, French, German, etc.), provide an accurate English translation for that turn under the "translation" key.
+   - PHONETIC & CONTEXT CORRECTION: When translating, if the native transcript contains minor phonetic errors or garbled words, use conversational context to correct the translation so that it is fluent, accurate, and reflects the true intended meaning.
+   - If the turn is already in English, copy the text exactly into the "translation" key.
+4. Detect the primary language of the Lead's speech and populate the "detectedVoiceLanguage" key (e.g., "Tamil", "Hindi", "English", "Spanish", etc.).
+5. Write a professional CRM call analysis summarizing the discussion, client objections, and proposed follow-up steps.
+6. Calculate a quality score (0 to 100) representing the lead's level of interest or business qualification.
 
 Return ONLY a raw JSON object (do not wrap in markdown fences like \`\`\`json) matching the following TypeScript interface:
 {
@@ -480,6 +746,62 @@ Return ONLY a raw JSON object (do not wrap in markdown fences like \`\`\`json) m
       } catch (secondErr: any) {
         throw new Error(`Failed to parse GPT response JSON: ${secondErr.message}. Raw output was: ${content}`);
       }
+    }
+
+    if (preSplitTranscript) {
+      const staticAgent = getStaticAgentTurn(targetLanguage, leadName);
+      const leadTranslation = parsedResult.translatedLeadText || parsedResult.translatedText || "";
+      const leadTextConverted = parsedResult.nativeLeadText || leadText;
+      const finalTurns = [
+        {
+          speaker: "Agent",
+          text: staticAgent.text,
+          translation: staticAgent.translation,
+          time: "00:02"
+        }
+      ];
+      if (leadTextConverted) {
+        finalTurns.push({
+          speaker: "Lead",
+          text: leadTextConverted,
+          translation: leadTranslation,
+          time: "00:08"
+        });
+      }
+
+      return {
+        detectedVoiceLanguage: parsedResult.detectedVoiceLanguage || targetLanguage,
+        translatedLanguage: "English",
+        transcript: JSON.stringify(finalTurns),
+        translatedText: `Agent: ${staticAgent.translation}\nLead: ${leadTranslation}`,
+        wordCount: rawTranscript.split(/\s+/).filter(Boolean).length,
+        analysis: parsedResult.analysis || "Call recording completed.",
+        aiScore: parsedResult.aiScore || 70,
+      };
+    }
+
+    // Post-process the transcript turns to ensure the Agent's greeting text and translation are always accurate and not hallucinated
+    try {
+      let transcriptObj = typeof parsedResult.transcript === "string"
+        ? JSON.parse(parsedResult.transcript)
+        : parsedResult.transcript;
+
+      if (Array.isArray(transcriptObj)) {
+        const staticAgent = getStaticAgentTurn(targetLanguage, leadName);
+        transcriptObj = transcriptObj.map((turn: any) => {
+          if (turn.speaker === "Agent") {
+            return {
+              ...turn,
+              text: staticAgent.text,
+              translation: staticAgent.translation
+            };
+          }
+          return turn;
+        });
+        parsedResult.transcript = JSON.stringify(transcriptObj);
+      }
+    } catch (e) {
+      console.warn("Failed to post-process transcript turns:", e);
     }
 
     return {

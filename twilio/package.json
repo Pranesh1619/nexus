@@ -1,0 +1,28 @@
+{
+  "name": "bpo-twilio-wrapper",
+  "version": "1.0.0",
+  "description": "Self-hosted Twilio API and Asterisk ARI calling gateway",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "ts-node src/server.ts"
+  },
+  "dependencies": {
+    "axios": "^1.6.8",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "uuid": "^9.0.1",
+    "ws": "^8.17.0",
+    "xml2js": "^0.6.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.12.12",
+    "@types/uuid": "^9.0.8",
+    "@types/ws": "^8.5.10",
+    "@types/xml2js": "*",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}

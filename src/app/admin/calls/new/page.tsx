@@ -20,6 +20,8 @@ type SipConfigPreview = {
   callerId: string;
   codec: string;
   isActive: boolean;
+  mockTwilioUrl?: string;
+  useRealTwilio?: boolean;
 };
 
 function NewCallContent() {
@@ -68,35 +70,52 @@ function NewCallContent() {
         const activeSip = await getActiveSipConfig();
         if (activeSip) {
           setSipConfig(activeSip);
-          setDialMode("SIP"); // Default to SIP if enabled
-          logToTerminal(`[SYSTEM] Active SIP Trunk detected: ${activeSip.domain}`);
-          logToTerminal(`[SYSTEM] Initializing SIP Stack in browser...`);
           
-          // Simulate registration
-          setTimeout(() => {
-            logToTerminal(`[TX] REGISTER sip:${activeSip.domain} SIP/2.0`);
-            logToTerminal(`     Via: SIP/2.0/WSS client.virpa.ai;branch=z9hG4bK-reg781`);
-            logToTerminal(`     From: <sip:${activeSip.username}@${activeSip.domain}>;tag=reg01`);
-            logToTerminal(`     To: <sip:${activeSip.username}@${activeSip.domain}>`);
-            logToTerminal(`     Call-ID: reg-${Math.random().toString(36).substring(7)}`);
-          }, 600);
+          if (activeSip.useRealTwilio) {
+            if (activeSip.isActive) {
+              setDialMode("SIP"); // Default to SIP if enabled
+              logToTerminal(`[SYSTEM] Active SIP Trunk detected: ${activeSip.domain}`);
+              logToTerminal(`[SYSTEM] Running in REAL Twilio Mode`);
+              logToTerminal(`[SYSTEM] Initializing SIP Stack in browser...`);
+              
+              // Simulate registration
+              setTimeout(() => {
+                logToTerminal(`[TX] REGISTER sip:${activeSip.domain} SIP/2.0`);
+                logToTerminal(`     Via: SIP/2.0/WSS client.virpa.ai;branch=z9hG4bK-reg781`);
+                logToTerminal(`     From: <sip:${activeSip.username}@${activeSip.domain}>;tag=reg01`);
+                logToTerminal(`     To: <sip:${activeSip.username}@${activeSip.domain}>`);
+                logToTerminal(`     Call-ID: reg-${Math.random().toString(36).substring(7)}`);
+              }, 600);
 
-          setTimeout(() => {
-            logToTerminal(`[RX] SIP/2.0 401 Unauthorized`);
-            logToTerminal(`     WWW-Authenticate: Digest realm="${activeSip.domain}", nonce="df8924b17"`);
-          }, 1100);
+              setTimeout(() => {
+                logToTerminal(`[RX] SIP/2.0 401 Unauthorized`);
+                logToTerminal(`     WWW-Authenticate: Digest realm="${activeSip.domain}", nonce="df8924b17"`);
+              }, 1100);
 
-          setTimeout(() => {
-            logToTerminal(`[TX] REGISTER (With Auth Digest)`);
-            logToTerminal(`     Authorization: Digest username="${activeSip.username}", realm="${activeSip.domain}", nonce="df8924b17", response="c7849e8a"`);
-          }, 1600);
+              setTimeout(() => {
+                logToTerminal(`[TX] REGISTER (With Auth Digest)`);
+                logToTerminal(`     Authorization: Digest username="${activeSip.username}", realm="${activeSip.domain}", nonce="df8924b17", response="c7849e8a"`);
+              }, 1600);
 
-          setTimeout(() => {
-            logToTerminal(`[RX] SIP/2.0 200 OK (Registered)`);
-            logToTerminal(`     Contact: <sip:${activeSip.username}@client.virpa.ai;transport=ws>;expires=3600`);
-            logToTerminal(`[SIP] SIP Trunk Successfully Registered and Idle.`);
+              setTimeout(() => {
+                logToTerminal(`[RX] SIP/2.0 200 OK (Registered)`);
+                logToTerminal(`     Contact: <sip:${activeSip.username}@client.virpa.ai;transport=ws>;expires=3600`);
+                logToTerminal(`[SIP] SIP Trunk Successfully Registered and Idle.`);
+                setSipStatus("Registered");
+              }, 2200);
+            } else {
+              logToTerminal(`[SYSTEM] Running in REAL Twilio Mode`);
+              logToTerminal(`[SYSTEM] SIP Trunk configuration is inactive. Defaulting to Simulated AI Dialer.`);
+            }
+          } else {
+            // Mock Twilio Mode
+            const mockUrl = activeSip.mockTwilioUrl || "http://localhost:5050";
+            setDialMode("SIP"); // Allow dialing via Twilio self-hosted replica
+            logToTerminal(`[SYSTEM] Running in MOCK Twilio Mode (Self-hosted)`);
+            logToTerminal(`[SYSTEM] Self-hosted Twilio replica detected: ${mockUrl}`);
+            logToTerminal(`[SYSTEM] Outbound Dialer enabled via local mock server.`);
             setSipStatus("Registered");
-          }, 2200);
+          }
         } else {
           logToTerminal(`[SYSTEM] No active SIP Trunk configuration found. Defaulting to Simulated AI Dialer.`);
           logToTerminal(`[SYSTEM] Configure SIP credentials in Admin Settings -> Telephony.`);
@@ -426,7 +445,7 @@ function NewCallContent() {
           <h2 className="fw-bold mb-1">Outbound Dialer</h2>
           <p className="text-secondary small">Initiate outbound telephony using physical SIP trunks or simulated AI voice pipelines.</p>
         </div>
-        {sipConfig?.isActive && (
+        {(sipConfig?.isActive || !sipConfig?.useRealTwilio) && (
           <div className="btn-group shadow-sm" role="group">
             <button
               type="button"

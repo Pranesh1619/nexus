@@ -12,6 +12,7 @@ type SipConfigType = {
   callerId: string;
   codec: string;
   isActive: boolean;
+  mockTwilioUrl?: string | null;
 };
 
 interface SipTrunkSettingsClientProps {
@@ -52,7 +53,8 @@ export default function SipTrunkSettingsClient({ initialConfig }: SipTrunkSettin
         password: password || undefined, // Only pass password if changed
         callerId: config.callerId,
         codec: config.codec,
-        isActive: config.isActive
+        isActive: config.isActive,
+        mockTwilioUrl: config.mockTwilioUrl
       });
 
       if (res.success) {
@@ -204,6 +206,21 @@ export default function SipTrunkSettingsClient({ initialConfig }: SipTrunkSettin
                 <option value="G711_ALAW">G.711 a-law (PCMA - Europe/International)</option>
               </select>
             </div>
+          </div>
+          <div className="col-12">
+            <label className="form-label x-small fw-bold text-secondary text-uppercase mb-1">Self-hosted Mock Twilio Server URL (Optional)</label>
+            <div className="input-group input-group-sm">
+              <span className="input-group-text bg-light text-secondary border-0"><i className="bi bi-server"></i></span>
+              <input
+                type="text"
+                name="mockTwilioUrl"
+                value={config.mockTwilioUrl || ""}
+                onChange={handleInputChange}
+                className="form-control border-0 bg-light"
+                placeholder="e.g. http://localhost:5050"
+              />
+            </div>
+            <div className="x-small text-muted mt-1">Specify a custom endpoint for your self-hosted Twilio simulator server (leaves real Twilio active if blank).</div>
           </div>
 
           <div className="col-12 mt-4 pt-2 border-top d-flex gap-2 justify-content-end">

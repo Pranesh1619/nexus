@@ -62,8 +62,8 @@ export async function saveCallLog(data: {
 
 export async function getActiveSipConfig() {
   try {
-    const config = await prisma.sipTrunkConfig.findFirst({
-      where: { isActive: true }
+    const config = await prisma.sipTrunkConfig.findUnique({
+      where: { id: "default_sip_config" }
     });
     if (config) {
       return {
@@ -71,7 +71,9 @@ export async function getActiveSipConfig() {
         username: config.username,
         callerId: config.callerId,
         codec: config.codec,
-        isActive: true
+        isActive: config.isActive,
+        mockTwilioUrl: config.mockTwilioUrl || "",
+        useRealTwilio: process.env.USE_REAL_TWILIO === "true"
       };
     }
   } catch (error) {
@@ -81,13 +83,6 @@ export async function getActiveSipConfig() {
 }
 
 export async function placeRealTwilioCall(leadId: string, currentHost?: string, language?: string, userId?: string) {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-
-  if (!accountSid || !authToken) {
-    return { error: "Twilio credentials are not configured in your .env file." };
-  }
-
   try {
     // 1. Fetch Lead phone number
     const lead = await prisma.lead.findUnique({
@@ -98,16 +93,26 @@ export async function placeRealTwilioCall(leadId: string, currentHost?: string, 
       return { error: "Lead not found in database." };
     }
 
-    // 2. Fetch Active SIP Trunk Config
-    const sipConfig = await prisma.sipTrunkConfig.findFirst({
-      where: { isActive: true }
+    // 2. Fetch SIP Trunk Config
+    const sipConfig = await prisma.sipTrunkConfig.findUnique({
+      where: { id: "default_sip_config" }
     });
 
-    if (!sipConfig || !sipConfig.callerId) {
-      return { error: "No active SIP Trunk configuration found. Please check your settings." };
+    const useRealTwilio = process.env.USE_REAL_TWILIO === "true";
+    const mockTwilioUrl = !useRealTwilio ? ((sipConfig as any)?.mockTwilioUrl || process.env.MOCK_TWILIO_URL || "http://localhost:5050") : null;
+    const accountSid = process.env.TWILIO_ACCOUNT_SID || "AC_mock_sid";
+    const authToken = process.env.TWILIO_AUTH_TOKEN || "mock_token";
+
+    if (useRealTwilio) {
+      if (!sipConfig || !sipConfig.isActive || !sipConfig.callerId) {
+        return { error: "No active SIP Trunk configuration found. Please check your settings." };
+      }
+      if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+        return { error: "Twilio credentials are not configured in your .env file." };
+      }
     }
 
-    const client = twilio(accountSid, authToken);
+    const callerId = sipConfig?.callerId || "+10000000000";
 
     // Format phone number to E.164 (ensure it has the country code)
     let formattedPhone = lead.phone.replace(/[^\d+]/g, ""); // Keep only digits and +
@@ -123,16 +128,44 @@ export async function placeRealTwilioCall(leadId: string, currentHost?: string, 
     const selectedLang = language || "English";
     const activeUserId = userId || "placeholder";
 
-    // Call out with a dynamic XML webhook url, enable call recording, and specify the recordingStatusCallback route
-    const call = await client.calls.create({
-      url: `${hostUrl}/api/twilio/voice?leadId=${leadId}&lang=${selectedLang}`,
-      to: formattedPhone,
-      from: sipConfig.callerId,
-      record: true,
-      recordingStatusCallback: `${hostUrl}/api/twilio/recording-callback?leadId=${leadId}&lang=${selectedLang}&userId=${activeUserId}`
-    });
+    let callSid = "";
+    if (mockTwilioUrl) {
+      console.log(`[SYSTEM] Self-hosted Twilio URL detected: ${mockTwilioUrl}`);
+      const bodyParams = new URLSearchParams();
+      bodyParams.append("To", formattedPhone);
+      bodyParams.append("From", callerId);
+      bodyParams.append("Url", `${hostUrl}/api/twilio/voice?leadId=${leadId}&lang=${selectedLang}`);
+      bodyParams.append("RecordingStatusCallback", `${hostUrl}/api/twilio/recording-callback?leadId=${leadId}&lang=${selectedLang}&userId=${activeUserId}`);
 
-    return { success: true, callSid: call.sid };
+      const response = await fetch(`${mockTwilioUrl}/2010-04-01/Accounts/${accountSid}/Calls.json`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: "Basic " + Buffer.from(`${accountSid}:${authToken}`).toString("base64")
+        },
+        body: bodyParams.toString()
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        return { error: `Mock Twilio Server Error: ${response.status} - ${errText}` };
+      }
+
+      const resData = await response.json();
+      callSid = resData.sid;
+    } else {
+      const client = twilio(accountSid, authToken);
+      const call = await client.calls.create({
+        url: `${hostUrl}/api/twilio/voice?leadId=${leadId}&lang=${selectedLang}`,
+        to: formattedPhone,
+        from: callerId,
+        record: true,
+        recordingStatusCallback: `${hostUrl}/api/twilio/recording-callback?leadId=${leadId}&lang=${selectedLang}&userId=${activeUserId}`
+      });
+      callSid = call.sid;
+    }
+
+    return { success: true, callSid };
   } catch (error: any) {
     console.error("Twilio Outbound Call Error:", error);
     return { error: error.message || "Failed to trigger outbound call via Twilio." };
@@ -244,17 +277,44 @@ export async function getCallLogStatus(id: string) {
 }
 
 export async function endTwilioCall(callSid: string) {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-
-  if (!accountSid || !authToken) {
-    return { error: "Twilio credentials are not configured in your .env file." };
-  }
-
   try {
-    const client = twilio(accountSid, authToken);
-    await client.calls(callSid).update({ status: "completed" });
-    return { success: true };
+    const sipConfig = await prisma.sipTrunkConfig.findFirst({
+      where: { isActive: true }
+    });
+    const useRealTwilio = process.env.USE_REAL_TWILIO === "true";
+    const mockTwilioUrl = !useRealTwilio ? ((sipConfig as any)?.mockTwilioUrl || process.env.MOCK_TWILIO_URL || "http://localhost:5050") : null;
+
+    const accountSid = process.env.TWILIO_ACCOUNT_SID || "AC_mock_sid";
+    const authToken = process.env.TWILIO_AUTH_TOKEN || "mock_token";
+
+    if (useRealTwilio && (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN)) {
+      return { error: "Twilio credentials are not configured in your .env file." };
+    }
+
+    if (mockTwilioUrl) {
+      console.log(`[SYSTEM] Self-hosted Twilio hangup requested for CallSid: ${callSid} using URL: ${mockTwilioUrl}`);
+      const bodyParams = new URLSearchParams();
+      bodyParams.append("Status", "completed");
+
+      const response = await fetch(`${mockTwilioUrl}/2010-04-01/Accounts/${accountSid}/Calls/${callSid}.json`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: "Basic " + Buffer.from(`${accountSid}:${authToken}`).toString("base64")
+        },
+        body: bodyParams.toString()
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        return { error: `Mock Twilio Server Hangup Error: ${response.status} - ${errText}` };
+      }
+      return { success: true };
+    } else {
+      const client = twilio(accountSid, authToken);
+      await client.calls(callSid).update({ status: "completed" });
+      return { success: true };
+    }
   } catch (error: any) {
     console.error("Error programmatically ending Twilio call:", error);
     return { error: error.message || "Failed to terminate Twilio call." };
@@ -262,17 +322,34 @@ export async function endTwilioCall(callSid: string) {
 }
 
 export async function getTwilioCallStatus(callSid: string) {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-
-  if (!accountSid || !authToken) {
-    return null;
-  }
-
   try {
-    const client = twilio(accountSid, authToken);
-    const call = await client.calls(callSid).fetch();
-    return call.status; // "queued", "ringing", "in-progress", "completed", "failed", "busy", "no-answer", "canceled"
+    const sipConfig = await prisma.sipTrunkConfig.findFirst({
+      where: { isActive: true }
+    });
+    const useRealTwilio = process.env.USE_REAL_TWILIO === "true";
+    const mockTwilioUrl = !useRealTwilio ? ((sipConfig as any)?.mockTwilioUrl || process.env.MOCK_TWILIO_URL || "http://localhost:5050") : null;
+
+    const accountSid = process.env.TWILIO_ACCOUNT_SID || "AC_mock_sid";
+    const authToken = process.env.TWILIO_AUTH_TOKEN || "mock_token";
+
+    if (useRealTwilio && (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN)) {
+      return null;
+    }
+
+    if (mockTwilioUrl) {
+      const response = await fetch(`${mockTwilioUrl}/2010-04-01/Accounts/${accountSid}/Calls/${callSid}.json`, {
+        headers: {
+          Authorization: "Basic " + Buffer.from(`${accountSid}:${authToken}`).toString("base64")
+        }
+      });
+      if (!response.ok) return null;
+      const resData = await response.json();
+      return resData.status; // "queued", "ringing", "in-progress", "completed", "failed"
+    } else {
+      const client = twilio(accountSid, authToken);
+      const call = await client.calls(callSid).fetch();
+      return call.status; // "queued", "ringing", "in-progress", "completed", "failed", "busy", "no-answer", "canceled"
+    }
   } catch (error) {
     console.error("Error fetching live Twilio call status:", error);
     return null;
