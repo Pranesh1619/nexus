@@ -302,10 +302,54 @@ function findBoundarySplitIndex(rawTranscript: string): { index: number; boundar
     "legen sie auf wenn sie fertig sind",
     "முடித்ததும் போனை தொங்கவிடவும்",
     "முடித்ததும் போனை தொங்க விடவும்",
+    "முடித்ததும் போனை தொங்கவிடுங்கள்",
+    "முடித்ததும் போனை தொங்க விடுங்கள்",
+    "முடித்ததும் போனை தொங்கவிடங்கள்",
+    "முடித்ததும் போனை தொங்க விடங்கள்",
     "போனை தொங்கவிடவும்",
     "போனை தொங்க விடவும்",
+    "போனை தொங்கவிடுங்கள்",
+    "போனை தொங்க விடுங்கள்",
+    "போனை தொங்கவிடங்கள்",
+    "போனை தொங்க விடங்கள்",
     "தொங்கவிடவும்",
-    "தொங்க விடவும்"
+    "தொங்க விடவும்",
+    "தொங்கவிடுங்கள்",
+    "தொங்க விடுங்கள்",
+    "தொங்கவிடங்கள்",
+    "தொங்க விடங்கள்",
+    
+    // Romanized Tamil boundaries
+    "mudithathum phoneai thongavidavum",
+    "mudithathum phone ai thongavidavum",
+    "mudithathum phone-ai thongavidavum",
+    "mudithathum phoneai thonga vidavum",
+    "mudithathum phone ai thonga vidavum",
+    "mudithathum phone-ai thonga vidavum",
+    "mudindhathum phoneai thongavidavum",
+    "mudindhathum phone ai thongavidavum",
+    "mudindhathum phone-ai thongavidavum",
+    "mudindhathum phoneai thonga vidavum",
+    "mudindhathum phone ai thonga vidavum",
+    "mudindhathum phone-ai thonga vidavum",
+    "thongavidavum",
+    "thonga vidavum",
+    "tongavidavom",
+    "tonga vidavom",
+    "thongavidavom",
+    "thonga vidavom",
+
+    // Romanized Hindi boundaries
+    "poora hone par phone kaat dein",
+    "poora hone par phone kaat den",
+    "poora hone par phone kat dein",
+    "poora hone par phone kat den",
+    "poora hone par phone kaat de",
+    "poora hone par phone kat de",
+    "phone kaat dein",
+    "phone kaat den",
+    "phone kat de",
+    "phone kaat de"
   ];
 
   for (const phrase of boundaryPhrases) {
@@ -419,12 +463,35 @@ function cleanGreetingPhrases(rawTranscript: string, leadName: string): string {
     /நீங்கள்\s+முடித்ததும்\s+போனை\s+தொங்க\s+விடவும்/g,
     /நீங்கள்\s+முடித்ததும்\s+போனி\s+தொங்கவிடவும்/g,
     /நீங்கள்\s+முடித்ததும்\s+போனி\s+தொங்க\s+விடவும்/g,
+    /நீங்கள்\s+முடித்ததும்\s+போனை\s+தொங்கவிடுங்கள்/g,
+    /நீங்கள்\s+முடித்ததும்\s+போனை\s+தொங்க\s+விடுங்கள்/g,
+    /நீங்கள்\s+முடித்ததும்\s+போனை\s+தொங்கவிடங்கள்/g,
+    /நீங்கள்\s+முடித்ததும்\s+போனை\s+தொங்க\s+விடங்கள்/g,
     /போனை\s+தொங்கவிடவும்/g,
     /போனை\s+தொங்க\s+விடவும்/g,
     /போனி\s+தொங்கவிடவும்/g,
     /போனி\s+தொங்க\s+விடவும்/g,
+    /போனை\s+தொங்கவிடுங்கள்/g,
+    /போனை\s+தொங்க\s+விடுங்கள்/g,
+    /போனை\s+தொங்கவிடங்கள்/g,
+    /போனை\s+தொங்க\s+விடங்கள்/g,
     /தொங்கவிடவும்/g,
     /தொங்க\s+விடவும்/g,
+    /தொங்கவிடுங்கள்/g,
+    /தொங்க\s+விடுங்கள்/g,
+    /தொங்கவிடங்கள்/g,
+    /தொங்க\s+விடங்கள்/g,
+
+    // Romanized Tamil greetings (flexible name variants)
+    /vanakkam\s+.*?\s*(?:vir|vi|virpe|vipa)nix/gi,
+    /wanaqam\s+.*?\s*(?:vir|vi|virpe|vipa)nix/gi,
+    /vanakkam/gi,
+    /wanaqam/gi,
+    /thonga\s*vidavum/gi,
+    /thonga\s*vidavom/gi,
+    /tongavidavom/gi,
+    /mudithathum/gi,
+    /mudindhathum/gi,
 
     // Spanish greetings
     /hola\s+.*?\s*bienvenido\s+a\s+la\s+consola/gi,
@@ -439,6 +506,20 @@ function cleanGreetingPhrases(rawTranscript: string, leadName: string): string {
     /विरपैनिक्स\s+सेल्स\s+कंसोल\s+में\s+आपका\s+स्वागत\s+है/g,
     /कृपया\s+बीप\s+के\s+बाद\s+अपना\s+संदेश\s+बोलें\s+और\s+हम\s+इसे\s+रिकॉर्ड\s+करेंगे/g,
     /पूरा\s+होने\s+पर\s+फोन\s+काट\s+दें/g,
+
+    // Romanized Hindi greetings
+    /namaste\s+.*?\s*(?:vir|vi|virpe|vipa)nix/gi,
+    /namaste/gi,
+    /swagat\s+hai/gi,
+    /apka\s+swagat\s+hai/gi,
+    /aapka\s+swagat\s+hai/gi,
+    /kripya\s+beep\s+ke\s+baad/gi,
+    /kripya\s+beep\s+ke\s+bad/gi,
+    /apna\s+sandesh\s+bolein/gi,
+    /apna\s+sandesh\s+bolen/gi,
+    /phone\s+kaat\s+dein/gi,
+    /phone\s+kaat\s+den/gi,
+    /phone\s+kat\s+de/gi,
 
     // French greetings
     /bonjour\s+.*?\s*bienvenue\s+sur\s+la\s+console/gi,
@@ -509,17 +590,9 @@ export async function transcribeAndAnalyzeRecording(
     whisperFormData.append("file", fileBlob, "call_recording.wav");
     whisperFormData.append("model", whisperModel);
 
-    // Force Whisper to transcribe in the native language/script by providing the ISO 639-1 language code
-    const langMap: Record<string, string> = {
-      English: "en",
-      Spanish: "es",
-      Hindi: "hi",
-      French: "fr",
-      German: "de",
-      Tamil: "ta"
-    };
-    const whisperLang = langMap[targetLanguage] || "en";
-    whisperFormData.append("language", whisperLang);
+    // Do not pin Whisper's language parameter. This allows Whisper to automatically detect and transcribe
+    // whichever language is actually spoken (e.g., if the user speaks Hindi on a Tamil-configured call).
+    console.log(`[Whisper] Omitting language parameter to enable automatic voice language detection.`);
 
     // Provide a rich multilingual prompt so Whisper transcribes whichever language is spoken (English, Tamil, Hindi, Spanish, French, German) in its native script
     const whisperPrompt = `தமிழ்: இது ஒரு வாடிக்கையாளர் அழைப்பு. நான் தமிழ் பேசுகிறேன். நீங்கள் எப்படி இருக்கிறீர்கள்?
@@ -634,17 +707,19 @@ English: This is a customer call. You have a trial account.`;
 1. An automated system greeting in language "${targetLanguage}":
    - Original Speech: "${staticAgent.text}"
    - English Translation: "${staticAgent.translation}"
-2. A recording of the Lead's speech in language "${targetLanguage}":
-   - Original Speech: "${leadText}"
+2. A recording of the Lead's speech:
+   - Spoken Speech: "${leadText}"
 
 Please perform the following operations:
-1. Translate the Lead's speech into fluent English. Save this translation under the "translatedLeadText" key.
+1. Translate the Lead's speech into fluent English, regardless of what language they actually spoke. Save this translation under the "translatedLeadText" key.
    - PHONETIC & CONTEXT CORRECTION: Whisper transcriptions of regional languages often contain garbled words, homophones, or phonetic transcription errors due to accent/audio quality (e.g. transcribing "மாப்பிள்ளை" as "வப்பில்" or "கூப்பிட்டாய்/அழைத்தாய்" as "அழைத்துவிட்டோய்"). You MUST use the conversational context of the call to correct these minor transcription anomalies so the English translation is accurate, natural, logical, and captures the true intended meaning.
 2. Transliterate/convert the Lead's speech to its proper native script under the "nativeLeadText" key:
-   - If the Lead's speech is in a foreign language (Tamil, Hindi, Spanish, French, German) but transcribed in Romanized/Latin script (e.g. "kaise ho" or "post pönitinkilä"), you MUST convert/transliterate it into its proper native script (e.g. Hindi Devanagari "कैसे हो" or Tamil script "போஸ்ட் பண்ணிட்டீங்களா").
-   - If the Lead's speech is already in its native script or is English, copy it exactly as is, but correct any minor phonetic spelling errors or garbled words to their proper native words (e.g., correcting "வப்பில்" to "மாப்பிள்ளை" or "அழைத்துவிட்டோய்" to "அழைத்தாய்").
+   - Note that the Lead may have responded in ANY language (Tamil, Hindi, English, Spanish, French, German, or a mixture of these), regardless of the targetLanguage of the system greeting.
+   - You MUST detect the actual language spoken by the Lead.
+   - If the Lead's speech is transcribed using characters of a different script than the actual language spoken (e.g. Hindi spoken words transcribed as Tamil characters like "ஆப் கைசே ஹோ" or "ஆப் கைசே ஹைன்"), or if it is transcribed in Romanized/Latin script (e.g. "kaise ho" or "post pönitinkilä"), you MUST convert/transliterate it into the proper native script of that language (e.g. Hindi Devanagari "कैसे हो" / "कैसे हैं", or Tamil script "போஸ்ட் பண்ணிட்டீங்களா").
+   - If the Lead's speech is already in its proper native script or is English, copy it exactly as is, but correct any minor phonetic spelling errors or garbled words to their proper native words.
    - Do NOT translate this key to English; it must represent the spoken words in the native language's script.
-3. Detect the primary language of the Lead's speech and populate the "detectedVoiceLanguage" key (e.g., "Tamil", "Hindi", "English", "Spanish", etc.).
+3. Detect the primary language of the Lead's speech and populate the "detectedVoiceLanguage" key (e.g., "Tamil", "Hindi", "English", "Spanish", "French", "German", etc.).
 4. Write a professional CRM call analysis summarizing the discussion, client objections, and proposed follow-up steps.
 5. Calculate a quality score (0 to 100) representing the lead's level of interest or business qualification.
 
@@ -658,7 +733,7 @@ Return ONLY a raw JSON object (do not wrap in markdown fences like \`\`\`json) m
 }`;
     } else {
       prompt = `You are a CRM call analyzer. We have a raw transcription of a real phone call between Agent "${agentName}" and Lead "${leadName}".
-The call was conducted in the language "${targetLanguage}".
+The call system greeting was conducted in the language "${targetLanguage}", but the Lead may have responded in English, Tamil, Hindi, Spanish, French, German, or a mixture of these.
 Raw transcription:
 "${rawTranscript}"
 
@@ -669,19 +744,20 @@ Please perform the following operations:
    - The automated Agent's system speech (trial warning and system greeting) ALWAYS ends with the phrase "Hang up when you are finished" or its translation in other languages (such as "தொங்கவிடவும்", "cuelgue cuando termine", "फोन काट दें", "raccrochez lorsque vous avez terminé", "legen Sie auf, wenn Sie fertig sind"). You MUST assign this system warning and greeting to the "Agent".
    - Every single word, sentence, and phrase in the raw transcription that occurs AFTER "Hang up when you are finished" (or its translation) is spoken by the "Lead" (the caller). You MUST assign ALL of these subsequent turns to the "Lead". Under no circumstances should you assign any of the speech after the automated greeting ends to the "Agent".
 2. Populate the "text" key with the spoken words in their proper native script:
-   - If any spoken words are in a foreign language (such as Tamil or Hindi) but transcribed in Romanized/Latin characters (e.g., 'kaise ho' or 'post pönitinkilä'), you MUST convert/transliterate them into their proper native script (e.g., Devanagari 'कैसे हो' or Tamil 'போஸ்ட் பண்ணிட்டீங்களா') for the "text" key.
-   - If the Lead's speech contains minor phonetic spelling errors, typos, or garbled words due to accent/audio quality (e.g. transcribing "மாப்பிள்ளை" as "வப்பில்" or "கூப்பிட்டாய்/அழைத்தாய்" as "அழைத்துவிட்டோய்"), correct them to their proper native words.
+   - Note that the Lead may have responded in ANY language, regardless of targetLanguage. You MUST detect the actual language spoken by the Lead.
+   - If any spoken words are transcribed using characters of a different script than the actual language spoken (e.g. Hindi spoken words transcribed as Tamil characters like "ஆப் கைசே ஹோ" or "ஆப் கைசே ஹைன்"), or if they are transcribed in Romanized/Latin characters (e.g. 'kaise ho' or 'post pönitinkilä'), you MUST convert/transliterate them into their proper native script (e.g. Devanagari 'कैसे हो' / 'कैसे हैं', or Tamil 'போஸ்ட் பண்ணிட்டீங்களா') for the "text" key.
+   - If the Lead's speech contains minor phonetic spelling errors, typos, or garbled words due to accent/audio quality, correct them to their proper native words.
    - Under NO circumstances should you translate the "text" key to English.
 3. Detect the language of the turn. If it is in a foreign language (like Tamil, Hindi, Spanish, French, German, etc.), provide an accurate English translation for that turn under the "translation" key.
    - PHONETIC & CONTEXT CORRECTION: When translating, if the native transcript contains minor phonetic errors or garbled words, use conversational context to correct the translation so that it is fluent, accurate, and reflects the true intended meaning.
    - If the turn is already in English, copy the text exactly into the "translation" key.
-4. Detect the primary language of the Lead's speech and populate the "detectedVoiceLanguage" key (e.g., "Tamil", "Hindi", "English", "Spanish", etc.).
+4. Detect the primary language of the Lead's speech and populate the "detectedVoiceLanguage" key (e.g., "Tamil", "Hindi", "English", "Spanish", "French", "German", etc.).
 5. Write a professional CRM call analysis summarizing the discussion, client objections, and proposed follow-up steps.
 6. Calculate a quality score (0 to 100) representing the lead's level of interest or business qualification.
 
 Return ONLY a raw JSON object (do not wrap in markdown fences like \`\`\`json) matching the following TypeScript interface:
 {
-  "detectedVoiceLanguage": string, // e.g. "${targetLanguage}", "English", "Spanish", "Hindi", etc.
+  "detectedVoiceLanguage": string, // e.g. "Tamil", "Hindi", "English", "Spanish", "French", "German", etc.
   "translatedLanguage": "English",
   "transcript": string, // JSON string representation of: Array<{ speaker: "Agent" | "Lead", text: string, translation: string, time: string }>
   "translatedText": string, // Text paragraph of the English-translated dialogue

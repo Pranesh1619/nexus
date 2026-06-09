@@ -321,7 +321,7 @@ export default function CallDetailsClient({
                     {parsedTurns.map((turn, idx) => {
                       const isAgent = turn.speaker === "Agent";
                       const speakerName = isAgent ? (call.user?.name || "Agent") : (call.lead?.name || "Lead");
-                      const showTranslation = turn.translation && turn.translation !== turn.text;
+                      const showTranslation = !!turn.translation;
                       
                       return (
                         <div key={idx} className={`d-flex gap-3 align-items-start ${isAgent ? "" : "flex-row-reverse"}`}>
@@ -360,7 +360,7 @@ export default function CallDetailsClient({
                             {showTranslation && (
                               <div className={`mt-2 pt-2 border-top border-secondary border-opacity-10 x-small text-muted ${isAgent ? "text-start" : "text-end"}`}>
                                 <div className="mb-1">
-                                  <span className="badge bg-success bg-opacity-15 text-success" style={{ fontSize: "9px", letterSpacing: "0.5px" }}>TRANSLATED TO ENGLISH</span>
+                                  <span className="badge bg-success bg-opacity-15 " style={{ fontSize: "9px", letterSpacing: "0.5px" }}>TRANSLATED TO ENGLISH</span>
                                 </div>
                                 <div className="mt-1 font-monospace fw-semibold text-secondary" style={{ whiteSpace: "pre-wrap" }}>
                                   {turn.translation}
