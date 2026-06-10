@@ -54,6 +54,7 @@ function NewCallContent() {
   const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
   const consoleEndRef = useRef<HTMLDivElement>(null);
   const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
+  const deviceRef = useRef<any>(null);
 
   // Soundwave and pipeline state
   const [pipelineConnected, setPipelineConnected] = useState(false);
@@ -78,7 +79,7 @@ function NewCallContent() {
               logToTerminal(`[SYSTEM] Running in REAL Twilio Mode`);
               logToTerminal(`[SYSTEM] Initializing SIP Stack in browser...`);
               
-              // Simulate registration
+              // Simulate registration (decorative)
               setTimeout(() => {
                 logToTerminal(`[TX] REGISTER sip:${activeSip.domain} SIP/2.0`);
                 logToTerminal(`     Via: SIP/2.0/WSS client.virpa.ai;branch=z9hG4bK-reg781`);
@@ -101,7 +102,6 @@ function NewCallContent() {
                 logToTerminal(`[RX] SIP/2.0 200 OK (Registered)`);
                 logToTerminal(`     Contact: <sip:${activeSip.username}@client.virpa.ai;transport=ws>;expires=3600`);
                 logToTerminal(`[SIP] SIP Trunk Successfully Registered and Idle.`);
-                setSipStatus("Registered");
               }, 2200);
             } else {
               logToTerminal(`[SYSTEM] Running in REAL Twilio Mode`);
@@ -129,6 +129,57 @@ function NewCallContent() {
 
     loadData();
   }, [leadId]);
+
+  // Initialize Twilio Voice Device for WebRTC
+  useEffect(() => {
+    if (!sipConfig || !sipConfig.useRealTwilio || typeof window === "undefined") return;
+
+    let dev: any = null;
+
+    async function initDevice() {
+      try {
+        logToTerminal(`[SYSTEM] Fetching Twilio WebRTC Access Token...`);
+        const res = await fetch("/api/twilio/token");
+        const data = await res.json();
+        
+        if (data.error) {
+          logToTerminal(`[ERROR] Twilio Token Endpoint error: ${data.error}`);
+          return;
+        }
+
+        logToTerminal(`[SYSTEM] Initializing Twilio WebRTC Device for user identity: ${data.identity}`);
+        const { Device } = await import("@twilio/voice-sdk");
+        
+        dev = new Device(data.token, {
+          codecPreferences: ["opus", "pcmu"] as any,
+        });
+
+        dev.on("registered", () => {
+          logToTerminal(`[SYSTEM] Twilio WebRTC Voice Device successfully registered and ready.`);
+          setSipStatus("Registered");
+        });
+
+        dev.on("error", (err: any) => {
+          logToTerminal(`[ERROR] Twilio Device Error: ${err.message}`);
+        });
+
+        await dev.register();
+        deviceRef.current = dev;
+      } catch (e: any) {
+        logToTerminal(`[ERROR] Failed to load Twilio WebRTC Device: ${e.message}`);
+      }
+    }
+
+    initDevice();
+
+    return () => {
+      if (deviceRef.current) {
+        console.log("Destroying Twilio Voice Device...");
+        deviceRef.current.destroy();
+        deviceRef.current = null;
+      }
+    };
+  }, [sipConfig]);
 
   // Handle call timer
   useEffect(() => {
@@ -234,70 +285,166 @@ function NewCallContent() {
       setStatus("Establishing SIP Session...");
       setSipStatus("Dialing");
       
-      logToTerminal(`[CALL] Initiating live outbound call via Twilio Trunk...`);
+      logToTerminal(`[CALL] Initiating outbound call via Twilio Trunk...`);
 
-      // Trigger the real Twilio voice outbound call
-      const origin = typeof window !== "undefined" ? window.location.origin : "";
-      placeRealTwilioCall(leadId, origin, callLanguage).then((res) => {
-        if (res.error) {
-          logToTerminal(`[ERROR] Twilio Trunk rejected request: ${res.error}`);
+      if (sipConfig.useRealTwilio) {
+        if (!deviceRef.current) {
+          logToTerminal(`[ERROR] Twilio WebRTC Device not ready yet.`);
           setStatus("Failed to connect");
           setSipStatus("Registered");
           setCalling(false);
-        } else {
-          setCallSid(res.callSid || null);
-          logToTerminal(`[SYSTEM] Twilio session established. Call SID: ${res.callSid}`);
-          logToTerminal(`[SYSTEM] Dispatching SIP INVITE request packet...`);
+          return;
         }
-      });
-      
-      // Step 1: Send INVITE
-      const t1 = setTimeout(() => {
-        logToTerminal(`[TX] INVITE sip:${destPhone}@${sipDom} SIP/2.0`);
-        logToTerminal(`     Via: SIP/2.0/WSS client.virpa.ai;branch=z9hG4bK-inv${Math.floor(Math.random() * 100000)}`);
-        logToTerminal(`     From: "${sipUser}" <sip:${sipUser}@${sipDom}>;tag=vcall-${Math.floor(Math.random() * 1000)}`);
-        logToTerminal(`     To: <sip:${destPhone}@${sipDom}>`);
-        logToTerminal(`     Call-ID: call-${Math.random().toString(36).substring(7)}@client.virpa.ai`);
-        logToTerminal(`     Content-Type: application/sdp`);
-        logToTerminal(`     SDP: m=audio 4000 RTP/SAVPF 111`);
-        logToTerminal(`     SDP: a=rtpmap:111 ${codec.replace("_", "/")}/48000/2`);
-      }, 500);
 
-      // Step 2: Receive 100 Trying
-      const t2 = setTimeout(() => {
-        setStatus("SIP: 100 Trying...");
-        logToTerminal(`[RX] SIP/2.0 100 Trying`);
-        logToTerminal(`     Content: Trunk Gateway locating outbound trunk routes...`);
-      }, 1200);
+        logToTerminal(`[CALL] Requesting microphone access and connecting WebRTC session...`);
+        
+        let formattedPhone = destPhone.replace(/[^\d+]/g, ""); // Keep only digits and +
+        if (!formattedPhone.startsWith("+")) {
+          if (formattedPhone.startsWith("91") && formattedPhone.length === 12) {
+            formattedPhone = "+" + formattedPhone;
+          } else {
+            formattedPhone = "+91" + formattedPhone; // Default to India (+91)
+          }
+        }
 
-      // Step 3: Receive 180 Ringing
-      const t3 = setTimeout(() => {
-        setStatus("SIP: 180 Ringing...");
-        logToTerminal(`[RX] SIP/2.0 180 Ringing`);
-        logToTerminal(`     Content: Alerting far-end subscriber terminal...`);
-      }, 2000);
+        deviceRef.current.connect({
+          params: {
+            destPhone: formattedPhone,
+            leadId: leadId,
+            lang: callLanguage,
+            userId: "placeholder"
+          }
+        }).then((twilioCall: any) => {
+          twilioCall.on("accept", () => {
+            setStatus("Connected - Audio Active");
+            setSipStatus("Connected");
+            setPipelineConnected(true);
+            logToTerminal(`[MEDIA] WebRTC Call accepted by Twilio.`);
+            logToTerminal(`[MEDIA] Audio stream established successfully.`);
+            
+            const sid = twilioCall.parameters?.CallSid || twilioCall.sid;
+            if (sid) {
+              setCallSid(sid);
+              logToTerminal(`[SYSTEM] Twilio Call SID: ${sid}`);
+              
+              // Register initial call log entry in the background
+              syncSipCallLog({
+                leadId,
+                callSid: sid,
+                duration: 0,
+                stage: selectedStage,
+                userId: "placeholder"
+              });
+            }
+          });
 
-      // Step 4: Receive 200 OK
-      const t4 = setTimeout(() => {
-        setStatus("SIP: 200 OK (Answered)");
-        setSipStatus("Connected");
-        setPipelineConnected(true);
-        logToTerminal(`[RX] SIP/2.0 200 OK`);
-        logToTerminal(`     Contact: <sip:${destPhone}@${sipDom};transport=ws>`);
-        logToTerminal(`     SDP: m=audio 5002 RTP/SAVPF 111`);
-        logToTerminal(`     SDP: a=rtpmap:111 ${codec.replace("_", "/")}/48000/2`);
-      }, 3500);
+          twilioCall.on("audio", (audioElement: any) => {
+            logToTerminal(`[MEDIA] Remote audio stream received.`);
+            if (audioElement && typeof window !== "undefined") {
+              // Ensure audio element is appended to DOM to trigger browser speaker output
+              document.body.appendChild(audioElement);
+              logToTerminal(`[MEDIA] Remote audio element successfully attached to DOM.`);
+            }
+          });
 
-      // Step 5: Send ACK & Establish WebRTC audio channel
-      const t5 = setTimeout(() => {
-        logToTerminal(`[TX] ACK sip:${destPhone}@${sipDom} SIP/2.0`);
-        logToTerminal(`[MEDIA] Audio media flow established.`);
-        logToTerminal(`[MEDIA] Codec Negotiated: ${codec}`);
-        logToTerminal(`[MEDIA] SRTP Encryption Enabled (AES_CM_128_HMAC_SHA1_80)`);
-        setStatus("Connected - Audio Active");
-      }, 3800);
+          twilioCall.on("disconnect", () => {
+            logToTerminal(`[SYSTEM] WebRTC call disconnected by remote party.`);
+            handleEndCall();
+          });
 
-      timeoutsRef.current = [t1, t2, t3, t4, t5];
+          twilioCall.on("reject", () => {
+            logToTerminal(`[SYSTEM] WebRTC call rejected.`);
+            handleEndCall();
+          });
+        }).catch((err: any) => {
+          logToTerminal(`[ERROR] Failed to start WebRTC session: ${err.message}`);
+          setStatus("Failed to connect");
+          setSipStatus("Registered");
+          setCalling(false);
+        });
+
+        // Decorative SIP protocol trace logs
+        const t1 = setTimeout(() => {
+          logToTerminal(`[TX] INVITE sip:${formattedPhone}@${sipDom} SIP/2.0`);
+          logToTerminal(`     Via: SIP/2.0/WSS client.virpa.ai;branch=z9hG4bK-inv${Math.floor(Math.random() * 100000)}`);
+          logToTerminal(`     From: "${sipUser}" <sip:${sipUser}@${sipDom}>;tag=vcall-${Math.floor(Math.random() * 100)}`);
+          logToTerminal(`     To: <sip:${formattedPhone}@${sipDom}>`);
+          logToTerminal(`     Content-Type: application/sdp`);
+        }, 500);
+
+        const t2 = setTimeout(() => {
+          logToTerminal(`[RX] SIP/2.0 100 Trying (Locating routes...)`);
+        }, 1200);
+
+        const t3 = setTimeout(() => {
+          logToTerminal(`[RX] SIP/2.0 180 Ringing (Alerting destination...)`);
+        }, 2000);
+
+        timeoutsRef.current = [t1, t2, t3];
+      } else {
+        // Trigger the mock Twilio voice outbound call
+        const origin = typeof window !== "undefined" ? window.location.origin : "";
+        placeRealTwilioCall(leadId, origin, callLanguage).then((res) => {
+          if (res.error) {
+            logToTerminal(`[ERROR] Twilio Trunk rejected request: ${res.error}`);
+            setStatus("Failed to connect");
+            setSipStatus("Registered");
+            setCalling(false);
+          } else {
+            setCallSid(res.callSid || null);
+            logToTerminal(`[SYSTEM] Twilio session established. Call SID: ${res.callSid}`);
+            logToTerminal(`[SYSTEM] Dispatching SIP INVITE request packet...`);
+          }
+        });
+        
+        // Step 1: Send INVITE
+        const t1 = setTimeout(() => {
+          logToTerminal(`[TX] INVITE sip:${destPhone}@${sipDom} SIP/2.0`);
+          logToTerminal(`     Via: SIP/2.0/WSS client.virpa.ai;branch=z9hG4bK-inv${Math.floor(Math.random() * 100000)}`);
+          logToTerminal(`     From: "${sipUser}" <sip:${sipUser}@${sipDom}>;tag=vcall-${Math.floor(Math.random() * 1000)}`);
+          logToTerminal(`     To: <sip:${destPhone}@${sipDom}>`);
+          logToTerminal(`     Call-ID: call-${Math.random().toString(36).substring(7)}@client.virpa.ai`);
+          logToTerminal(`     Content-Type: application/sdp`);
+          logToTerminal(`     SDP: m=audio 4000 RTP/SAVPF 111`);
+          logToTerminal(`     SDP: a=rtpmap:111 ${codec.replace("_", "/")}/48000/2`);
+        }, 500);
+
+        // Step 2: Receive 100 Trying
+        const t2 = setTimeout(() => {
+          setStatus("SIP: 100 Trying...");
+          logToTerminal(`[RX] SIP/2.0 100 Trying`);
+          logToTerminal(`     Content: Trunk Gateway locating outbound trunk routes...`);
+        }, 1200);
+
+        // Step 3: Receive 180 Ringing
+        const t3 = setTimeout(() => {
+          setStatus("SIP: 180 Ringing...");
+          logToTerminal(`[RX] SIP/2.0 180 Ringing`);
+          logToTerminal(`     Content: Alerting far-end subscriber terminal...`);
+        }, 2000);
+
+        // Step 4: Receive 200 OK
+        const t4 = setTimeout(() => {
+          setStatus("SIP: 200 OK (Answered)");
+          setSipStatus("Connected");
+          setPipelineConnected(true);
+          logToTerminal(`[RX] SIP/2.0 200 OK`);
+          logToTerminal(`     Contact: <sip:${destPhone}@${sipDom};transport=ws>`);
+          logToTerminal(`     SDP: m=audio 5002 RTP/SAVPF 111`);
+          logToTerminal(`     SDP: a=rtpmap:111 ${codec.replace("_", "/")}/48000/2`);
+        }, 3500);
+
+        // Step 5: Send ACK & Establish WebRTC audio channel
+        const t5 = setTimeout(() => {
+          logToTerminal(`[TX] ACK sip:${destPhone}@${sipDom} SIP/2.0`);
+          logToTerminal(`[MEDIA] Audio media flow established.`);
+          logToTerminal(`[MEDIA] Codec Negotiated: ${codec}`);
+          logToTerminal(`[MEDIA] SRTP Encryption Enabled (AES_CM_128_HMAC_SHA1_80)`);
+          setStatus("Connected - Audio Active");
+        }, 3800);
+
+        timeoutsRef.current = [t1, t2, t3, t4, t5];
+      }
     } else {
       // AI dialer simulator
       setStatus("AI Dialing...");
@@ -334,6 +481,11 @@ function NewCallContent() {
       logToTerminal(`     From: "${sipUser}" <sip:${sipUser}@${sipDom}>;tag=hangup`);
       logToTerminal(`     To: <sip:${destPhone}@${sipDom}>`);
       
+      if (sipConfig.useRealTwilio && deviceRef.current) {
+        logToTerminal(`[SYSTEM] Disconnecting WebRTC call device...`);
+        deviceRef.current.disconnectAll();
+      }
+
       if (callSid) {
         logToTerminal(`[SYSTEM] Hanging up active Twilio call Session: ${callSid}...`);
         endTwilioCall(callSid).then((res) => {

@@ -8,6 +8,8 @@ export async function POST(request: Request) {
     const leadId = searchParams.get("leadId") || "";
     const lang = searchParams.get("lang") || "English";
     const userId = searchParams.get("userId") || "";
+    const callType = searchParams.get("callType") || "";
+    const isWebRTC = callType === "webrtc";
 
     // Parse Twilio application/x-www-form-urlencoded POST body
     const formData = await request.formData();
@@ -91,7 +93,8 @@ export async function POST(request: Request) {
           openAiKey,
           lead.name,
           agentName,
-          lang
+          lang,
+          isWebRTC
         );
       } catch (err: any) {
         console.error("OpenAI real transcription failed:", err);

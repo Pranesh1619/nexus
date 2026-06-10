@@ -559,7 +559,8 @@ export async function transcribeAndAnalyzeRecording(
   apiKey: string,
   leadName: string,
   agentName: string,
-  targetLanguage: string = "English"
+  targetLanguage: string = "English",
+  isWebRTC: boolean = false
 ) {
   try {
     console.log(`[Whisper] Downloading call recording from: ${recordingUrl}`);
@@ -649,40 +650,42 @@ English: This is a customer call. You have a trial account.`;
     rawTranscript = rawTranscript.trim();
     console.log(`[Whisper] Cleaned Transcription: "${rawTranscript}"`);
 
-    // Find and strip automated greeting by boundary first
-    const boundary = findBoundarySplitIndex(rawTranscript);
-    if (boundary.index !== -1) {
-      const splitPoint = boundary.index + boundary.boundaryLength;
-      console.log(`[Parser] Located greeting boundary at index ${boundary.index}. Slicing off system greeting.`);
-      rawTranscript = rawTranscript.substring(splitPoint).trim();
-    } else {
-      console.log(`[Parser] Greeting boundary not found. Falling back to phrase-based cleaning.`);
-    }
+    if (!isWebRTC) {
+      // Find and strip automated greeting by boundary first
+      const boundary = findBoundarySplitIndex(rawTranscript);
+      if (boundary.index !== -1) {
+        const splitPoint = boundary.index + boundary.boundaryLength;
+        console.log(`[Parser] Located greeting boundary at index ${boundary.index}. Slicing off system greeting.`);
+        rawTranscript = rawTranscript.substring(splitPoint).trim();
+      } else {
+        console.log(`[Parser] Greeting boundary not found. Falling back to phrase-based cleaning.`);
+      }
 
-    // Clean all automated system greeting phrases from the raw transcript so they do not contaminate the Lead's speech
-    rawTranscript = cleanGreetingPhrases(rawTranscript, leadName);
-    console.log(`[Whisper] Post-Greeting Cleaned Transcription: "${rawTranscript}"`);
+      // Clean all automated system greeting phrases from the raw transcript so they do not contaminate the Lead's speech
+      rawTranscript = cleanGreetingPhrases(rawTranscript, leadName);
+      console.log(`[Whisper] Post-Greeting Cleaned Transcription: "${rawTranscript}"`);
 
-    // If there is no speech left after removing the greeting, return a standard "No message left" call log directly
-    if (!rawTranscript) {
-      const staticAgent = getStaticAgentTurn(targetLanguage, leadName);
-      const finalTurns = [
-        {
-          speaker: "Agent",
-          text: staticAgent.text,
-          translation: staticAgent.translation,
-          time: "00:02"
-        }
-      ];
-      return {
-        detectedVoiceLanguage: targetLanguage,
-        translatedLanguage: "English",
-        transcript: JSON.stringify(finalTurns),
-        translatedText: `Agent: ${staticAgent.translation}`,
-        wordCount: 0,
-        analysis: "The call was answered, but the lead hung up without leaving a message.",
-        aiScore: 10,
-      };
+      // If there is no speech left after removing the greeting, return a standard "No message left" call log directly
+      if (!rawTranscript) {
+        const staticAgent = getStaticAgentTurn(targetLanguage, leadName);
+        const finalTurns = [
+          {
+            speaker: "Agent",
+            text: staticAgent.text,
+            translation: staticAgent.translation,
+            time: "00:02"
+          }
+        ];
+        return {
+          detectedVoiceLanguage: targetLanguage,
+          translatedLanguage: "English",
+          transcript: JSON.stringify(finalTurns),
+          translatedText: `Agent: ${staticAgent.translation}`,
+          wordCount: 0,
+          analysis: "The call was answered, but the lead hung up without leaving a message.",
+          aiScore: 10,
+        };
+      }
     }
 
     // Since we've cleaned the greeting, the remaining rawTranscript is entirely the Lead's speech.
@@ -690,15 +693,17 @@ English: This is a customer call. You have a trial account.`;
     let preSplitTranscript = null;
     let leadText = rawTranscript;
 
-    const staticAgent = getStaticAgentTurn(targetLanguage, leadName);
-    const turns = [
-      { speaker: "Agent", text: staticAgent.text, translation: staticAgent.translation, time: "00:02" }
-    ];
-    if (leadText) {
-      turns.push({ speaker: "Lead", text: leadText, translation: "", time: "00:08" });
+    if (!isWebRTC) {
+      const staticAgent = getStaticAgentTurn(targetLanguage, leadName);
+      const turns = [
+        { speaker: "Agent", text: staticAgent.text, translation: staticAgent.translation, time: "00:02" }
+      ];
+      if (leadText) {
+        turns.push({ speaker: "Lead", text: leadText, translation: "", time: "00:08" });
+      }
+      preSplitTranscript = turns;
+      console.log(`[Parser] Deterministically set transcription to Agent and Lead turns. Lead text: "${leadText}"`);
     }
-    preSplitTranscript = turns;
-    console.log(`[Parser] Deterministically set transcription to Agent and Lead turns. Lead text: "${leadText}"`);
 
     let prompt = "";
     if (preSplitTranscript) {
@@ -728,6 +733,41 @@ Return ONLY a raw JSON object (do not wrap in markdown fences like \`\`\`json) m
   "detectedVoiceLanguage": string,
   "translatedLeadText": string, // English translation of the Lead's speech
   "nativeLeadText": string, // Lead's speech in its proper native script
+  "analysis": string,
+  "aiScore": number
+}`;
+    } else if (isWebRTC) {
+      prompt = `You are a CRM call analyzer. We have a raw transcription of a real live WebRTC phone call between Agent "${agentName}" and Lead "${leadName}".
+The call may be in English, Tamil, Hindi, Spanish, French, German, or a mixture of these.
+Raw transcription:
+"${rawTranscript}"
+
+Please perform the following operations:
+1. Parse this transcript into a JSON array of dialogue turns. Assign each turn to either "Agent" or "Lead" based on conversational context. Provide an approximated time marker format "MM:SS" (e.g. 00:02, 00:08) reflecting the natural speed of conversation.
+   CRITICAL COMPLETENESS RULE: Every single sentence, phrase, and word in the raw transcription MUST be represented in the output turns. Do NOT summarize, truncate, or omit any spoken words from the dialogue turns. If there is a transition of language or speaker, split it into a separate turn.
+   CRITICAL SPEAKER ASSIGNMENT RULES:
+   - The call is an outbound connection initiated by Agent "${agentName}" to Lead "${leadName}". The very first turn is spoken by the Agent.
+   - PHONETIC NAME ERRORS: Whisper often transcribes regional names phonetically as common words (e.g. transcribing the lead name "Pranesh" as "Français" or "French"). You must recognize these homophone errors.
+   - For example: if one speaker asks "Hello, is this Français?" or "Hello, is this Pranesh?", that is the Agent verifying the customer's identity. The speaker replying "Yes, this is Français/Pranesh. What is the matter?" is the Lead. Do not swap these roles.
+2. Populate the "text" key with the spoken words in their proper native script:
+   - Note that the speakers may have responded in ANY language. You MUST detect the actual language spoken in each turn.
+   - If any spoken words are transcribed using characters of a different script than the actual language spoken (e.g. Hindi spoken words transcribed as Tamil characters), or if they are transcribed in Romanized/Latin characters, you MUST convert/transliterate them into their proper native script.
+   - If there are minor phonetic spelling errors, typos, or garbled words due to accent/audio quality, correct them to their proper native words.
+   - Under NO circumstances should you translate the "text" key to English.
+3. Detect the language of the turn. If it is in a foreign language (like Tamil, Hindi, Spanish, French, German, etc.), provide an accurate English translation for that turn under the "translation" key.
+   - PHONETIC & CONTEXT CORRECTION: When translating, if the native transcript contains minor phonetic errors or garbled words, use conversational context to correct the translation so that it is fluent, accurate, and reflects the true intended meaning (e.g., translating "Français" to "Pranesh" when referring to the person's name).
+   - If the turn is already in English, copy the text exactly into the "translation" key.
+4. Detect the primary language of the Lead's speech and populate the "detectedVoiceLanguage" key (e.g., "Tamil", "Hindi", "English", "Spanish", "French", "German", etc.).
+5. Write a professional CRM call analysis summarizing the discussion, client objections, and proposed follow-up steps.
+6. Calculate a quality score (0 to 100) representing the lead's level of interest or business qualification.
+
+Return ONLY a raw JSON object (do not wrap in markdown fences like \`\`\`json) matching the following TypeScript interface:
+{
+  "detectedVoiceLanguage": string,
+  "translatedLanguage": "English",
+  "transcript": string, // JSON string representation of: Array<{ speaker: "Agent" | "Lead", text: string, translation: string, time: string }>
+  "translatedText": string, // Text paragraph of the English-translated dialogue
+  "wordCount": number, // total words in transcription
   "analysis": string,
   "aiScore": number
 }`;
@@ -862,7 +902,7 @@ Return ONLY a raw JSON object (do not wrap in markdown fences like \`\`\`json) m
         ? JSON.parse(parsedResult.transcript)
         : parsedResult.transcript;
 
-      if (Array.isArray(transcriptObj)) {
+      if (Array.isArray(transcriptObj) && !isWebRTC) {
         const staticAgent = getStaticAgentTurn(targetLanguage, leadName);
         transcriptObj = transcriptObj.map((turn: any) => {
           if (turn.speaker === "Agent") {
