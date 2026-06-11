@@ -71,6 +71,8 @@ export default function CallList({ logs }: { logs: CallLogListItem[] }) {
   const [selectedFilter, setSelectedFilter] = useState<"all" | "missed" | "connected" | "converted">("all");
   const [selectedAgentId, setSelectedAgentId] = useState<string>("all");
   const [expandedLeadIds, setExpandedLeadIds] = useState<Record<string, boolean>>({});
+  const [activeModalLog, setActiveModalLog] = useState<CallLogListItem | null>(null);
+  const [modalDetailTab, setModalDetailTab] = useState<"transcript" | "recording">("transcript");
 
   const handleDelete = async () => {
     if (deleteId) {
@@ -358,15 +360,17 @@ export default function CallList({ logs }: { logs: CallLogListItem[] }) {
                                           </td>
                                           <td className="px-3 py-2.5 text-end">
                                             <div className="d-flex justify-content-end align-items-center gap-1.5">
-                                              <Link 
-                                                href={`/admin/calls/${log.id}`} 
-                                                onClick={(e) => e.stopPropagation()}
+                                              <button 
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  router.push(`/admin/calls/${log.id}`);
+                                                }}
                                                 className="btn btn-xs btn-light border text-primary px-2 py-0.5" 
                                                 style={{ fontSize: "11px" }}
-                                                title="View Analysis"
+                                                title="View Details"
                                               >
                                                 <i className="bi bi-eye"></i>
-                                              </Link>
+                                              </button>
                                               <Link 
                                                 href={`/admin/calls/${log.id}/edit`} 
                                                 onClick={(e) => e.stopPropagation()}
@@ -448,6 +452,181 @@ export default function CallList({ logs }: { logs: CallLogListItem[] }) {
                 onClick={handleDelete}
               >
                 Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Call Details Modal */}
+      {activeModalLog && (
+        <div 
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center animate-fade"
+          style={{ 
+            zIndex: 1060, 
+            backgroundColor: "rgba(15, 23, 42, 0.45)", 
+            backdropFilter: "blur(10px)",
+            transition: "all 0.3s ease"
+          }}
+          onClick={() => setActiveModalLog(null)}
+        >
+          <div 
+            className="card border-0 shadow-lg p-0 w-100 mx-3 bg-white" 
+            style={{ maxWidth: "680px", borderRadius: "20px", maxHeight: "85vh", overflow: "hidden" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="card-header bg-white border-bottom border-light-subtle p-4 d-flex justify-content-between align-items-center">
+              <div>
+                <h5 className="fw-bold text-dark mb-1" style={{ fontSize: "16px" }}>
+                  Call Analysis: {activeModalLog.lead.name}
+                </h5>
+                <p className="text-secondary mb-0" style={{ fontSize: "12px" }}>
+                  Handled by Agent: <strong>{activeModalLog.user?.name || "System"}</strong> on {new Date(activeModalLog.createdAt).toLocaleString()}
+                </p>
+              </div>
+              <button 
+                className="btn btn-light rounded-circle p-2 border-0" 
+                onClick={() => setActiveModalLog(null)}
+                style={{ width: "36px", height: "36px" }}
+              >
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="card-body p-4 overflow-auto" style={{ maxHeight: "calc(85vh - 150px)" }}>
+              {/* Outcome Badges & Score */}
+              <div className="d-flex justify-content-between align-items-center pb-3 border-bottom mb-3">
+                <span className="fw-bold text-primary" style={{ fontSize: "14px" }}>
+                  AI Qualification Score: <strong className="fs-5">{getDisplayScore(activeModalLog)}%</strong>
+                </span>
+                <span className={`badge ${getCallOutcome(activeModalLog.status, activeModalLog.stage, activeModalLog.lead.status).class} rounded-pill px-3 py-1.5 fw-bold`} style={{ fontSize: "12px" }}>
+                  {activeModalLog.status} • {activeModalLog.stage}
+                </span>
+              </div>
+
+              {/* CRM Analysis Summary */}
+              {activeModalLog.analysis && (
+                <div className="mb-4 p-3 bg-light rounded-3 border-0">
+                  <span className="fw-bold text-secondary uppercase d-block mb-1" style={{ fontSize: "11px", letterSpacing: "0.5px" }}>CRM Analysis Summary</span>
+                  <p className="text-dark mb-0" style={{ fontSize: "13.5px", lineHeight: "1.5" }}>{activeModalLog.analysis}</p>
+                </div>
+              )}
+
+              {/* Tab Navigation */}
+              <div className="d-flex border-bottom mb-3 gap-3">
+                <button
+                  onClick={() => setModalDetailTab("transcript")}
+                  className={`btn btn-link nav-link pb-2 px-3 fw-bold border-bottom border-2 text-decoration-none ${modalDetailTab === "transcript" ? "border-primary text-primary" : "border-transparent text-secondary"}`}
+                  style={{ fontSize: "13px", borderRadius: 0, boxShadow: "none" }}
+                >
+                  <i className="bi bi-file-earmark-text me-1.5"></i> Transcript
+                </button>
+                <button
+                  onClick={() => setModalDetailTab("recording")}
+                  className={`btn btn-link nav-link pb-2 px-3 fw-bold border-bottom border-2 text-decoration-none ${modalDetailTab === "recording" ? "border-primary text-primary" : "border-transparent text-secondary"}`}
+                  style={{ fontSize: "13px", borderRadius: 0, boxShadow: "none" }}
+                >
+                  <i className="bi bi-play-circle me-1.5"></i> Call Recording
+                </button>
+              </div>
+
+              {modalDetailTab === "transcript" ? (
+                <div className="d-flex flex-column gap-3">
+                  {(() => {
+                    try {
+                      const rawTurns = JSON.parse(activeModalLog.transcript || "[]");
+                      if (Array.isArray(rawTurns) && rawTurns.length > 0) {
+                        const turns: any[] = [];
+                        rawTurns.forEach((turn: any) => {
+                          const last = turns[turns.length - 1];
+                          if (last && last.speaker === turn.speaker) {
+                            last.text = (last.text + " " + turn.text).trim();
+                            if (turn.translation) {
+                              last.translation = ((last.translation || "") + " " + turn.translation).trim();
+                            }
+                          } else {
+                            turns.push({ ...turn });
+                          }
+                        });
+                        return turns.map((turn: any, idx: number) => {
+                          const isAgent = turn.speaker === "Agent";
+                          const speakerName = isAgent ? activeModalLog.user?.name : activeModalLog.lead.name;
+                          return (
+                            <div key={idx} className={`p-3 rounded-3 ${isAgent ? "bg-white border-start border-primary border-3 shadow-sm" : "bg-success bg-opacity-10 border-end border-success border-3 text-end shadow-sm"}`}>
+                              <div className="fw-bold mb-1" style={{ fontSize: "10px", color: isAgent ? "#0d6efd" : "#198754" }}>
+                                {speakerName} • {turn.time}
+                              </div>
+                              <div className="text-dark fw-medium" style={{ fontSize: "13.5px" }}>{turn.text}</div>
+                              {turn.translation && turn.translation !== turn.text && (
+                                <div className="text-secondary mt-1.5 border-top pt-1.5" style={{ fontSize: "11px" }}>Translation: {turn.translation}</div>
+                              )}
+                            </div>
+                          );
+                        });
+                      }
+                    } catch (e) {
+                      // ignore json error
+                    }
+                    return (
+                      <p className="small text-muted mb-0">{activeModalLog.translatedText || activeModalLog.transcript || "No transcript available."}</p>
+                    );
+                  })()}
+                </div>
+              ) : (
+                <div className="d-flex flex-column gap-3">
+                  <div className="p-3 bg-light rounded-3 border-0">
+                    <h6 className="fw-bold text-dark mb-2 small text-uppercase tracking-wider">Recording Details</h6>
+                    <div className="row g-2 text-secondary" style={{ fontSize: "12px" }}>
+                      <div className="col-6">
+                        <span className="fw-bold">Caller:</span> {activeModalLog.callerPhone || "+1 (555) 019-2834"}
+                      </div>
+                      <div className="col-6">
+                        <span className="fw-bold">Receiver:</span> {activeModalLog.receiverPhone || activeModalLog.lead.phone}
+                      </div>
+                      <div className="col-6">
+                        <span className="fw-bold">Duration:</span> {activeModalLog.duration || 0} seconds
+                      </div>
+                      <div className="col-6">
+                        <span className="fw-bold">Date:</span> {new Date(activeModalLog.startTime || activeModalLog.createdAt).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="d-flex flex-column align-items-center w-100 p-3 bg-light rounded-3">
+                    <span className="text-secondary fw-bold small uppercase mb-2" style={{ fontSize: "10px", letterSpacing: "1px" }}>PLAY RECORDING</span>
+                    <audio
+                      controls
+                      className="w-100"
+                      src={
+                        activeModalLog.jobId && !activeModalLog.jobId.startsWith("mock_")
+                          ? `/api/recordings/${activeModalLog.jobId}`
+                          : `/recordings/2026-06-10_17-20-59_CA4a1c848d5af71a94d102a3647ce98a47.wav`
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="card-footer bg-white border-top border-light-subtle p-3 d-flex justify-content-between">
+              {activeModalLog && (
+                <Link
+                  href={`/admin/calls/${activeModalLog.id}`}
+                  className="btn btn-outline-primary px-4 d-flex align-items-center gap-2"
+                >
+                  <i className="bi bi-eye"></i>
+                  View Details
+                </Link>
+              )}
+              <button 
+                type="button" 
+                className="btn btn-secondary px-4" 
+                onClick={() => setActiveModalLog(null)}
+              >
+                Close
               </button>
             </div>
           </div>

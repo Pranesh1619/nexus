@@ -997,7 +997,7 @@ export default function AgentsWorkspace({ initialAgents }: AgentsWorkspaceProps)
             </div>
           </div>
 
-          {/* 3. AI Performance Analytics & Pipeline Funnel */}
+          {/* 3. AI Performance Analytics & Pipeline Funnel (Commented out per user request)
           <div className="row g-4 mb-4">
             <div className="col-12 col-md-6">
               <div className="card border-0 shadow-sm p-4 bg-white rounded-4 h-100">
@@ -1085,6 +1085,7 @@ export default function AgentsWorkspace({ initialAgents }: AgentsWorkspaceProps)
               </div>
             </div>
           </div>
+          */}
 
           {/* 4. Assigned Pipelines & Leads Table */}
           <div className="card border-0 shadow-sm mb-4 rounded-4 overflow-hidden bg-white">

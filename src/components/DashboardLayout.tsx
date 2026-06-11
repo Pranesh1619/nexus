@@ -24,23 +24,36 @@ export default function DashboardLayout({ children, userRole = "ADMIN", userName
   }, [pathname]); // Refresh when page changes to keep status fresh
 
 
+  interface SidebarItem {
+    title: string;
+    icon: string;
+    path: string;
+    children?: { title: string; icon: string; path: string }[];
+  }
+
   const sections = [
     {
       title: "MAIN MENU",
       items: [
         { title: "Dashboard", icon: "bi-grid", path: "/admin" },
-        { title: "Agents", icon: "bi-headset", path: "/admin/agents" },
+        { title: "Call Logs", icon: "bi-telephone-outbound", path: "/admin/calls" },
         { title: "Leads", icon: "bi-person-badge", path: "/admin/leads" },
-        { title: "Calls", icon: "bi-telephone-outbound", path: "/admin/calls" },
-        ...(userRole === "ADMIN" ? [
-          { title: "Sales", icon: "bi-graph-up-arrow", path: "/admin/sales" }
-        ] : []),
+        { 
+          title: "Agents", 
+          icon: "bi-headset", 
+          path: "/admin/agents",
+          ...(userRole === "ADMIN" ? {
+            children: [
+              { title: "Lead Assign", icon: "bi-person-plus", path: "/admin/sales" }
+            ]
+          } : {})
+        },
         { title: "Deals", icon: "bi-kanban", path: "/admin/deals" },
         ...(userRole === "ADMIN" ? [
           { title: "Users", icon: "bi-people", path: "/admin/users" }
         ] : []),
         { title: "CRM Sync", icon: "bi-cloud-arrow-up", path: "/admin/migration" }
-      ]
+      ] as SidebarItem[]
     }
   ];
 
@@ -67,26 +80,44 @@ export default function DashboardLayout({ children, userRole = "ADMIN", userName
         >
           <i className="bi bi-x-lg" style={{ fontSize: "18px" }}></i>
         </button>
-
+ 
         <Link href="/admin" className="sidebar-logo">
           <i className="bi bi-intersect text-success fs-2"></i>
           <span>Virpa</span>
         </Link>
-
+ 
         {sections.map((section, idx) => (
           section.items.length > 0 && (
             <div className="nav-section" key={idx}>
               <div className="nav-section-title">{section.title}</div>
-              {section.items.map((item) => (
-                <Link
-                  key={item.path}
-                  href={item.path}
-                  className={`nav-link ${pathname === item.path ? "active" : ""}`}
-                >
-                  <i className={`bi ${item.icon}`}></i>
-                  <span>{item.title}</span>
-                </Link>
-              ))}
+              {section.items.map((item) => {
+                const isParentActive = pathname === item.path || (item.children && item.children.some(c => pathname === c.path));
+                return (
+                  <div key={item.path} className="nav-item-group">
+                    <Link
+                      href={item.path}
+                      className={`nav-link ${isParentActive ? "active" : ""}`}
+                    >
+                      <i className={`bi ${item.icon}`}></i>
+                      <span>{item.title}</span>
+                    </Link>
+                    {item.children && item.children.length > 0 && isParentActive && (
+                      <div className="nav-children-list">
+                        {item.children.map((child) => (
+                          <Link
+                            key={child.path}
+                            href={child.path}
+                            className={`nav-child-link ${pathname === child.path ? "active" : ""}`}
+                          >
+                            <i className={`bi ${child.icon}`}></i>
+                            <span>{child.title}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )
         ))}

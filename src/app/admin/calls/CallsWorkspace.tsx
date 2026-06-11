@@ -178,8 +178,11 @@ export default function CallsWorkspace({
 
   // Tab control: "workspace" or "history"
   const [activeTab, setActiveTab] = useState<"workspace" | "history">(
-    (initialTab as "workspace" | "history") || "history"
+    (initialTab as "workspace" | "history") || "workspace"
   );
+
+  const [activeModalLog, setActiveModalLog] = useState<any | null>(null);
+  const [modalDetailTab, setModalDetailTab] = useState<"transcript" | "recording">("transcript");
 
   // Lead Selection
   const [selectedLeadId, setSelectedLeadId] = useState<string>(
@@ -727,17 +730,14 @@ export default function CallsWorkspace({
   return (
     <div className="d-flex flex-column gap-4 animate-fade">
 
-      {/* Tab Switcher & Metrics bar */}
-      <div className="d-flex flex-wrap justify-content-between align-items-center gap-3">
+      {/* Call Center Workspace Row: Title on Left, Tab Switcher on Right End */}
+      <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-2">
+        <div>
+          <h2 className="fw-bold mb-1 text-dark">Call Center Workspace</h2>
+          <p className="text-secondary small mb-0">Dial customers via SIP trunks and manage interactive transcripts in a single screen.</p>
+        </div>
+
         <div className="d-flex align-items-center gap-3">
-          <button
-            onClick={() => setActiveTab("history")}
-            className={`btn px-4 py-2 fw-bold small shadow-sm ${activeTab === "history" ? "btn-primary text-white" : "btn-light border bg-white"}`}
-            style={{ fontSize: "13.5px", borderRadius: "10px" }}
-          >
-            <i className="bi bi-card-text me-2"></i>
-            Call History Database
-          </button>
           <button
             onClick={() => setActiveTab("workspace")}
             className={`btn px-4 py-2 fw-bold small shadow-sm ${activeTab === "workspace" ? "btn-primary text-white" : "btn-light border bg-white"}`}
@@ -746,13 +746,14 @@ export default function CallsWorkspace({
             <i className="bi bi-telephone-outbound-fill me-2"></i>
             Dialing Workspace
           </button>
-        </div>
-
-        <div className="d-flex align-items-center gap-2">
-          <Link href="/admin/leads" className="btn btn-sm btn-outline-secondary px-3 py-1.5 fw-bold" style={{ borderRadius: "8px" }}>
-            <i className="bi bi-people-fill me-1.5"></i>
-            Manage Leads
-          </Link>
+          <button
+            onClick={() => setActiveTab("history")}
+            className={`btn px-4 py-2 fw-bold small shadow-sm ${activeTab === "history" ? "btn-primary text-white" : "btn-light border bg-white"}`}
+            style={{ fontSize: "13.5px", borderRadius: "10px" }}
+          >
+            <i className="bi bi-card-text me-2"></i>
+            Call History
+          </button>
         </div>
       </div>
       {activeTab === "history" ? (
@@ -760,25 +761,6 @@ export default function CallsWorkspace({
       ) : (
         /* Workspace Dual Panel View */
         <div className="card border shadow-sm mb-4 rounded-4 overflow-hidden bg-white" style={{ borderColor: "#cbd5e1" }}>
-          <div className="card-header bg-white border-bottom border-light-subtle p-4">
-            <div className="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2">
-              <div>
-                <h5 className="fw-bold text-dark mb-0 d-flex align-items-center gap-2" style={{ fontSize: "15.5px" }}>
-                  <i className="bi bi-person-workspace text-success"></i>
-                  Interactive Dialing CRM Workspace
-                </h5>
-                <p className="text-secondary mb-0" style={{ fontSize: "12px" }}>
-                  Select customer lead, trigger voice session, monitor signaling console, and inspect real-time outcomes.
-                </p>
-              </div>
-              {selectedLead && (
-                <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-1.5 small fw-semibold">
-                  Active Dial Target: {selectedLead.name}
-                </span>
-              )}
-            </div>
-          </div>
-
           <div className="row g-0" style={{ minHeight: "600px" }}>
 
             {/* Left Panel: Lead Selection Sidebar */}
@@ -1145,10 +1127,20 @@ export default function CallsWorkspace({
 
                       {/* 3. Call History & Transcripts list */}
                       <div className="card border p-4 bg-white" style={{ borderRadius: "16px", borderColor: "#cbd5e1" }}>
-                        <h5 className="fw-bold mb-3 d-flex align-items-center gap-2">
-                          <i className="bi bi-clock-history text-secondary"></i>
-                          Call History with {selectedLead.name}
-                        </h5>
+                        <div className="d-flex align-items-center justify-content-between mb-3">
+                          <h5 className="fw-bold mb-0 d-flex align-items-center gap-2">
+                            <i className="bi bi-clock-history text-secondary"></i>
+                            Call History with {selectedLead.name}
+                          </h5>
+                          <Link
+                            href={`/admin/leads/${selectedLead.id}`}
+                            className="btn btn-sm btn-outline-primary px-3 d-flex align-items-center gap-1.5"
+                            style={{ fontSize: "13px" }}
+                          >
+                            <i className="bi bi-person-badge"></i>
+                            View Details
+                          </Link>
+                        </div>
 
                         {selectedLeadCalls.length === 0 ? (
                           <div className="text-center py-4 text-muted small">
@@ -1156,11 +1148,9 @@ export default function CallsWorkspace({
                           </div>
                         ) : (
                           <div className="row g-4">
-                            {/* Left: list of call sessions */}
-                            <div className="col-md-5 border-end pr-md-3">
-                              <div className="d-flex flex-column gap-2 overflow-auto" style={{ maxHeight: "300px" }}>
+                            <div className="col-12">
+                              <div className="d-flex flex-column gap-2 overflow-auto" style={{ maxHeight: "400px" }}>
                                 {selectedLeadCalls.map((log) => {
-                                  const isSelected = activeCallDetailId === log.id;
                                   const dt = new Date(log.createdAt).toLocaleString("en-IN", {
                                     day: "2-digit",
                                     month: "short",
@@ -1171,147 +1161,37 @@ export default function CallsWorkspace({
                                   return (
                                     <button
                                       key={log.id}
-                                      onClick={() => setActiveCallDetailId(log.id)}
-                                      className={`w-100 text-start border p-2.5 rounded-3 d-flex flex-column gap-1 ${isSelected ? "bg-light border-primary" : "bg-transparent hover-bg-light"
-                                        }`}
-                                      style={{ transition: "all 0.15s" }}
+                                      onClick={() => {
+                                        setActiveModalLog(log);
+                                        setModalDetailTab("transcript");
+                                      }}
+                                      className="w-100 text-start border p-3 rounded-3 d-flex justify-content-between align-items-center bg-transparent hover-bg-light"
+                                      style={{ transition: "all 0.15s", borderRadius: "12px" }}
                                     >
-                                      <div className="d-flex justify-content-between align-items-center">
-                                        <span className="fw-bold small text-dark">{dt}</span>
-                                        <span className="badge bg-primary bg-opacity-10 text-primary small">{log.stage}</span>
+                                      <div className="d-flex align-items-center gap-3">
+                                        <div className="bg-light rounded-circle p-2 d-flex align-items-center justify-content-center" style={{ width: "40px", height: "40px" }}>
+                                          <i className="bi bi-telephone text-primary"></i>
+                                        </div>
+                                        <div>
+                                          <span className="fw-bold text-dark d-block" style={{ fontSize: "14px" }}>{dt}</span>
+                                          <span className="text-secondary small">Duration: {log.duration ? `${log.duration}s` : "0s"}</span>
+                                        </div>
                                       </div>
-                                      <div className="d-flex justify-content-between text-secondary" style={{ fontSize: "11px" }}>
-                                        <span>Duration: {log.duration ? `${log.duration}s` : "N/A"}</span>
-                                        {log.aiScore !== null && <span className="fw-bold text-success">Score: {log.aiScore}%</span>}
+                                      <div className="d-flex align-items-center gap-2">
+                                        {log.aiScore !== null && (
+                                          <span className="badge bg-success bg-opacity-10 text-success fw-bold px-2.5 py-1.5" style={{ fontSize: "12px" }}>
+                                            Score: {log.aiScore}%
+                                          </span>
+                                        )}
+                                        <span className="badge bg-primary bg-opacity-10 text-primary fw-bold px-2.5 py-1.5" style={{ fontSize: "12px" }}>
+                                          {log.stage}
+                                        </span>
+                                        <i className="bi bi-chevron-right text-secondary ms-1"></i>
                                       </div>
                                     </button>
                                   );
                                 })}
                               </div>
-                            </div>
-
-                            {/* Right: Selected Call transcript detail */}
-                            <div className="col-md-7">
-                              {activeCallDetail ? (
-                                <div className="bg-light p-3 rounded-4 border overflow-auto" style={{ maxHeight: "350px", minHeight: "300px" }}>
-                                  <div className="d-flex justify-content-between align-items-center pb-2 border-bottom mb-2">
-                                    <span className="fw-bold text-primary small">AI Score: {activeCallDetail.aiScore || 0}%</span>
-                                    <span className="badge bg-success small">{activeCallDetail.status}</span>
-                                  </div>
-
-                                  {/* Tab Navigation */}
-                                  <div className="d-flex border-bottom mb-3 mt-1 gap-3">
-                                    <button
-                                      onClick={() => setDetailTab("transcript")}
-                                      className={`btn btn-link nav-link pb-1.5 px-3 fw-bold border-bottom border-2 text-decoration-none ${detailTab === "transcript" ? "border-primary text-primary" : "border-transparent text-secondary"
-                                        }`}
-                                      style={{ fontSize: "12px", borderRadius: 0, boxShadow: "none" }}
-                                    >
-                                      <i className="bi bi-file-earmark-text me-1.5"></i> Transcript
-                                    </button>
-                                    <button
-                                      onClick={() => setDetailTab("recording")}
-                                      className={`btn btn-link nav-link pb-1.5 px-3 fw-bold border-bottom border-2 text-decoration-none ${detailTab === "recording" ? "border-primary text-primary" : "border-transparent text-secondary"
-                                        }`}
-                                      style={{ fontSize: "12px", borderRadius: 0, boxShadow: "none" }}
-                                    >
-                                      <i className="bi bi-play-circle me-1.5"></i> Call Recording
-                                    </button>
-                                  </div>
-
-                                  {detailTab === "transcript" ? (
-                                    <>
-                                      {/* Analysis Summary */}
-                                      {activeCallDetail.analysis && (
-                                        <div className="mb-3 p-2.5 bg-white rounded-3 border-0 shadow-sm">
-                                          <span className="x-small fw-bold text-secondary uppercase d-block mb-1">CRM Analysis Summary</span>
-                                          <p className="small text-dark mb-0">{activeCallDetail.analysis}</p>
-                                        </div>
-                                      )}
-
-                                      {/* Dialogue turns */}
-                                      <span className="x-small fw-bold text-secondary uppercase d-block mb-2">Transcript turns</span>
-                                      <div className="d-flex flex-column gap-2.5">
-                                        {(() => {
-                                          try {
-                                            const rawTurns = JSON.parse(activeCallDetail.transcript || "[]");
-                                            if (Array.isArray(rawTurns)) {
-                                              const turns: any[] = [];
-                                              rawTurns.forEach((turn: any) => {
-                                                const last = turns[turns.length - 1];
-                                                if (last && last.speaker === turn.speaker) {
-                                                  last.text = (last.text + " " + turn.text).trim();
-                                                  if (turn.translation) {
-                                                    last.translation = ((last.translation || "") + " " + turn.translation).trim();
-                                                  }
-                                                } else {
-                                                  turns.push({ ...turn });
-                                                }
-                                              });
-                                              return turns.map((turn: any, idx: number) => {
-                                                const isAgent = turn.speaker === "Agent";
-                                                const speakerName = isAgent ? activeCallDetail.user.name : activeCallDetail.lead.name;
-                                                return (
-                                                  <div key={idx} className={`p-2 rounded-3 x-small ${isAgent ? "bg-white border-start border-primary border-3" : "bg-success bg-opacity-10 border-end border-success border-3 text-end"}`}>
-                                                    <div className="fw-bold mb-0.5" style={{ fontSize: "9.5px", color: isAgent ? "#0d6efd" : "#198754" }}>
-                                                      {speakerName} • {turn.time}
-                                                    </div>
-                                                    <div className="text-dark fw-medium">{turn.text}</div>
-                                                    {turn.translation && turn.translation !== turn.text && (
-                                                      <div className="text-secondary mt-0.5 border-top pt-0.5" style={{ fontSize: "8.5px" }}>Translation: {turn.translation}</div>
-                                                    )}
-                                                  </div>
-                                                );
-                                              });
-                                            }
-                                          } catch (e) {
-                                            // Ignore JSON errors
-                                          }
-                                          return (
-                                            <p className="small text-muted mb-0">{activeCallDetail.translatedText || activeCallDetail.transcript || "No transcript available."}</p>
-                                          );
-                                        })()}
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <div className="d-flex flex-column gap-3 animate-fade">
-                                      <div className="p-3 bg-white rounded-3 border-0 shadow-sm">
-                                        <h6 className="fw-bold text-dark mb-2 small text-uppercase tracking-wider">Recording Details</h6>
-                                        <div className="row g-2 text-secondary" style={{ fontSize: "11px" }}>
-                                          <div className="col-6">
-                                            <span className="fw-bold">Caller:</span> {activeCallDetail.callerPhone || "+1 (555) 019-2834"}
-                                          </div>
-                                          <div className="col-6">
-                                            <span className="fw-bold">Receiver:</span> {activeCallDetail.receiverPhone || activeCallDetail.lead.phone}
-                                          </div>
-                                          <div className="col-6">
-                                            <span className="fw-bold">Duration:</span> {activeCallDetail.duration || 0} seconds
-                                          </div>
-                                          <div className="col-6">
-                                            <span className="fw-bold">Date:</span> {new Date(activeCallDetail.startTime || activeCallDetail.createdAt).toLocaleString()}
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      <div className="d-flex flex-column align-items-center w-100">
-                                        <span className="text-secondary fw-bold small uppercase mb-1" style={{ fontSize: "9px", letterSpacing: "1px" }}>PLAY RECORDING</span>
-                                        <CustomAudioPlayer
-                                          src={
-                                            activeCallDetail.jobId && !activeCallDetail.jobId.startsWith("mock_")
-                                              ? `/api/recordings/${activeCallDetail.jobId}`
-                                              : `/recordings/2026-06-10_17-20-59_CA4a1c848d5af71a94d102a3647ce98a47.wav`
-                                          }
-                                          initialDuration={activeCallDetail.duration || 0}
-                                        />
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              ) : (
-                                <div className="d-flex align-items-center justify-content-center text-muted small py-5 bg-light rounded-4 border" style={{ minHeight: "200px" }}>
-                                  Select a call session on the left to view its transcript and AI analysis
-                                </div>
-                              )}
                             </div>
                           </div>
                         )}
@@ -1348,6 +1228,181 @@ export default function CallsWorkspace({
               <p className="text-secondary small mb-0">
                 Downloading voice recording, transcribing using Groq Whisper, and running translation and CRM analysis. Please wait...
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Call Details Modal */}
+      {activeModalLog && (
+        <div 
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center animate-fade"
+          style={{ 
+            zIndex: 1060, 
+            backgroundColor: "rgba(15, 23, 42, 0.45)", 
+            backdropFilter: "blur(10px)",
+            transition: "all 0.3s ease"
+          }}
+          onClick={() => setActiveModalLog(null)}
+        >
+          <div 
+            className="card border-0 shadow-lg p-0 w-100 mx-3 bg-white" 
+            style={{ maxWidth: "680px", borderRadius: "20px", maxHeight: "85vh", overflow: "hidden" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="card-header bg-white border-bottom border-light-subtle p-4 d-flex justify-content-between align-items-center">
+              <div>
+                <h5 className="fw-bold text-dark mb-1" style={{ fontSize: "16px" }}>
+                  Call Analysis: {selectedLead?.name || "Customer"}
+                </h5>
+                <p className="text-secondary mb-0" style={{ fontSize: "12px" }}>
+                  Handled by Agent: <strong>{activeModalLog.user?.name || "System"}</strong> on {new Date(activeModalLog.createdAt).toLocaleString()}
+                </p>
+              </div>
+              <button 
+                className="btn btn-light rounded-circle p-2 border-0" 
+                onClick={() => setActiveModalLog(null)}
+                style={{ width: "36px", height: "36px" }}
+              >
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="card-body p-4 overflow-auto" style={{ maxHeight: "calc(85vh - 150px)" }}>
+              {/* Outcome Badges & Score */}
+              <div className="d-flex justify-content-between align-items-center pb-3 border-bottom mb-3">
+                <span className="fw-bold text-primary" style={{ fontSize: "14px" }}>
+                  AI Qualification Score: <strong className="fs-5">{activeModalLog.aiScore || 0}%</strong>
+                </span>
+                <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-1.5 fw-bold" style={{ fontSize: "12px" }}>
+                  {activeModalLog.status} • {activeModalLog.stage}
+                </span>
+              </div>
+
+              {/* CRM Analysis Summary */}
+              {activeModalLog.analysis && (
+                <div className="mb-4 p-3 bg-light rounded-3 border-0">
+                  <span className="fw-bold text-secondary uppercase d-block mb-1" style={{ fontSize: "11px", letterSpacing: "0.5px" }}>CRM Analysis Summary</span>
+                  <p className="text-dark mb-0" style={{ fontSize: "13.5px", lineHeight: "1.5" }}>{activeModalLog.analysis}</p>
+                </div>
+              )}
+
+              {/* Tab Navigation */}
+              <div className="d-flex border-bottom mb-3 gap-3">
+                <button
+                  onClick={() => setModalDetailTab("transcript")}
+                  className={`btn btn-link nav-link pb-2 px-3 fw-bold border-bottom border-2 text-decoration-none ${modalDetailTab === "transcript" ? "border-primary text-primary" : "border-transparent text-secondary"}`}
+                  style={{ fontSize: "13px", borderRadius: 0, boxShadow: "none" }}
+                >
+                  <i className="bi bi-file-earmark-text me-1.5"></i> Transcript
+                </button>
+                <button
+                  onClick={() => setModalDetailTab("recording")}
+                  className={`btn btn-link nav-link pb-2 px-3 fw-bold border-bottom border-2 text-decoration-none ${modalDetailTab === "recording" ? "border-primary text-primary" : "border-transparent text-secondary"}`}
+                  style={{ fontSize: "13px", borderRadius: 0, boxShadow: "none" }}
+                >
+                  <i className="bi bi-play-circle me-1.5"></i> Call Recording
+                </button>
+              </div>
+
+              {modalDetailTab === "transcript" ? (
+                <div className="d-flex flex-column gap-3">
+                  {(() => {
+                    try {
+                      const rawTurns = JSON.parse(activeModalLog.transcript || "[]");
+                      if (Array.isArray(rawTurns) && rawTurns.length > 0) {
+                        const turns: any[] = [];
+                        rawTurns.forEach((turn: any) => {
+                          const last = turns[turns.length - 1];
+                          if (last && last.speaker === turn.speaker) {
+                            last.text = (last.text + " " + turn.text).trim();
+                            if (turn.translation) {
+                              last.translation = ((last.translation || "") + " " + turn.translation).trim();
+                            }
+                          } else {
+                            turns.push({ ...turn });
+                          }
+                        });
+                        return turns.map((turn: any, idx: number) => {
+                          const isAgent = turn.speaker === "Agent";
+                          const speakerName = isAgent ? activeModalLog.user?.name || "Agent" : selectedLead?.name || "Customer";
+                          return (
+                            <div key={idx} className={`p-3 rounded-3 ${isAgent ? "bg-white border-start border-primary border-3 shadow-sm" : "bg-success bg-opacity-10 border-end border-success border-3 text-end shadow-sm"}`}>
+                              <div className="fw-bold mb-1" style={{ fontSize: "10px", color: isAgent ? "#0d6efd" : "#198754" }}>
+                                {speakerName} • {turn.time}
+                              </div>
+                              <div className="text-dark fw-medium" style={{ fontSize: "13.5px" }}>{turn.text}</div>
+                              {turn.translation && turn.translation !== turn.text && (
+                                <div className="text-secondary mt-1.5 border-top pt-1.5" style={{ fontSize: "11px" }}>Translation: {turn.translation}</div>
+                              )}
+                            </div>
+                          );
+                        });
+                      }
+                    } catch (e) {
+                      // ignore json error
+                    }
+                    return (
+                      <p className="small text-muted mb-0">{activeModalLog.translatedText || activeModalLog.transcript || "No transcript available."}</p>
+                    );
+                  })()}
+                </div>
+              ) : (
+                <div className="d-flex flex-column gap-3">
+                  <div className="p-3 bg-light rounded-3 border-0">
+                    <h6 className="fw-bold text-dark mb-2 small text-uppercase tracking-wider">Recording Details</h6>
+                    <div className="row g-2 text-secondary" style={{ fontSize: "12px" }}>
+                      <div className="col-6">
+                        <span className="fw-bold">Caller:</span> {activeModalLog.callerPhone || "+1 (555) 019-2834"}
+                      </div>
+                      <div className="col-6">
+                        <span className="fw-bold">Receiver:</span> {activeModalLog.receiverPhone || selectedLead?.phone}
+                      </div>
+                      <div className="col-6">
+                        <span className="fw-bold">Duration:</span> {activeModalLog.duration || 0} seconds
+                      </div>
+                      <div className="col-6">
+                        <span className="fw-bold">Date:</span> {new Date(activeModalLog.startTime || activeModalLog.createdAt).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="d-flex flex-column align-items-center w-100 p-3 bg-light rounded-3">
+                    <span className="text-secondary fw-bold small uppercase mb-2" style={{ fontSize: "10px", letterSpacing: "1px" }}>PLAY RECORDING</span>
+                    <audio
+                      controls
+                      className="w-100"
+                      src={
+                        activeModalLog.jobId && !activeModalLog.jobId.startsWith("mock_")
+                          ? `/api/recordings/${activeModalLog.jobId}`
+                          : `/recordings/2026-06-10_17-20-59_CA4a1c848d5af71a94d102a3647ce98a47.wav`
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="card-footer bg-white border-top border-light-subtle p-3 d-flex justify-content-between">
+              {activeModalLog && (
+                <Link
+                  href={`/admin/calls/${activeModalLog.id}`}
+                  className="btn btn-outline-primary px-4 d-flex align-items-center gap-2"
+                >
+                  <i className="bi bi-eye"></i>
+                  View Details
+                </Link>
+              )}
+              <button 
+                type="button" 
+                className="btn btn-secondary px-4" 
+                onClick={() => setActiveModalLog(null)}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

@@ -41,7 +41,7 @@ export default async function LeadDetailsPage({ params }: { params: Promise<{ id
         </div>
       </div>
 
-      {/* 1. Lead Status Stage Pipeline at the top (Always displays the 5-stage Lead Lifecycle) */}
+      {/* 1. Lead Status Stage Pipeline at the top (Always displays the 5-stage Lead Lifecycle)
       <LeadProgressionTimeline 
         leadId={lead.id} 
         leadStatus={lead.status} 
@@ -51,14 +51,21 @@ export default async function LeadDetailsPage({ params }: { params: Promise<{ id
         updatedAt={lead.updatedAt}
         calls={lead.calls}
       />
+      */}
 
       {/* High-Density Form View Lead Information */}
       <div className="card border-0 shadow-sm mb-4">
         <div className="card-body p-4">
           <div className="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
             <h6 className="fw-bold mb-0">Record Overview</h6>
+            <Link 
+              href={`/admin/calls/new?leadId=${id}`} 
+              className="btn btn-success btn-sm px-3.5 py-1.5 shadow-sm fw-bold rounded-pill d-flex align-items-center gap-1.5"
+            >
+              <i className="bi bi-telephone-plus"></i>Start Call
+            </Link>
           </div>
-          
+
           <div className="row g-4">
             <div className="col-md-4 col-lg-3">
               <div className="p-2 px-3 bg-light rounded-3">
@@ -106,12 +113,6 @@ export default async function LeadDetailsPage({ params }: { params: Promise<{ id
               </div>
             </div>
           </div>
-
-          <div className="mt-4 d-flex justify-content-end">
-            <Link href={`/admin/calls/new?leadId=${id}`} className="btn btn-success btn-sm px-4 py-2 shadow-sm fw-bold">
-              <i className="bi bi-telephone-plus me-2"></i> Start Call
-            </Link>
-          </div>
         </div>
       </div>
 
@@ -125,7 +126,7 @@ export default async function LeadDetailsPage({ params }: { params: Promise<{ id
       <div className="card border-0 shadow-sm">
         <div className="card-body p-4">
           <h6 className="fw-bold mb-4">Interaction History</h6>
-          
+
           {lead.calls && lead.calls.length > 0 ? (
             <div className="table-responsive">
               <table className="table table-hover align-middle">
@@ -161,7 +162,7 @@ export default async function LeadDetailsPage({ params }: { params: Promise<{ id
             </div>
           ) : (
             <div className="text-center py-5">
-              <div className="bg-light rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style={{width: 60, height: 60}}>
+              <div className="bg-light rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style={{ width: 60, height: 60 }}>
                 <i className="bi bi-chat-left-text text-secondary opacity-25 fs-4"></i>
               </div>
               <p className="text-secondary small mb-0">No interaction history found.</p>

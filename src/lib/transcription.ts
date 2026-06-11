@@ -579,6 +579,147 @@ export async function transcribeAndAnalyzeRecording(
     }
 
     const arrayBuffer = await audioRes.arrayBuffer();
+
+    // Check for Google Gemini API Key. If present, use Gemini 1.5 Flash
+    // for direct, high-quality multimodal audio transcription and speaker classification.
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (geminiKey) {
+      console.log("[Gemini] GEMINI_API_KEY detected. Using Gemini 1.5 Flash for transcription and analysis...");
+      const uploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${geminiKey}`;
+      const uploadMetadata = {
+        file: {
+          mimeType: "audio/mp3",
+          displayName: "call_recording.mp3"
+        }
+      };
+
+      const boundary = "------Boundary" + Math.random().toString(36).substring(2);
+      let body = "";
+      body += `--${boundary}\r\n`;
+      body += `Content-Disposition: form-data; name="metadata"\r\n`;
+      body += `Content-Type: application/json; charset=UTF-8\r\n\r\n`;
+      body += JSON.stringify(uploadMetadata) + `\r\n`;
+      body += `--${boundary}\r\n`;
+      body += `Content-Disposition: form-data; name="file"; filename="call_recording.mp3"\r\n`;
+      body += `Content-Type: audio/mp3\r\n\r\n`;
+
+      const preBuffer = Buffer.from(body, "utf-8");
+      const postBuffer = Buffer.from(`\r\n--${boundary}--\r\n`, "utf-8");
+      const fileBuffer = Buffer.from(arrayBuffer);
+      const requestBody = Buffer.concat([preBuffer, fileBuffer, postBuffer]);
+
+      const uploadRes = await fetch(uploadUrl, {
+        method: "POST",
+        headers: {
+          "X-Goog-Upload-Protocol": "multipart",
+          "Content-Type": `multipart/related; boundary=${boundary}`
+        },
+        body: requestBody
+      });
+
+      if (!uploadRes.ok) {
+        const errText = await uploadRes.text();
+        throw new Error(`Gemini upload failed: ${uploadRes.status} - ${errText}`);
+      }
+
+      const uploadData = await uploadRes.json();
+      const fileUri = uploadData.file.uri;
+      const fileName = uploadData.file.name;
+      console.log(`[Gemini] Audio uploaded successfully. File URI: ${fileUri}`);
+
+      const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+      const promptText = `
+You are an advanced BPO quality analyst and CRM sync tool.
+Analyze this audio recording of a telephone sales call between Agent: "${agentName}" and Lead: "${leadName}".
+
+Perform the following tasks:
+1. Transcribe the entire conversation verbatim, segmenting it by speaker and timestamps.
+2. For each segment, provide the "text" in the native language spoken (e.g. Tamil or English).
+3. For each segment, provide the "translation" in English. If the original text is already in English, the translation should be identical.
+4. Classify each segment's speaker as "Agent" or "Lead" (NOT "Speaker A" / "Speaker B").
+5. Format the timestamps as "MM:SS".
+6. Detect the primary voice language (e.g., "Tamil", "Hindi", "English").
+7. Evaluate the lead quality score on a scale of 0 to 100 based on their interest.
+8. Generate a brief CRM conversation summary analysis.
+
+Provide your response in JSON format matching this schema:
+{
+  "detectedVoiceLanguage": "Tamil",
+  "aiScore": 85,
+  "analysis": "A summary of the call details here...",
+  "transcript": [
+    {
+      "speaker": "Agent",
+      "time": "00:00",
+      "text": "ஹலோ",
+      "translation": "Hello"
+    },
+    {
+      "speaker": "Lead",
+      "time": "00:01",
+      "text": "அப்ரமேஷ் கேக்குதா?",
+      "translation": "Apramesh, can you hear me?"
+    }
+  ]
+}
+
+Ensure the output is valid JSON. Do not include markdown code block syntax (like \`\`\`json) in the response text itself, return only the raw JSON.
+`;
+
+      const generateRes = await fetch(generateUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  fileData: {
+                    mimeType: "audio/mp3",
+                    fileUri: fileUri
+                  }
+                },
+                {
+                  text: promptText
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            responseMimeType: "application/json"
+          }
+        })
+      });
+
+      // Cleanup file from Gemini storage asynchronously
+      fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${geminiKey}`, {
+        method: "DELETE"
+      }).catch(e => console.error("[Gemini] Failed to delete file:", e));
+
+      if (!generateRes.ok) {
+        const errText = await generateRes.text();
+        throw new Error(`Gemini content generation failed: ${generateRes.status} - ${errText}`);
+      }
+
+      const generateData = await generateRes.json();
+      const rawText = generateData.candidates[0].content.parts[0].text;
+      const parsedResult = JSON.parse(rawText.trim());
+
+      return {
+        detectedVoiceLanguage: parsedResult.detectedVoiceLanguage || "English",
+        aiScore: parsedResult.aiScore || 50,
+        analysis: parsedResult.analysis || "",
+        transcript: JSON.stringify(parsedResult.transcript || []),
+        translatedText: (parsedResult.transcript || [])
+          .map((t: any) => `${t.speaker}: ${t.translation}`)
+          .join("\n"),
+        wordCount: (parsedResult.transcript || [])
+          .reduce((acc: number, curr: any) => acc + (curr.text || "").split(" ").length, 0)
+      };
+    }
+
     const fileBlob = new Blob([arrayBuffer], { type: "audio/mp3" });
 
     const isGroq = apiKey.startsWith("gsk_");
@@ -591,27 +732,33 @@ export async function transcribeAndAnalyzeRecording(
     const whisperFormData = new FormData();
     whisperFormData.append("file", fileBlob, "call_recording.mp3");
     whisperFormData.append("model", whisperModel);
+    whisperFormData.append("response_format", "verbose_json");
 
-    // Pin Whisper's language parameter based on targetLanguage to ensure high-accuracy transcription
-    // and avoid language-detection confusion (such as detecting Spanish for Tamil or Hindi voice).
-    const langMap: Record<string, string> = {
-      English: "en",
-      Spanish: "es",
-      Hindi: "hi",
-      Tamil: "ta",
-      French: "fr",
-      German: "de",
-    };
-    const isoLang = langMap[targetLanguage];
-    if (isoLang) {
-      console.log(`[Whisper] Pinning Whisper language parameter to: ${isoLang} (${targetLanguage})`);
-      whisperFormData.append("language", isoLang);
+    // Pin Whisper's language parameter based on targetLanguage for automated campaigns (non-WebRTC)
+    // to ensure high-accuracy transcription and avoid language-detection confusion.
+    // For live WebRTC calls, we pin language to English ("en") to translate any regional accents/Tamil
+    // into clean, high-confidence English text, and supply a real estate vocabulary prompt.
+    if (!isWebRTC) {
+      const langMap: Record<string, string> = {
+        English: "en",
+        Spanish: "es",
+        Hindi: "hi",
+        Tamil: "ta",
+        French: "fr",
+        German: "de",
+      };
+      const isoLang = langMap[targetLanguage];
+      if (isoLang) {
+        console.log(`[Whisper] Pinning Whisper language parameter to: ${isoLang} (${targetLanguage})`);
+        whisperFormData.append("language", isoLang);
+      } else {
+        console.log(`[Whisper] Omitting language parameter to enable automatic voice language detection.`);
+      }
     } else {
-      console.log(`[Whisper] Omitting language parameter to enable automatic voice language detection.`);
+      console.log(`[Whisper] Live WebRTC call. Pinning Whisper language parameter to English (en) for auto-translation, and appending real estate vocabulary prompt.`);
+      whisperFormData.append("language", "en");
+      whisperFormData.append("prompt", "Pranesh, Coimbatore, Thudiyalur, Saravanampatti, Annur, plot, villa, flat, budget, 5 to 7 lakhs, amenities, parking, power, water, Friday site visit, slot booking.");
     }
-
-    // We omit the prompt parameter here because specific prompts can bias the decoder, causing it
-    // to hallucinate sentences from the prompt and cut off the rest of the actual spoken audio.
 
     const whisperRes = await fetch(whisperEndpoint, {
       method: "POST",
@@ -658,6 +805,37 @@ export async function transcribeAndAnalyzeRecording(
     }
     rawTranscript = rawTranscript.trim();
     console.log(`[Whisper] Cleaned Transcription: "${rawTranscript}"`);
+
+    // Format segments with timestamps for LLM speaker classification
+    let formattedSegments = "";
+    if (whisperData.segments && Array.isArray(whisperData.segments)) {
+      formattedSegments = whisperData.segments.map((seg: any) => {
+        const formatTime = (secs: number) => {
+          const m = Math.floor(secs / 60).toString().padStart(2, "0");
+          const s = Math.floor(secs % 60).toString().padStart(2, "0");
+          return `${m}:${s}`;
+        };
+        let txt = seg.text || "";
+        for (const regex of hallucinations) {
+          txt = txt.replace(regex, "");
+        }
+        txt = txt.trim();
+        if (!txt) return null;
+
+        // Discard low-confidence segments (silence/noise hallucinations) for WebRTC calls
+        if (isWebRTC && seg.avg_logprob && seg.avg_logprob < -1.35) {
+          console.log(`[Whisper Filter] Discarding segment [${formatTime(seg.start)} - ${formatTime(seg.end)}] due to low avg_logprob (${seg.avg_logprob}): "${txt}"`);
+          return null;
+        }
+
+        return `[${formatTime(seg.start)}]: "${txt}"`;
+      }).filter(Boolean).join("\n");
+    }
+
+    if (!formattedSegments) {
+      formattedSegments = `[00:00]: "${rawTranscript}"`;
+    }
+    console.log(`[Whisper] Formatted Segments for LLM:\n${formattedSegments}`);
 
     if (!isWebRTC) {
       // Find and strip automated greeting by boundary first
@@ -746,27 +924,23 @@ Return ONLY a raw JSON object (do not wrap in markdown fences like \`\`\`json) m
   "aiScore": number
 }`;
     } else if (isWebRTC) {
-      prompt = `You are a CRM call analyzer. We have a raw transcription of a real live WebRTC phone call between Agent "${agentName}" and Lead "${leadName}".
-The call may be in English, Tamil, Hindi, Spanish, French, German, or a mixture of these.
-Raw transcription:
-"${rawTranscript}"
+      prompt = `You are a CRM call analyzer. We have a list of transcribed audio segments with start timestamps from a real live WebRTC phone call between Agent "${agentName}" and Lead "${leadName}".
+The call is bilingual and was spoken in a mixture of English and Tamil (Tanglish), but the segments below are translated to English.
+
+Segments with timestamps:
+${formattedSegments}
 
 Please perform the following operations:
-1. Parse this transcript into a JSON array of dialogue turns. Assign each turn to either "Agent" or "Lead" based on conversational context. Provide an approximated time marker format "MM:SS" (e.g. 00:02, 00:08) reflecting the natural speed of conversation.
-   CRITICAL COMPLETENESS RULE: Every single sentence, phrase, and word in the raw transcription MUST be represented in the output turns. Do NOT summarize, truncate, or omit any spoken words from the dialogue turns. If there is a transition of language or speaker, split it into a separate turn.
+1. Parse this transcript into a JSON array of dialogue turns. Assign each turn to either "Agent" or "Lead" by classifying the speaker of each timestamped segment based on the conversation flow. Group consecutive segments from the same speaker together into a single turn, preserving the initial time marker of the first segment.
+   CRITICAL COMPLETENESS RULE: Every single spoken word, sentence, and segment in the list above MUST be represented in the output turns, EXCEPT for any segments that are Whisper hallucinations or static noise. Do NOT summarize, truncate, or omit any actual spoken words from the real dialogue turns. If there is a transition of language or speaker, split it into a separate turn.
    CRITICAL SPEAKER ASSIGNMENT RULES:
    - The call is an outbound connection initiated by Agent "${agentName}" to Lead "${leadName}". The very first turn is spoken by the Agent.
-   - PHONETIC NAME ERRORS: Whisper often transcribes regional names phonetically as common words (e.g. transcribing the lead name "Pranesh" as "Français" or "French"). You must recognize these homophone errors.
+   - PHONETIC NAME ERRORS: Whisper often transcribes regional names phonetically as common words (e.g. transcribing the lead name "Pranesh" as "Français" or "French" or "Pramesh"). You must recognize these homophone errors.
    - For example: if one speaker asks "Hello, is this Français?" or "Hello, is this Pranesh?", that is the Agent verifying the customer's identity. The speaker replying "Yes, this is Français/Pranesh. What is the matter?" is the Lead. Do not swap these roles.
-2. Populate the "text" key with the spoken words in their proper native script:
-   - Note that the speakers may have responded in ANY language. You MUST detect the actual language spoken in each turn.
-   - If any spoken words are transcribed using characters of a different script than the actual language spoken (e.g. Hindi spoken words transcribed as Tamil characters), or if they are transcribed in Romanized/Latin characters, you MUST convert/transliterate them into their proper native script.
-   - If there are minor phonetic spelling errors, typos, or garbled words due to accent/audio quality, correct them to their proper native words.
-   - Under NO circumstances should you translate the "text" key to English.
-3. Detect the language of the turn. If it is in a foreign language (like Tamil, Hindi, Spanish, French, German, etc.), provide an accurate English translation for that turn under the "translation" key.
-   - PHONETIC & CONTEXT CORRECTION: When translating, if the native transcript contains minor phonetic errors or garbled words, use conversational context to correct the translation so that it is fluent, accurate, and reflects the true intended meaning (e.g., translating "Français" to "Pranesh" when referring to the person's name).
-   - If the turn is already in English, copy the text exactly into the "translation" key.
-4. Detect the primary language of the Lead's speech and populate the "detectedVoiceLanguage" key (e.g., "Tamil", "Hindi", "English", "Spanish", "French", "German", etc.).
+2. In the "text" key, reconstruct what the speakers originally said in their native spoken language (Tamil script for Tamil turns/phrases, English for English turns), representing a natural code-switched business call (e.g. converting "5 to 7 lakhs" back to "5 டு 7 லாக்ஸ்" or "5 to 7 lakhs", and "Annur is a bit far" back to "அன்னூர் கொஞ்சம் தூரமா இருக்கும்", and "Pramesh" back to "பிரணேஷ்" or "பிரமேஷ்").
+   - Under NO circumstances should you keep the "text" key in English if the original speech was in Tamil.
+3. In the "translation" key, keep the clean English translation.
+4. Detect the primary language of the Lead's speech and populate the "detectedVoiceLanguage" key ("Tamil" if they spoke mostly in Tamil/Tanglish).
 5. Write a professional CRM call analysis summarizing the discussion, client objections, and proposed follow-up steps.
 6. Calculate a quality score (0 to 100) representing the lead's level of interest or business qualification.
 

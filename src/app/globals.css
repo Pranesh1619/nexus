@@ -17,7 +17,14 @@ body {
   font-family: 'Roboto', 'Segoe UI', -apple-system, system-ui, sans-serif;
   margin: 0;
   padding: 0;
-  overflow-x: hidden;
+}
+
+* {
+  font-family: 'Roboto', 'Segoe UI', -apple-system, system-ui, sans-serif;
+}
+
+.font-monospace, code, pre, .font-mono, .font-monospace * {
+  font-family: var(--bs-font-monospace), SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
 }
 
 .table th {
@@ -747,4 +754,53 @@ button:focus,
 /* Fix overlapping placeholder text and search icon on input fields */
 .search-input-field {
   padding-left: 38px !important;
+}
+
+/* Sidebar Child Link Styles */
+.nav-item-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.nav-children-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-left: 1px dashed var(--border-color);
+  margin-left: 22px;
+  padding-left: 12px;
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+.nav-child-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-radius: 8px;
+  font-size: 13.5px !important;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.nav-child-link i {
+  font-size: 16px !important;
+}
+
+.nav-child-link:hover {
+  background-color: rgba(0, 167, 111, 0.08);
+  color: var(--primary-color);
+}
+
+.nav-child-link.active {
+  background-color: rgba(0, 167, 111, 0.08);
+  color: var(--primary-color);
+  font-weight: 700;
+}
+
+.sidebar.collapsed .nav-children-list {
+  display: none !important;
 }
