@@ -738,3 +738,13 @@ button:focus,
 .table-responsive::-webkit-scrollbar {
   display: none; /* Safari and Chrome */
 }
+
+/* Ensure lead list item buttons have a flat/straight edge to align the active border indicator */
+.lead-list-btn {
+  border-radius: 0px !important;
+}
+
+/* Fix overlapping placeholder text and search icon on input fields */
+.search-input-field {
+  padding-left: 38px !important;
+}

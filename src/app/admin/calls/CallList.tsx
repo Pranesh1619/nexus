@@ -23,6 +23,16 @@ export interface CallLogListItem {
     id: string;
     name: string;
   };
+  analysis?: string | null;
+  transcript?: string | null;
+  translatedText?: string | null;
+  detectedVoiceLanguage?: string | null;
+  translatedLanguage?: string | null;
+  wordCount?: number | null;
+  callerPhone?: string | null;
+  receiverPhone?: string | null;
+  startTime?: string | Date | null;
+  jobId?: string | null;
 }
 
 // Consistent scoring logic for the list view
@@ -60,12 +70,21 @@ export default function CallList({ logs }: { logs: CallLogListItem[] }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState<"all" | "missed" | "connected" | "converted">("all");
   const [selectedAgentId, setSelectedAgentId] = useState<string>("all");
+  const [expandedLeadIds, setExpandedLeadIds] = useState<Record<string, boolean>>({});
 
   const handleDelete = async () => {
     if (deleteId) {
       await deleteCallLog(deleteId);
       setDeleteId(null);
     }
+  };
+
+  const toggleLeadExpanded = (leadId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedLeadIds(prev => ({
+      ...prev,
+      [leadId]: !prev[leadId]
+    }));
   };
 
   // Helper to format talk time
@@ -119,6 +138,32 @@ export default function CallList({ logs }: { logs: CallLogListItem[] }) {
       return true;
     });
   }, [logs, searchTerm, selectedFilter, selectedAgentId]);
+
+  // Group filtered logs by lead
+  const groupedLogs = useMemo(() => {
+    const groups: Record<string, { lead: CallLogListItem["lead"]; logs: CallLogListItem[]; lastCallDate: Date; totalDuration: number }> = {};
+    filteredLogs.forEach(log => {
+      const leadId = log.lead.id;
+      if (!groups[leadId]) {
+        groups[leadId] = {
+          lead: log.lead,
+          logs: [],
+          lastCallDate: new Date(log.createdAt),
+          totalDuration: 0
+        };
+      }
+      groups[leadId].logs.push(log);
+      
+      const logDate = new Date(log.createdAt);
+      if (logDate > groups[leadId].lastCallDate) {
+        groups[leadId].lastCallDate = logDate;
+      }
+      groups[leadId].totalDuration += (log.duration || 0);
+    });
+
+    // Sort groups by last call date descending
+    return Object.values(groups).sort((a, b) => b.lastCallDate.getTime() - a.lastCallDate.getTime());
+  }, [filteredLogs]);
 
   return (
     <div className="d-flex flex-column gap-3 animate-fade">
@@ -182,108 +227,179 @@ export default function CallList({ logs }: { logs: CallLogListItem[] }) {
           <table className="table table-hover align-middle mb-0">
             <thead className="table-light">
               <tr>
+                <th className="border-0 small text-secondary" style={{ padding: "12px 16px", width: "60px" }}></th>
                 <th className="border-0 small text-secondary" style={{ padding: "12px 16px" }}>S.No</th>
-                <th className="border-0 small text-secondary" style={{ padding: "12px 16px" }}>Date</th>
                 <th className="border-0 small text-secondary" style={{ padding: "12px 16px" }}>Customer</th>
-                <th className="border-0 small text-secondary" style={{ padding: "12px 16px" }}>Agent</th>
-                <th className="border-0 small text-secondary" style={{ padding: "12px 16px" }}>Duration</th>
-                <th className="border-0 small text-secondary" style={{ padding: "12px 16px" }}>AI Score</th>
-                <th className="border-0 small text-secondary" style={{ padding: "12px 16px" }}>Outcome</th>
+                <th className="border-0 small text-secondary" style={{ padding: "12px 16px" }}>Total Call Count</th>
+                <th className="border-0 small text-secondary" style={{ padding: "12px 16px" }}>Total Talk Time</th>
+                <th className="border-0 small text-secondary" style={{ padding: "12px 16px" }}>Last Interaction</th>
+                <th className="border-0 small text-secondary" style={{ padding: "12px 16px" }}>Status</th>
                 <th className="border-0 small text-secondary text-end" style={{ padding: "12px 16px" }}>Action</th>
               </tr>
             </thead>
             <tbody>
-              {filteredLogs.length === 0 ? (
+              {groupedLogs.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-5 text-center text-secondary small">
                     No matching call history found.
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map((log, index) => {
-                  const displayScore = getDisplayScore(log);
-                  const outcome = getCallOutcome(log.status, log.stage, log.lead.status);
-                  
-                  // Color for AI Score matching standard colors
-                  let scoreColor = "text-success";
-                  if (displayScore < 85) scoreColor = "text-warning";
-                  if (displayScore < 75) scoreColor = "text-danger";
+                groupedLogs.map((group, index) => {
+                  const isExpanded = !!expandedLeadIds[group.lead.id];
+                  const latestLog = group.logs[0]; // Already sorted desc by date
+                  const outcome = getCallOutcome(latestLog.status, latestLog.stage, group.lead.status);
 
                   return (
-                    <tr 
-                      key={log.id}
-                      onClick={() => router.push(`/admin/calls/${log.id}`)}
-                      className="cursor-pointer"
-                      style={{ cursor: "pointer", transition: "all 0.15s ease" }}
-                    >
-                      <td className="small text-secondary" style={{ padding: "12px 16px" }}>{index + 1}</td>
-                      <td style={{ padding: "12px 16px" }}>
-                        <div className="d-flex flex-column text-secondary small">
-                          <div className="text-secondary" style={{ fontSize: "14px" }}>{new Date(log.createdAt).toLocaleDateString()}</div>
-                          <div className="text-muted" style={{ fontSize: "11.5px", whiteSpace: "nowrap" }} >
-                            {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <React.Fragment key={group.lead.id}>
+                      {/* Main Group Header Row */}
+                      <tr 
+                        onClick={(e) => toggleLeadExpanded(group.lead.id, e)}
+                        className="cursor-pointer bg-opacity-10 hover-bg-light"
+                        style={{ cursor: "pointer", transition: "all 0.15s ease", borderLeft: isExpanded ? "4px solid #0d6efd" : "4px solid transparent" }}
+                      >
+                        <td style={{ padding: "12px 16px" }}>
+                          <i className={`bi ${isExpanded ? "bi-chevron-up text-primary" : "bi-chevron-down text-muted"}`} style={{ fontSize: "14px" }}></i>
+                        </td>
+                        <td className="small text-secondary" style={{ padding: "12px 16px" }}>{index + 1}</td>
+                        <td style={{ padding: "12px 16px" }}>
+                          <div>
+                            <div className="fw-bold text-dark" style={{ fontSize: "14.5px" }}>{group.lead.name}</div>
+                            <div className="text-secondary small font-monospace">{group.lead.phone}</div>
                           </div>
-                        </div>
-                      </td>
-                      <td style={{ padding: "12px 16px" }}>
-                        <div>
-                          <div className="fw-bold text-dark" style={{ fontSize: "14px" }}>{log.lead.name}</div>
-                          <div className="text-secondary" style={{ fontSize: "11.5px", whiteSpace: "nowrap" }}>{log.lead.phone}</div>
-                        </div>
-                      </td>
-                      <td style={{ padding: "12px 16px" }}>
-                        <span className="fw-bold text-dark" style={{ fontSize: "14px" }}>{log.user.name}</span>
-                      </td>
-                      <td style={{ padding: "12px 16px" }}>
-                        <span className="text-secondary" style={{ fontSize: "14px" }}>
-                          {log.status === "MISSED" ? "—" : formatDuration(log.duration)}
-                        </span>
-                      </td>
-                      <td style={{ padding: "12px 16px" }}>
-                        {log.status === "CONNECTED" ? (
-                          <span className={`fw-bold ${scoreColor}`} style={{ fontSize: "14px" }}>
-                            {displayScore}%
+                        </td>
+                        <td style={{ padding: "12px 16px" }}>
+                          <span className="badge bg-primary bg-opacity-10 text-primary px-3 py-1.5 fw-bold" style={{ borderRadius: "20px" }}>
+                            {group.logs.length} call{group.logs.length > 1 ? "s" : ""}
                           </span>
-                        ) : (
-                          <span className="text-muted small">—</span>
-                        )}
-                      </td>
-                      <td style={{ padding: "12px 16px" }}>
-                        <span className={`badge ${outcome.class} rounded-pill px-2.5 py-1.5 fw-bold`} style={{ fontSize: "11px" }}>
-                          {outcome.label}
-                        </span>
-                      </td>
-                      <td className="text-end" style={{ padding: "12px 16px" }}>
-                        <div className="d-flex justify-content-end align-items-center gap-2">
-                          <Link 
-                            href={`/admin/calls/${log.id}`} 
-                            onClick={(e) => e.stopPropagation()}
-                            className="btn btn-sm btn-light border-0 text-primary" 
-                            title="View Analysis"
-                          >
-                            <i className="bi bi-eye"></i>
-                          </Link>
-                          <Link 
-                            href={`/admin/calls/${log.id}/edit`} 
-                            onClick={(e) => e.stopPropagation()}
-                            className="btn btn-sm btn-light border-0 text-info" 
-                            title="Edit Log"
-                          >
-                            <i className="bi bi-pencil-square"></i>
-                          </Link>
+                        </td>
+                        <td style={{ padding: "12px 16px" }}>
+                          <span className="text-secondary fw-semibold">
+                            {formatDuration(group.totalDuration)}
+                          </span>
+                        </td>
+                        <td style={{ padding: "12px 16px" }}>
+                          <div className="text-secondary small">
+                            <div>{group.lastCallDate.toLocaleDateString()}</div>
+                            <div className="text-muted x-small">
+                              {group.lastCallDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: "12px 16px" }}>
+                          <span className={`badge ${outcome.class} rounded-pill px-2.5 py-1.5 fw-bold`} style={{ fontSize: "11px" }}>
+                            {outcome.label}
+                          </span>
+                        </td>
+                        <td className="text-end" style={{ padding: "12px 16px" }}>
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteId(log.id);
-                            }}
-                            className="btn btn-sm btn-light border-0 text-danger"
-                            title="Delete Log"
+                            onClick={(e) => toggleLeadExpanded(group.lead.id, e)}
+                            className="btn btn-sm btn-light border-0"
                           >
-                            <i className="bi bi-trash"></i>
+                            <span className="small fw-bold text-secondary me-1">{isExpanded ? "Hide Logs" : "View Logs"}</span>
                           </button>
-                        </div>
-                      </td>
-                    </tr>
+                        </td>
+                      </tr>
+
+                      {/* Expanded Call Log Rows */}
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={8} className="bg-light p-0">
+                            <div className="p-4 bg-white border-bottom shadow-inner" style={{ backgroundColor: "#f8fafc" }}>
+                              <h6 className="fw-bold mb-3 text-secondary x-small text-uppercase d-flex align-items-center gap-2">
+                                <i className="bi bi-clock-history text-primary"></i>
+                                Call Sessions for {group.lead.name}
+                              </h6>
+                              <div className="table-responsive rounded-3 border overflow-hidden">
+                                <table className="table table-sm table-hover align-middle mb-0 bg-white">
+                                  <thead className="table-light">
+                                    <tr>
+                                      <th className="small text-secondary px-3 py-2">Session Date</th>
+                                      <th className="small text-secondary px-3 py-2">Agent Handled</th>
+                                      <th className="small text-secondary px-3 py-2">Duration</th>
+                                      <th className="small text-secondary px-3 py-2">AI Score</th>
+                                      <th className="small text-secondary px-3 py-2">Outcome Stage</th>
+                                      <th className="small text-secondary px-3 py-2 text-end">Action</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {group.logs.map((log) => {
+                                      const displayScore = getDisplayScore(log);
+                                      const logOutcome = getCallOutcome(log.status, log.stage, group.lead.status);
+                                      
+                                      let scoreColor = "text-success";
+                                      if (displayScore < 85) scoreColor = "text-warning";
+                                      if (displayScore < 75) scoreColor = "text-danger";
+
+                                      return (
+                                        <tr key={log.id} onClick={() => router.push(`/admin/calls/${log.id}`)} className="cursor-pointer">
+                                          <td className="px-3 py-2.5 text-secondary small">
+                                            {new Date(log.createdAt).toLocaleString()}
+                                          </td>
+                                          <td className="px-3 py-2.5 fw-semibold text-dark small">
+                                            {log.user.name}
+                                          </td>
+                                          <td className="px-3 py-2.5 text-secondary small">
+                                            {log.status === "MISSED" ? "—" : formatDuration(log.duration)}
+                                          </td>
+                                          <td className="px-3 py-2.5 small">
+                                            {log.status === "CONNECTED" ? (
+                                              <span className={`fw-bold ${scoreColor}`}>
+                                                {displayScore}%
+                                              </span>
+                                            ) : (
+                                              <span className="text-muted">—</span>
+                                            )}
+                                          </td>
+                                          <td className="px-3 py-2.5 small">
+                                            <span className={`badge ${logOutcome.class} rounded-pill px-2 py-1 fw-bold`} style={{ fontSize: "10.5px" }}>
+                                              {logOutcome.label}
+                                            </span>
+                                          </td>
+                                          <td className="px-3 py-2.5 text-end">
+                                            <div className="d-flex justify-content-end align-items-center gap-1.5">
+                                              <Link 
+                                                href={`/admin/calls/${log.id}`} 
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="btn btn-xs btn-light border text-primary px-2 py-0.5" 
+                                                style={{ fontSize: "11px" }}
+                                                title="View Analysis"
+                                              >
+                                                <i className="bi bi-eye"></i>
+                                              </Link>
+                                              <Link 
+                                                href={`/admin/calls/${log.id}/edit`} 
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="btn btn-xs btn-light border text-info px-2 py-0.5" 
+                                                style={{ fontSize: "11px" }}
+                                                title="Edit Log"
+                                              >
+                                                <i className="bi bi-pencil-square"></i>
+                                              </Link>
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setDeleteId(log.id);
+                                                }}
+                                                className="btn btn-xs btn-light border text-danger px-2 py-0.5"
+                                                style={{ fontSize: "11px" }}
+                                                title="Delete Log"
+                                              >
+                                                <i className="bi bi-trash"></i>
+                                              </button>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })
               )}

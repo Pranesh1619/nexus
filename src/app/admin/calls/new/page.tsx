@@ -52,7 +52,7 @@ function NewCallContent() {
 
   // SIP Terminal state
   const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
-  const consoleEndRef = useRef<HTMLDivElement>(null);
+  const consoleContainerRef = useRef<HTMLDivElement>(null);
   const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
   const deviceRef = useRef<any>(null);
 
@@ -199,6 +199,9 @@ function NewCallContent() {
     const interval = setInterval(async () => {
       try {
         const liveStatus = await getTwilioCallStatus(callSid);
+        if (liveStatus) {
+          logToTerminal(`[SYSTEM] Live Twilio Call Status: ${liveStatus}`);
+        }
         if (liveStatus && ["completed", "failed", "busy", "no-answer", "canceled"].includes(liveStatus)) {
           logToTerminal(`[SYSTEM] Call disconnected by remote party (Twilio Status: ${liveStatus})`);
           handleEndCall();
@@ -244,8 +247,8 @@ function NewCallContent() {
 
   // Scroll to bottom of terminal
   useEffect(() => {
-    if (consoleEndRef.current) {
-      consoleEndRef.current.scrollIntoView({ behavior: "smooth" });
+    if (consoleContainerRef.current) {
+      consoleContainerRef.current.scrollTop = consoleContainerRef.current.scrollHeight;
     }
   }, [terminalLogs]);
 
@@ -908,6 +911,7 @@ function NewCallContent() {
             </div>
             
             <div 
+              ref={consoleContainerRef}
               className="card-body p-4 font-monospace overflow-auto bg-black bg-opacity-75 flex-grow-1"
               style={{ 
                 height: "380px", 
@@ -936,7 +940,6 @@ function NewCallContent() {
                   );
                 })
               )}
-              <div ref={consoleEndRef} />
             </div>
           </div>
         </div>

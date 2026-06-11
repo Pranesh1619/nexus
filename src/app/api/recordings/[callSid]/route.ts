@@ -11,6 +11,7 @@ export async function GET(
     const { callSid } = resolvedParams;
 
     let audioBuffer: any = null;
+    let contentType = "audio/wav";
 
     // 1. Try to serve the recording from local storage first for maximum speed and reliability
     try {
@@ -20,12 +21,15 @@ export async function GET(
       
       if (fs.existsSync(recordingsDir)) {
         const files = fs.readdirSync(recordingsDir);
-        const match = files.find((f: string) => f.endsWith(`${callSid}.wav`));
+        const match = files.find((f: string) => f.endsWith(`${callSid}.wav`) || f.endsWith(`${callSid}.mp3`));
         if (match) {
           const localPath = path.join(recordingsDir, match);
           if (fs.existsSync(localPath)) {
             console.log(`[Recording Proxy] Serving local audio file: ${localPath}`);
             audioBuffer = fs.readFileSync(localPath);
+            if (match.endsWith(".mp3")) {
+              contentType = "audio/mpeg";
+            }
           }
         }
       }
@@ -47,8 +51,11 @@ export async function GET(
       const twilioToken = process.env.TWILIO_AUTH_TOKEN || "";
       const authHeader = "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64");
 
+      const mp3Url = callLog.audioUrl.endsWith(".mp3") ? callLog.audioUrl : `${callLog.audioUrl}.mp3`;
+      contentType = "audio/mpeg";
+
       // Fetch the recording with manual redirect follow to strip Auth headers for S3
-      let response = await fetch(callLog.audioUrl, {
+      let response = await fetch(mp3Url, {
         headers: {
           Authorization: authHeader
         },
@@ -92,7 +99,7 @@ export async function GET(
           "Content-Range": `bytes ${start}-${end}/${audioLength}`,
           "Accept-Ranges": "bytes",
           "Content-Length": String(chunksize),
-          "Content-Type": "audio/wav",
+          "Content-Type": contentType,
           "Cache-Control": "public, max-age=31536000",
         }
       });
@@ -102,7 +109,7 @@ export async function GET(
         headers: {
           "Accept-Ranges": "bytes",
           "Content-Length": String(audioLength),
-          "Content-Type": "audio/wav",
+          "Content-Type": contentType,
           "Cache-Control": "public, max-age=31536000",
         }
       });

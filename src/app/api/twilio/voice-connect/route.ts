@@ -32,13 +32,13 @@ export async function POST(request: Request) {
 
     console.log(`[Voice Connect] Routing call from ${callerId} to customer ${to}. Bridge recording enabled.`);
 
-    // Return TwiML with <Dial> to connect WebRTC stream to PSTN/SIP phone number
-    // We enable dual-channel call recording to capture both agent and customer speech.
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+  // Return TwiML with <Dial> to connect WebRTC stream to PSTN/SIP phone number
+  // We record the call as mixed mono (record-from-answer) to ensure Whisper transcribes both channels together.
+  const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Dial 
     callerId="${callerId}" 
-    record="record-from-answer-dual" 
+    record="record-from-answer" 
     recordingStatusCallback="${hostUrl}/api/twilio/recording-callback?leadId=${leadId}&amp;lang=${lang}&amp;userId=${userId}&amp;callType=webrtc"
   >
     <Number>${to}</Number>

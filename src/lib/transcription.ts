@@ -563,12 +563,13 @@ export async function transcribeAndAnalyzeRecording(
   isWebRTC: boolean = false
 ) {
   try {
-    console.log(`[Whisper] Downloading call recording from: ${recordingUrl}`);
+    const mp3Url = recordingUrl.endsWith(".mp3") ? recordingUrl : `${recordingUrl}.mp3`;
+    console.log(`[Whisper] Downloading MP3 call recording from: ${mp3Url}`);
     const twilioSid = process.env.TWILIO_ACCOUNT_SID || "";
     const twilioToken = process.env.TWILIO_AUTH_TOKEN || "";
     const authHeader = "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64");
 
-    const audioRes = await fetch(recordingUrl, {
+    const audioRes = await fetch(mp3Url, {
       headers: {
         Authorization: authHeader
       }
@@ -578,7 +579,7 @@ export async function transcribeAndAnalyzeRecording(
     }
 
     const arrayBuffer = await audioRes.arrayBuffer();
-    const fileBlob = new Blob([arrayBuffer], { type: "audio/wav" });
+    const fileBlob = new Blob([arrayBuffer], { type: "audio/mp3" });
 
     const isGroq = apiKey.startsWith("gsk_");
     const whisperEndpoint = isGroq 
@@ -588,21 +589,29 @@ export async function transcribeAndAnalyzeRecording(
 
     console.log(`[Whisper] Submitting audio to ${isGroq ? "Groq" : "OpenAI"} Whisper API (${whisperModel}) with target language: ${targetLanguage}...`);
     const whisperFormData = new FormData();
-    whisperFormData.append("file", fileBlob, "call_recording.wav");
+    whisperFormData.append("file", fileBlob, "call_recording.mp3");
     whisperFormData.append("model", whisperModel);
 
-    // Do not pin Whisper's language parameter. This allows Whisper to automatically detect and transcribe
-    // whichever language is actually spoken (e.g., if the user speaks Hindi on a Tamil-configured call).
-    console.log(`[Whisper] Omitting language parameter to enable automatic voice language detection.`);
+    // Pin Whisper's language parameter based on targetLanguage to ensure high-accuracy transcription
+    // and avoid language-detection confusion (such as detecting Spanish for Tamil or Hindi voice).
+    const langMap: Record<string, string> = {
+      English: "en",
+      Spanish: "es",
+      Hindi: "hi",
+      Tamil: "ta",
+      French: "fr",
+      German: "de",
+    };
+    const isoLang = langMap[targetLanguage];
+    if (isoLang) {
+      console.log(`[Whisper] Pinning Whisper language parameter to: ${isoLang} (${targetLanguage})`);
+      whisperFormData.append("language", isoLang);
+    } else {
+      console.log(`[Whisper] Omitting language parameter to enable automatic voice language detection.`);
+    }
 
-    // Provide a rich multilingual prompt so Whisper transcribes whichever language is spoken (English, Tamil, Hindi, Spanish, French, German) in its native script
-    const whisperPrompt = `தமிழ்: இது ஒரு வாடிக்கையாளர் அழைப்பு. நான் தமிழ் பேசுகிறேன். நீங்கள் எப்படி இருக்கிறீர்கள்?
-हिन्दी: यह एक ग्राहक कॉल है। मैं हिंदी बोलता हूँ। आप कैसे हैं?
-Español: Esta es una llamada de cliente. Hablo español. ¿Cómo estás?
-Français: C'est un appel client. Je parle français. Comment ça va?
-Deutsch: Dies ist ein Kundenanruf. Ich spreche Deutsch. Wie geht es Ihnen?
-English: This is a customer call. You have a trial account.`;
-    whisperFormData.append("prompt", whisperPrompt);
+    // We omit the prompt parameter here because specific prompts can bias the decoder, causing it
+    // to hallucinate sentences from the prompt and cut off the rest of the actual spoken audio.
 
     const whisperRes = await fetch(whisperEndpoint, {
       method: "POST",

@@ -30,11 +30,11 @@ export default function DashboardLayout({ children, userRole = "ADMIN", userName
       items: [
         { title: "Dashboard", icon: "bi-grid", path: "/admin" },
         { title: "Agents", icon: "bi-headset", path: "/admin/agents" },
+        { title: "Leads", icon: "bi-person-badge", path: "/admin/leads" },
         { title: "Calls", icon: "bi-telephone-outbound", path: "/admin/calls" },
         ...(userRole === "ADMIN" ? [
           { title: "Sales", icon: "bi-graph-up-arrow", path: "/admin/sales" }
         ] : []),
-        { title: "Leads", icon: "bi-person-badge", path: "/admin/leads" },
         { title: "Deals", icon: "bi-kanban", path: "/admin/deals" },
         ...(userRole === "ADMIN" ? [
           { title: "Users", icon: "bi-people", path: "/admin/users" }

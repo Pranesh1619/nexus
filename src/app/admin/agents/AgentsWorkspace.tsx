@@ -116,9 +116,20 @@ export default function AgentsWorkspace({ initialAgents }: AgentsWorkspaceProps)
   const filteredLeadsForWorkspace = useMemo(() => {
     if (!selectedAgent) return [];
     const leads = selectedAgent.leads;
-    if (!leadSearchQuery) return leads;
+    
+    // Deduplicate leads by phone number to avoid duplicate entries in the console sidebar
+    const uniqueMap = new Map<string, Lead>();
+    leads.forEach(l => {
+      const existing = uniqueMap.get(l.phone);
+      if (!existing || new Date(l.createdAt) > new Date(existing.createdAt)) {
+        uniqueMap.set(l.phone, l);
+      }
+    });
+    const uniqueLeads = Array.from(uniqueMap.values());
+
+    if (!leadSearchQuery) return uniqueLeads;
     const q = leadSearchQuery.toLowerCase();
-    return leads.filter((l) =>
+    return uniqueLeads.filter((l) =>
       l.name.toLowerCase().includes(q) ||
       (l.company || "").toLowerCase().includes(q) ||
       l.phone.includes(q)
@@ -661,35 +672,45 @@ export default function AgentsWorkspace({ initialAgents }: AgentsWorkspaceProps)
                           onClick={() => setLocalSelectedLeadId(l.id)}
                           className={`lead-list-btn w-100 text-start border-0 px-3 py-3 d-flex flex-column gap-1 ${
                             isSelected
-                              ? "active-lead-item bg-white border-start border-3 border-success"
-                              : "bg-transparent"
+                              ? "bg-success bg-opacity-10"
+                              : "bg-transparent hover-bg-light"
                           }`}
                           style={{
                             cursor: "pointer",
                             borderBottom: "1px solid #f1f5f9",
-                            transition: "background 0.15s"
+                            borderLeft: isSelected ? "4px solid #198754" : "4px solid transparent",
+                            transition: "all 0.15s"
                           }}
                         >
                           <div className="d-flex w-100 justify-content-between align-items-center">
                             <span
-                              className="text-dark fw-semibold"
-                              style={{ fontSize: "13.5px", color: isSelected ? "#198754" : undefined }}
+                              className="text-dark fw-bold"
+                              style={{ fontSize: "14px" }}
                             >
                               {l.name}
                             </span>
-                            <span
-                              className="badge"
-                              style={{
-                                fontSize: "10px",
-                                backgroundColor: isSelected ? "rgba(25,135,84,0.1)" : "#f1f5f9",
-                                color: isSelected ? "#198754" : "#6c757d"
-                              }}
-                            >
-                              {l.status}
-                            </span>
+                            {(() => {
+                              const isGreenStatus = ["QUALIFIED", "CLOSED_WON", "INTERESTED", "CONNECTED"].includes(l.status.toUpperCase());
+                              return (
+                                <span
+                                  className="badge text-uppercase"
+                                  style={{
+                                    fontSize: "9.5px",
+                                    backgroundColor: isGreenStatus ? "rgba(25,135,84,0.15)" : "rgba(108,117,125,0.12)",
+                                    color: isGreenStatus ? "#198754" : "#6c757d",
+                                    fontWeight: "bold",
+                                    padding: "4px 8px",
+                                    borderRadius: "6px"
+                                  }}
+                                >
+                                  {l.status}
+                                </span>
+                              );
+                            })()}
                           </div>
                           <div className="d-flex justify-content-between text-secondary" style={{ fontSize: "11.5px" }}>
-                            <span className="text-truncate">{l.company || "No Company"}</span>
+                            <span className="font-monospace text-truncate">({l.phone})</span>
+                            <span className="text-truncate text-muted">{l.company || "No Company"}</span>
                           </div>
                         </button>
                       );

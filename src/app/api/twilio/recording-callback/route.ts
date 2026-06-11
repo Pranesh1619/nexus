@@ -40,15 +40,17 @@ export async function POST(request: Request) {
                         String(now.getHours()).padStart(2, "0") + "-" + 
                         String(now.getMinutes()).padStart(2, "0") + "-" + 
                         String(now.getSeconds()).padStart(2, "0");
-        const filename = `${dateStr}_${callSid}.wav`;
+        const filename = `${dateStr}_${callSid}.mp3`;
         const localPath = path.join(recordingsDir, filename);
         
         const twilioSid = process.env.TWILIO_ACCOUNT_SID || "";
         const twilioToken = process.env.TWILIO_AUTH_TOKEN || "";
         const authHeader = "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64");
 
+        const mp3Url = recordingUrl.endsWith(".mp3") ? recordingUrl : `${recordingUrl}.mp3`;
+
         // Download audio and write to disk
-        const audioResponse = await fetch(recordingUrl, {
+        const audioResponse = await fetch(mp3Url, {
           headers: {
             Authorization: authHeader
           }
