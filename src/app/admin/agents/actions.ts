@@ -106,3 +106,20 @@ export async function updateAgentLeadCall(id: string, data: {
   revalidatePath("/admin/calls");
   return call;
 }
+
+export async function deleteAgent(id: string) {
+  // Unassign all leads assigned to this agent
+  await prisma.lead.updateMany({
+    where: { assignedTo: id },
+    data: { assignedTo: null }
+  });
+  
+  // Delete the agent user (calls will cascade delete)
+  const deleted = await prisma.user.delete({
+    where: { id },
+  });
+  
+  revalidatePath("/admin/agents");
+  revalidatePath("/admin/users");
+  return deleted;
+}
