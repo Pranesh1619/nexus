@@ -21,9 +21,10 @@ interface CallProgressionProps {
   currentStage: string;
   aiScore: number;
   analysis: string;
+  leadId?: string;
 }
 
-export default function CallProgression({ callId, currentStage, aiScore, analysis }: CallProgressionProps) {
+export default function CallProgression({ callId, currentStage, aiScore, analysis, leadId }: CallProgressionProps) {
   const getInitialIndex = () => {
     const idx = stages.indexOf(currentStage);
     return idx === -1 ? 0 : idx;
@@ -252,72 +253,7 @@ export default function CallProgression({ callId, currentStage, aiScore, analysi
         </div>
       </div>
 
-      {/* Analysis Grid */}
-      <div className="row g-4 mb-4">
-        <div className="col-lg-8">
-          <div className="card border-0 shadow-sm h-100">
-            <div className="card-body p-4">
-              <div className="d-flex justify-content-between align-items-center mb-4">
-                <h6 className="fw-bold mb-0 x-small uppercase text-secondary">
-                  <i className="bi bi-cpu text-primary"></i> AI Analysis for {stages[selectedStageIndex]}
-                </h6>
-                <div className="d-flex align-items-center gap-2 bg-light px-3 py-1 rounded-pill">
-                  <span className="x-small text-secondary fw-bold">PROBABILITY:</span>
-                  <span className="fw-bold text-success small">{calculateDynamicScore(selectedStageIndex, aiScore)}%</span>
-                </div>
-              </div>
-              <div className="p-3 bg-light rounded-3 border-start border-primary border-4 mb-3">
-                <p className="mb-0 text-dark small" style={{ lineHeight: '1.6' }}>
-                  {getMockedAnalysis(selectedStageIndex, analysis)}
-                </p>
-              </div>
 
-              <div className="row g-3">
-                <div className="col-md-6">
-                  <div className="p-2 px-3 border rounded-3 bg-white">
-                    <h6 className="x-small fw-bold text-secondary text-uppercase mb-1">Status Summary</h6>
-                    <div className="x-small text-dark fw-bold">Positive Sentiment Detected</div>
-                  </div>
-                </div>
-                <div className="col-md-6">
-                  <div className="p-2 px-3 border rounded-3 bg-white">
-                    <h6 className="x-small fw-bold text-secondary text-uppercase mb-1">Key Signals</h6>
-                    <div className="d-flex flex-wrap gap-1 mt-1">
-                      <span className="badge  bg-opacity-10 text-primary x-small fw-normal">Engaged</span>
-                      <span className="badge bg-success bg-opacity-10 text-success x-small fw-normal">Verified</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-lg-4">
-          <div className="card border-0 shadow-sm h-100">
-            <div className="card-body p-4">
-              <h6 className="fw-bold mb-3 x-small uppercase text-secondary">Signal Analysis</h6>
-              <div className="space-y-3">
-                <div className="p-2 px-3 border rounded-3 mb-3 bg-light bg-opacity-50">
-                  <div className="text-secondary x-small fw-bold uppercase mb-1">Sentiment</div>
-                  <div className={`small fw-bold ${selectedStageIndex > 3 ? 'text-success' : 'text-warning'}`}>
-                    {selectedStageIndex > 3 ? 'Highly Positive' : 'Neutral'} 
-                  </div>
-                </div>
-                <div className="p-2 px-3 border rounded-3">
-                  <div className="text-secondary x-small fw-bold uppercase mb-1">Buying Intensity</div>
-                  <div className="progress" style={{ height: '4px' }}>
-                    <div 
-                      className={`progress-bar ${selectedStageIndex > 6 ? 'bg-success' : selectedStageIndex > 3 ? 'bg-primary' : 'bg-warning'}`} 
-                      style={{ width: `${(selectedStageIndex + 1) * 10}%` }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <style jsx>{`
         .bubble-step {
@@ -427,24 +363,4 @@ export default function CallProgression({ callId, currentStage, aiScore, analysi
   );
 }
 
-function getMockedAnalysis(index: number, baseAnalysis: string) {
-  const mockData = [
-    "New Lead record identified. System awaiting initial interaction.",
-    "First touchpoint attempted. Awaiting response from lead.",
-    "Call successfully connected. Identity and intent verified.",
-    "Lead raised an Enquiry regarding specific business solutions and service availability.",
-    "Lead engaged in active dialogue, asking deep technical questions and requirement gathering.",
-    "Lead expressed strong Interest in our managed services and core platform features.",
-    "Lead showed high Desire to implement the solution, requesting specific ROI documentation.",
-    "Lead Qualified for next steps. Budget and decision-makers identified.",
-    "Follow-up scheduled. Draft contract and proposal shared for review.",
-    "DEAL CLOSED. Lead converted to client. Onboarding process initiated."
-  ];
-  return mockData[index] || baseAnalysis;
-}
 
-function calculateDynamicScore(index: number, baseScore: number) {
-  const stageWeight = (index / (stages.length - 1)) * 40; 
-  const fixedScore = 50; 
-  return Math.min(100, Math.floor(fixedScore + stageWeight + (baseScore / 10)));
-}

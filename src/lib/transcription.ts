@@ -640,7 +640,7 @@ Perform the following tasks:
 5. Format the timestamps as "MM:SS".
 6. Detect the primary voice language (e.g., "Tamil", "Hindi", "English").
 7. Evaluate the lead quality score on a scale of 0 to 100 based on their interest.
-8. Generate a brief CRM conversation summary analysis.
+8. Identify and extract the customer's specific requirements from the call (e.g. what services, features, timing, or help they need). Do not write a general summary or analysis; focus purely on listing their explicit requirements.
 
 Provide your response in JSON format matching this schema:
 {
@@ -912,7 +912,7 @@ Please perform the following operations:
    - If the Lead's speech is already in its proper native script or is English, copy it exactly as is, but correct any minor phonetic spelling errors or garbled words to their proper native words.
    - Do NOT translate this key to English; it must represent the spoken words in the native language's script.
 3. Detect the primary language of the Lead's speech and populate the "detectedVoiceLanguage" key (e.g., "Tamil", "Hindi", "English", "Spanish", "French", "German", etc.).
-4. Write a professional CRM call analysis summarizing the discussion, client objections, and proposed follow-up steps.
+4. Extract the customer's specific requirements from the call (e.g., what services, features, pricing, support seats, or timeline they need). Do not write a general summary or analysis; focus purely on listing their explicit requirements as a clean bulleted list of points (using *).
 5. Calculate a quality score (0 to 100) representing the lead's level of interest or business qualification.
 
 Return ONLY a raw JSON object (do not wrap in markdown fences like \`\`\`json) matching the following TypeScript interface:
@@ -941,7 +941,7 @@ Please perform the following operations:
    - Under NO circumstances should you keep the "text" key in English if the original speech was in Tamil.
 3. In the "translation" key, keep the clean English translation.
 4. Detect the primary language of the Lead's speech and populate the "detectedVoiceLanguage" key ("Tamil" if they spoke mostly in Tamil/Tanglish).
-5. Write a professional CRM call analysis summarizing the discussion, client objections, and proposed follow-up steps.
+5. Extract the customer's specific requirements from the call (e.g., what services, features, pricing, support seats, or timeline they need). Do not write a general summary or analysis; focus purely on listing their explicit requirements as a clean bulleted list of points (using *).
 6. Calculate a quality score (0 to 100) representing the lead's level of interest or business qualification.
 
 Return ONLY a raw JSON object (do not wrap in markdown fences like \`\`\`json) matching the following TypeScript interface:
@@ -975,7 +975,7 @@ Please perform the following operations:
    - PHONETIC & CONTEXT CORRECTION: When translating, if the native transcript contains minor phonetic errors or garbled words, use conversational context to correct the translation so that it is fluent, accurate, and reflects the true intended meaning.
    - If the turn is already in English, copy the text exactly into the "translation" key.
 4. Detect the primary language of the Lead's speech and populate the "detectedVoiceLanguage" key (e.g., "Tamil", "Hindi", "English", "Spanish", "French", "German", etc.).
-5. Write a professional CRM call analysis summarizing the discussion, client objections, and proposed follow-up steps.
+5. Extract the customer's specific requirements from the call (e.g., what services, features, pricing, support seats, or timeline they need). Do not write a general summary or analysis; focus purely on listing their explicit requirements as a clean bulleted list of points (using *).
 6. Calculate a quality score (0 to 100) representing the lead's level of interest or business qualification.
 
 Return ONLY a raw JSON object (do not wrap in markdown fences like \`\`\`json) matching the following TypeScript interface:
@@ -1115,5 +1115,131 @@ Return ONLY a raw JSON object (do not wrap in markdown fences like \`\`\`json) m
   } catch (error) {
     console.error("Error in transcribeAndAnalyzeRecording:", error);
     throw error;
+  }
+}
+
+/**
+ * Generates a consolidated overall summary based on all call logs of a lead.
+ */
+export async function generateOverallSummaryFromLLM(
+  leadName: string,
+  companyName: string | null,
+  calls: any[]
+): Promise<string> {
+  try {
+    const callsText = calls.map((call, index) => {
+      const turns = (() => {
+        try {
+          const parsed = JSON.parse(call.transcript || "[]");
+          if (Array.isArray(parsed)) {
+            return parsed.map((t: any) => `${t.speaker}: ${t.text}`).join("\n");
+          }
+        } catch (_) {}
+        return call.translatedText || call.transcript || "";
+      })();
+      return `Call #${index + 1} (${new Date(call.createdAt).toLocaleDateString()}):
+Duration: ${call.duration} seconds
+Stage/Outcome: ${call.stage}
+Requirements/Summary: ${call.analysis || "None"}
+Transcript turns:
+${turns}`;
+    }).join("\n\n---\n\n");
+
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (geminiKey) {
+      console.log("[Gemini] Generating overall summary...");
+      const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+      const promptText = `You are a professional BPO client manager and CRM assistant.
+We have conducted ${calls.length} phone calls with a client named "${leadName}" (Company: "${companyName || "Unknown"}").
+Here is the history of all call details and transcripts:
+
+${callsText}
+
+Please analyze the call history and generate a consolidated overall summary across all calls.
+You must strictly follow this format:
+1. A single concise paragraph summarizing the calls, relationship progression, and status.
+2. A bulleted list of all client requirements gathered across all calls.
+
+Do not include any extra sections, timelines, action plans, or introductions. Keep it short, focused, and professional.`;
+
+      const generateRes = await fetch(generateUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: promptText
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.2
+          }
+        })
+      });
+
+      if (generateRes.ok) {
+        const generateData = await generateRes.json();
+        return generateData.candidates[0].content.parts[0].text.trim();
+      }
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return calls.map((c, i) => `[Call #${i+1}]: ${c.analysis || "No requirements recorded."}`).join("\n\n");
+    }
+
+    const isGroq = apiKey.startsWith("gsk_");
+    const chatEndpoint = isGroq
+      ? "https://api.groq.com/openai/v1/chat/completions"
+      : "https://api.openai.com/v1/chat/completions";
+    const chatModel = isGroq ? "llama-3.3-70b-versatile" : "gpt-4o-mini";
+
+    console.log(`[LLM] Generating overall summary using ${chatModel}...`);
+    const promptText = `You are a professional BPO client manager and CRM assistant.
+We have conducted ${calls.length} phone calls with a client named "${leadName}" (Company: "${companyName || "Unknown"}").
+Here is the history of all call details and transcripts:
+
+${callsText}
+
+Please analyze the call history and generate a consolidated overall summary across all calls.
+You must strictly follow this format:
+1. A single concise paragraph summarizing the calls, relationship progression, and status.
+2. A bulleted list of all client requirements gathered across all calls.
+
+Do not include any extra sections, timelines, action plans, or introductions. Keep it short, focused, and professional.`;
+
+    const chatRes = await fetch(chatEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: chatModel,
+        messages: [
+          { role: "system", content: "You are a professional sales manager. Summarize the caller's history clearly." },
+          { role: "user", content: promptText }
+        ],
+        temperature: 0.2,
+        max_tokens: 1000
+      }),
+    });
+
+    if (chatRes.ok) {
+      const chatData = await chatRes.json();
+      return chatData.choices[0].message.content.trim();
+    } else {
+      const errText = await chatRes.text();
+      throw new Error(`LLM Error: ${chatRes.status} - ${errText}`);
+    }
+  } catch (error: any) {
+    console.error("Error in generateOverallSummaryFromLLM:", error);
+    return `Failed to generate overall summary: ${error.message || error}`;
   }
 }

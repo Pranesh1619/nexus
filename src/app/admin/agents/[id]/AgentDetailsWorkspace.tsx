@@ -3,6 +3,15 @@
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer 
+} from "recharts";
 
 type CallLog = {
   id: string;
@@ -51,17 +60,83 @@ type Agent = {
   calls: CallLog[];
 };
 
+const CustomTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div 
+        className="card border-0 shadow-lg p-3 bg-white" 
+        style={{ 
+          maxWidth: "320px", 
+          borderRadius: "12px", 
+          zIndex: 1000, 
+          fontSize: "12.5px",
+          borderLeft: "4px solid #0d6efd"
+        }}
+      >
+        <div className="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom">
+          <span className="fw-bold text-dark">{data.leadName}</span>
+          <span className="badge bg-primary rounded-pill px-2.5 py-1" style={{ fontSize: "10px" }}>{data.stage}</span>
+        </div>
+        <div className="space-y-1 text-secondary">
+          <div className="mb-1"><span className="fw-bold text-dark">Company:</span> {data.company}</div>
+          <div className="mb-1"><span className="fw-bold text-dark">Date & Time:</span> {data.date} at {data.time}</div>
+          <div className="mb-1"><span className="fw-bold text-dark">Duration:</span> {data.duration}</div>
+          <div className="d-flex align-items-center gap-1.5 mt-2 mb-2 text-dark fw-bold" style={{ fontSize: "13px" }}>
+            <i className="bi bi-robot text-primary"></i>
+            <span>AI Score:</span> 
+            <span className="text-success">{data.score}%</span>
+          </div>
+          <div className="mt-2 pt-2 border-top">
+            <span className="fw-bold text-dark d-block mb-1" style={{ fontSize: "11px" }}>AI Summary:</span>
+            <p className="mb-0 text-muted small" style={{ lineHeight: "1.4", whiteSpace: "pre-wrap" }}>
+              {data.analysis}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 interface AgentDetailsWorkspaceProps {
   agent: Agent;
 }
 
 export default function AgentDetailsWorkspace({ agent }: AgentDetailsWorkspaceProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"leads" | "calls">("leads");
+  const [activeTab, setActiveTab] = useState<"leads" | "calls" | "graph">("leads");
   
   const [leadSearchQuery, setLeadSearchQuery] = useState("");
   const [callSearchQuery, setCallSearchQuery] = useState("");
   const [selectedCallDetail, setSelectedCallDetail] = useState<CallLog | null>(null);
+
+  const [isMounted, setIsMounted] = useState(false);
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const chartData = useMemo(() => {
+    const sorted = [...agent.calls].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    return sorted.map((call, index) => {
+      const durationMin = Math.floor((call.duration || 0) / 60);
+      const durationSec = (call.duration || 0) % 60;
+      return {
+        seq: index + 1,
+        name: `Call #${index + 1}`,
+        score: call.aiScore || 0,
+        date: new Date(call.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
+        time: new Date(call.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+        leadName: call.lead?.name || "Unknown",
+        company: call.lead?.company || "N/A",
+        duration: `${durationMin}m ${durationSec}s`,
+        stage: call.stage,
+        analysis: call.analysis || call.notes || "No notes recorded",
+        originalCall: call
+      };
+    });
+  }, [agent.calls]);
 
   // Stats computation
   const stats = useMemo(() => {
@@ -147,7 +222,8 @@ export default function AgentDetailsWorkspace({ agent }: AgentDetailsWorkspacePr
       <div className="d-flex gap-2 border-bottom pb-1">
         {[
           { id: "leads", label: `Assigned Leads (${agent.leads.length})`, icon: "bi-people" },
-          { id: "calls", label: `Call History (${agent.calls.length})`, icon: "bi-telephone" }
+          { id: "calls", label: `Call History (${agent.calls.length})`, icon: "bi-telephone" },
+          { id: "graph", label: `Performance Graph`, icon: "bi-graph-up" }
         ].map((t) => (
           <button
             key={t.id}
@@ -428,6 +504,82 @@ export default function AgentDetailsWorkspace({ agent }: AgentDetailsWorkspacePr
                       })}
                     </tbody>
                   </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 3: Performance Graph */}
+        {activeTab === "graph" && (
+          <div className="card border-0 shadow-sm bg-white p-4" style={{ borderRadius: "16px" }}>
+            <div className="d-flex justify-content-between align-items-center mb-4">
+              <div>
+                <h5 className="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
+                  <i className="bi bi-graph-up text-primary"></i> Call Quality Timeline
+                </h5>
+                <p className="text-secondary mb-0 small">Chronological trend of AI call validation scores and interaction outcomes.</p>
+              </div>
+              <div className="bg-light px-3 py-1.5 rounded-pill d-flex align-items-center gap-2">
+                <span className="badge bg-primary rounded-circle" style={{ width: "8px", height: "8px", padding: 0 }}></span>
+                <span className="x-small fw-bold text-secondary">AI Score Trend</span>
+              </div>
+            </div>
+
+            <div style={{ height: "320px", width: "100%" }}>
+              {isMounted ? (
+                chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={chartData}
+                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient id="scoreColor" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#0d6efd" stopOpacity={0.15}/>
+                          <stop offset="95%" stopColor="#0d6efd" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis 
+                        dataKey="date" 
+                        stroke="#94a3b8" 
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis 
+                        domain={[0, 100]} 
+                        stroke="#94a3b8" 
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                        ticks={[0, 20, 40, 60, 80, 100]}
+                      />
+                      <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                      <Area 
+                        type="monotone" 
+                        dataKey="score" 
+                        stroke="#0d6efd" 
+                        strokeWidth={3}
+                        fillOpacity={1} 
+                        fill="url(#scoreColor)" 
+                        activeDot={{ r: 6, style: { fill: '#0d6efd', strokeWidth: 2 } }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5 text-secondary">
+                    <i className="bi bi-telephone-x fs-2 text-muted mb-2"></i>
+                    <div className="small fw-semibold">No calls logged yet</div>
+                    <div className="x-small text-muted">The quality timeline will display once outbound calls are executed.</div>
+                  </div>
+                )
+              ) : (
+                <div className="d-flex align-items-center justify-content-center h-100">
+                  <div className="spinner-border spinner-border-sm text-primary" role="status">
+                    <span className="visually-hidden">Loading chart...</span>
+                  </div>
                 </div>
               )}
             </div>

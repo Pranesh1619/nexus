@@ -9,7 +9,8 @@ import {
   syncSipCallLog,
   getCallLogStatus,
   endTwilioCall,
-  getTwilioCallStatus
+  getTwilioCallStatus,
+  getOverallSummary
 } from "./new/actions";
 import { deleteCallLog } from "./actions";
 import CallList, { CallLogListItem } from "./CallList";
@@ -182,7 +183,7 @@ export default function CallsWorkspace({
   );
 
   const [activeModalLog, setActiveModalLog] = useState<any | null>(null);
-  const [modalDetailTab, setModalDetailTab] = useState<"transcript" | "recording">("transcript");
+  const [modalDetailTab, setModalDetailTab] = useState<"requirement" | "overall" | "transcript" | "recording">("requirement");
 
   // Lead Selection
   const [selectedLeadId, setSelectedLeadId] = useState<string>(
@@ -256,6 +257,62 @@ export default function CallsWorkspace({
 
   // Soundwave and pipeline state
   const [pipelineConnected, setPipelineConnected] = useState(false);
+
+  const [overallSummary, setOverallSummary] = useState<string>("");
+  const [loadingOverall, setLoadingOverall] = useState<boolean>(false);
+
+  // States for Post-Call Summary Tabs
+  const [postCallSummaryTab, setPostCallSummaryTab] = useState<"requirement" | "overall" | "transcript" | "recording">("requirement");
+  const [postCallOverallSummary, setPostCallOverallSummary] = useState<string>("");
+  const [loadingPostCallOverall, setLoadingPostCallOverall] = useState<boolean>(false);
+
+  // Reset modal summary states when opening a different call log in modal
+  useEffect(() => {
+    if (activeModalLog) {
+      setModalDetailTab("requirement");
+      setOverallSummary("");
+      setLoadingOverall(false);
+    }
+  }, [activeModalLog]);
+
+  // Reset post-call summary states when last call summary changes
+  useEffect(() => {
+    if (lastCallSummary) {
+      setPostCallSummaryTab("requirement");
+      setPostCallOverallSummary("");
+      setLoadingPostCallOverall(false);
+    }
+  }, [lastCallSummary]);
+
+  const handleModalTabChange = async (tab: "requirement" | "overall" | "transcript" | "recording") => {
+    setModalDetailTab(tab);
+    if (tab === "overall" && !overallSummary && activeModalLog) {
+      setLoadingOverall(true);
+      try {
+        const summary = await getOverallSummary(activeModalLog.leadId);
+        setOverallSummary(summary);
+      } catch (err) {
+        setOverallSummary("Failed to compile overall summary.");
+      } finally {
+        setLoadingOverall(false);
+      }
+    }
+  };
+
+  const handlePostCallTabChange = async (tab: "requirement" | "overall" | "transcript" | "recording") => {
+    setPostCallSummaryTab(tab);
+    if (tab === "overall" && !postCallOverallSummary && lastCallSummary) {
+      setLoadingPostCallOverall(true);
+      try {
+        const summary = await getOverallSummary(lastCallSummary.leadId);
+        setPostCallOverallSummary(summary);
+      } catch (err) {
+        setPostCallOverallSummary("Failed to compile overall summary.");
+      } finally {
+        setLoadingPostCallOverall(false);
+      }
+    }
+  };
 
   // Sync selectedLeadId and activeTab when URL query parameters change
   useEffect(() => {
@@ -857,13 +914,7 @@ export default function CallsWorkspace({
                     /* Post Call Transcript & AI Summary Panel */
                     <div className="card border-0 shadow-sm p-4 bg-white animate-fade" style={{ borderRadius: "16px" }}>
                       <div className="d-flex justify-content-between align-items-center pb-3 border-bottom mb-4">
-                        <div>
-                          <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-1.5 small fw-bold mb-2 d-inline-block">
-                            <i className="bi bi-check-circle-fill me-1.5"></i>
-                            Voice Session Synced & Analyzed
-                          </span>
-                          <h4 className="fw-bold mb-0 text-dark">Call Summary Report</h4>
-                        </div>
+                        <h4 className="fw-bold mb-0 text-dark">Call Summary Report</h4>
                         <button
                           onClick={() => setLastCallSummary(null)}
                           className="btn btn-outline-primary btn-sm px-3 py-1.5 fw-bold"
@@ -874,29 +925,98 @@ export default function CallsWorkspace({
                         </button>
                       </div>
 
-                      <div className="row g-4">
-                        <div className="col-md-4">
-                          <div className="card border bg-light p-3 h-100 text-center d-flex flex-column justify-content-center align-items-center" style={{ borderRadius: "12px" }}>
-                            <div className="text-secondary x-small fw-bold text-uppercase mb-2">AI Score / Lead Quality</div>
-                            <div className="fs-1 fw-bold text-success mb-1">{lastCallSummary.aiScore || 0}%</div>
-                            <div className="small text-secondary fw-semibold">Outcome: {lastCallSummary.stage}</div>
-                          </div>
-                        </div>
-
-                        <div className="col-md-8">
-                          <div className="card border bg-white p-3 h-100" style={{ borderRadius: "12px" }}>
-                            <span className="x-small fw-bold text-secondary text-uppercase d-block mb-2">CRM Conversation Analysis</span>
-                            <p className="small text-dark mb-0" style={{ lineHeight: "1.6" }}>
-                              {lastCallSummary.analysis || "No analysis details compiled yet."}
-                            </p>
-                          </div>
-                        </div>
+                      {/* Premium modern tab navigation with gaps and pill style */}
+                      <div className="d-flex flex-wrap mb-4" style={{ gap: "10px" }}>
+                        <button
+                          onClick={() => handlePostCallTabChange("requirement")}
+                          className={`btn d-flex align-items-center gap-2 px-3 py-2 fw-semibold transition-all border-0`}
+                          style={{
+                            fontSize: "12px",
+                            borderRadius: "8px",
+                            letterSpacing: "0.2px",
+                            backgroundColor: postCallSummaryTab === "requirement" ? "#0d6efd" : "#f1f5f9",
+                            color: postCallSummaryTab === "requirement" ? "#ffffff" : "#475569",
+                            boxShadow: postCallSummaryTab === "requirement" ? "0 4px 12px rgba(13, 110, 253, 0.15)" : "none",
+                          }}
+                          type="button"
+                        >
+                          <i className="bi bi-list-task"></i>Requirement
+                        </button>
+                        <button
+                          onClick={() => handlePostCallTabChange("overall")}
+                          className={`btn d-flex align-items-center gap-2 px-3 py-2 fw-semibold transition-all border-0`}
+                          style={{
+                            fontSize: "12px",
+                            borderRadius: "8px",
+                            letterSpacing: "0.2px",
+                            backgroundColor: postCallSummaryTab === "overall" ? "#0d6efd" : "#f1f5f9",
+                            color: postCallSummaryTab === "overall" ? "#ffffff" : "#475569",
+                            boxShadow: postCallSummaryTab === "overall" ? "0 4px 12px rgba(13, 110, 253, 0.15)" : "none",
+                          }}
+                          type="button"
+                        >
+                          <i className="bi bi-intersect"></i>Overall Summary
+                        </button>
+                        <button
+                          onClick={() => handlePostCallTabChange("transcript")}
+                          className={`btn d-flex align-items-center gap-2 px-3 py-2 fw-semibold transition-all border-0`}
+                          style={{
+                            fontSize: "12px",
+                            borderRadius: "8px",
+                            letterSpacing: "0.2px",
+                            backgroundColor: postCallSummaryTab === "transcript" ? "#0d6efd" : "#f1f5f9",
+                            color: postCallSummaryTab === "transcript" ? "#ffffff" : "#475569",
+                            boxShadow: postCallSummaryTab === "transcript" ? "0 4px 12px rgba(13, 110, 253, 0.15)" : "none",
+                          }}
+                          type="button"
+                        >
+                          <i className="bi bi-file-earmark-text"></i>Transcript
+                        </button>
+                        <button
+                          onClick={() => handlePostCallTabChange("recording")}
+                          className={`btn d-flex align-items-center gap-2 px-3 py-2 fw-semibold transition-all border-0`}
+                          style={{
+                            fontSize: "12px",
+                            borderRadius: "8px",
+                            letterSpacing: "0.2px",
+                            backgroundColor: postCallSummaryTab === "recording" ? "#0d6efd" : "#f1f5f9",
+                            color: postCallSummaryTab === "recording" ? "#ffffff" : "#475569",
+                            boxShadow: postCallSummaryTab === "recording" ? "0 4px 12px rgba(13, 110, 253, 0.15)" : "none",
+                          }}
+                          type="button"
+                        >
+                          <i className="bi bi-play-circle"></i>Recording
+                        </button>
                       </div>
 
-                      {/* Dialogue Turns */}
-                      <div className="mt-4 pt-3 border-top">
-                        <span className="x-small fw-bold text-secondary text-uppercase d-block mb-3">Conversation Transcript turns</span>
-                        <div className="bg-light p-3 rounded-4 border overflow-auto" style={{ maxHeight: "350px" }}>
+                      {/* Contents */}
+                      <div className="tab-content flex-grow-1 overflow-auto" style={{ maxHeight: "400px" }}>
+                        {postCallSummaryTab === "requirement" && (
+                          <div className="p-3 bg-light rounded-0 border-start border-primary border-3 mb-3">
+                            <p className="small text-dark mb-0" style={{ lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
+                              {lastCallSummary.analysis || "No requirements compiled yet."}
+                            </p>
+                          </div>
+                        )}
+
+                        {postCallSummaryTab === "overall" && (
+                          <div className="p-3 bg-light rounded-0 border-start border-primary border-3 mb-3">
+                            {loadingPostCallOverall ? (
+                              <div className="d-flex align-items-center gap-2 py-2 text-primary">
+                                <div className="spinner-border spinner-border-sm" role="status">
+                                  <span className="visually-hidden">Loading...</span>
+                                </div>
+                                <span style={{ fontSize: "12px" }}>Generating consolidated summary...</span>
+                              </div>
+                            ) : (
+                              <div className="small text-dark mb-0 markdown-content" style={{ lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
+                                {postCallOverallSummary || "No overall summary generated yet."}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {postCallSummaryTab === "transcript" && (
                           <div className="d-flex flex-column gap-3">
                             {(() => {
                               try {
@@ -904,29 +1024,32 @@ export default function CallsWorkspace({
                                 if (Array.isArray(turns) && turns.length > 0) {
                                   return turns.map((turn: any, idx: number) => {
                                     const isAgent = turn.speaker === "Agent";
-                                    const speakerName = isAgent ? "Agent" : selectedLead.name;
+                                    const speakerName = isAgent ? "Agent" : selectedLead?.name || "Client";
                                     return (
-                                      <div key={idx} className={`p-3 rounded-3 small ${isAgent ? "bg-white border-start border-primary border-4 shadow-sm" : "bg-success bg-opacity-10 border-end border-success border-4 shadow-sm text-end"}`}>
-                                        <div className="fw-bold mb-1" style={{ fontSize: "11.5px", color: isAgent ? "#0d6efd" : "#198754" }}>
-                                          {speakerName} • {turn.time}
+                                      <div key={idx} className={`p-2.5 small ${isAgent ? "bg-light border-start border-primary border-3 shadow-sm" : "bg-success bg-opacity-10 border-end border-success border-3 text-end shadow-sm"}`} style={{ borderRadius: 0 }}>
+                                        <div className="fw-bold mb-1" style={{ fontSize: "10px", color: isAgent ? "#2563eb" : "#16a34a" }}>
+                                          {speakerName}
                                         </div>
-                                        <div className="text-dark fw-semibold" style={{ fontSize: "13.5px" }}>{turn.text}</div>
-                                        {turn.translation && turn.translation !== turn.text && (
-                                          <div className="text-secondary mt-1 border-top pt-1 small">Translation: {turn.translation}</div>
-                                        )}
+                                        <div className="small" style={{ fontSize: "12.5px" }}>{turn.text}</div>
                                       </div>
                                     );
                                   });
                                 }
-                              } catch (e) {
-                                // Fallback if not JSON
-                              }
-                              return (
-                                <p className="small text-muted mb-0">{lastCallSummary.translatedText || lastCallSummary.transcript || "No transcript turns captured."}</p>
-                              );
+                              } catch (e) {}
+                              return <p className="text-secondary small">No transcript turns available.</p>;
                             })()}
                           </div>
-                        </div>
+                        )}
+
+                        {postCallSummaryTab === "recording" && (
+                          <div className="p-3 bg-light rounded-0 border-start border-primary border-3">
+                            {lastCallSummary.recordingUrl ? (
+                              <CustomAudioPlayer src={lastCallSummary.recordingUrl} initialDuration={lastCallSummary.duration} />
+                            ) : (
+                              <p className="text-secondary small mb-0">No audio recording file available.</p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -1271,118 +1394,176 @@ export default function CallsWorkspace({
 
             {/* Modal Body */}
             <div className="card-body p-4 overflow-auto" style={{ maxHeight: "calc(85vh - 150px)" }}>
-              {/* Outcome Badges & Score */}
-              <div className="d-flex justify-content-between align-items-center pb-3 border-bottom mb-3">
-                <span className="fw-bold text-primary" style={{ fontSize: "14px" }}>
-                  AI Qualification Score: <strong className="fs-5">{activeModalLog.aiScore || 0}%</strong>
-                </span>
-                <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-1.5 fw-bold" style={{ fontSize: "12px" }}>
-                  {activeModalLog.status} • {activeModalLog.stage}
-                </span>
-              </div>
 
-              {/* CRM Analysis Summary */}
-              {activeModalLog.analysis && (
-                <div className="mb-4 p-3 bg-light rounded-3 border-0">
-                  <span className="fw-bold text-secondary uppercase d-block mb-1" style={{ fontSize: "11px", letterSpacing: "0.5px" }}>CRM Analysis Summary</span>
-                  <p className="text-dark mb-0" style={{ fontSize: "13.5px", lineHeight: "1.5" }}>{activeModalLog.analysis}</p>
-                </div>
-              )}
-
-              {/* Tab Navigation */}
-              <div className="d-flex border-bottom mb-3 gap-3">
+              {/* Premium modern tab navigation with gaps and pill style */}
+              <div className="d-flex flex-wrap mb-4" style={{ gap: "10px" }}>
                 <button
-                  onClick={() => setModalDetailTab("transcript")}
-                  className={`btn btn-link nav-link pb-2 px-3 fw-bold border-bottom border-2 text-decoration-none ${modalDetailTab === "transcript" ? "border-primary text-primary" : "border-transparent text-secondary"}`}
-                  style={{ fontSize: "13px", borderRadius: 0, boxShadow: "none" }}
+                  onClick={() => handleModalTabChange("requirement")}
+                  className={`btn d-flex align-items-center gap-2 px-3 py-2 fw-semibold transition-all border-0`}
+                  style={{
+                    fontSize: "13px",
+                    borderRadius: "8px",
+                    letterSpacing: "0.2px",
+                    backgroundColor: modalDetailTab === "requirement" ? "#0d6efd" : "#f1f5f9",
+                    color: modalDetailTab === "requirement" ? "#ffffff" : "#475569",
+                    boxShadow: modalDetailTab === "requirement" ? "0 4px 12px rgba(13, 110, 253, 0.15)" : "none",
+                  }}
+                  type="button"
                 >
-                  <i className="bi bi-file-earmark-text me-1.5"></i> Transcript
+                  <i className="bi bi-list-task"></i>Requirement
                 </button>
                 <button
-                  onClick={() => setModalDetailTab("recording")}
-                  className={`btn btn-link nav-link pb-2 px-3 fw-bold border-bottom border-2 text-decoration-none ${modalDetailTab === "recording" ? "border-primary text-primary" : "border-transparent text-secondary"}`}
-                  style={{ fontSize: "13px", borderRadius: 0, boxShadow: "none" }}
+                  onClick={() => handleModalTabChange("overall")}
+                  className={`btn d-flex align-items-center gap-2 px-3 py-2 fw-semibold transition-all border-0`}
+                  style={{
+                    fontSize: "13px",
+                    borderRadius: "8px",
+                    letterSpacing: "0.2px",
+                    backgroundColor: modalDetailTab === "overall" ? "#0d6efd" : "#f1f5f9",
+                    color: modalDetailTab === "overall" ? "#ffffff" : "#475569",
+                    boxShadow: modalDetailTab === "overall" ? "0 4px 12px rgba(13, 110, 253, 0.15)" : "none",
+                  }}
+                  type="button"
                 >
-                  <i className="bi bi-play-circle me-1.5"></i> Call Recording
+                  <i className="bi bi-intersect"></i>Overall Summary
+                </button>
+                <button
+                  onClick={() => handleModalTabChange("transcript")}
+                  className={`btn d-flex align-items-center gap-2 px-3 py-2 fw-semibold transition-all border-0`}
+                  style={{
+                    fontSize: "13px",
+                    borderRadius: "8px",
+                    letterSpacing: "0.2px",
+                    backgroundColor: modalDetailTab === "transcript" ? "#0d6efd" : "#f1f5f9",
+                    color: modalDetailTab === "transcript" ? "#ffffff" : "#475569",
+                    boxShadow: modalDetailTab === "transcript" ? "0 4px 12px rgba(13, 110, 253, 0.15)" : "none",
+                  }}
+                  type="button"
+                >
+                  <i className="bi bi-file-earmark-text"></i>Transcript
+                </button>
+                <button
+                  onClick={() => handleModalTabChange("recording")}
+                  className={`btn d-flex align-items-center gap-2 px-3 py-2 fw-semibold transition-all border-0`}
+                  style={{
+                    fontSize: "13px",
+                    borderRadius: "8px",
+                    letterSpacing: "0.2px",
+                    backgroundColor: modalDetailTab === "recording" ? "#0d6efd" : "#f1f5f9",
+                    color: modalDetailTab === "recording" ? "#ffffff" : "#475569",
+                    boxShadow: modalDetailTab === "recording" ? "0 4px 12px rgba(13, 110, 253, 0.15)" : "none",
+                  }}
+                  type="button"
+                >
+                  <i className="bi bi-play-circle"></i>Call Recording
                 </button>
               </div>
 
-              {modalDetailTab === "transcript" ? (
-                <div className="d-flex flex-column gap-3">
-                  {(() => {
-                    try {
-                      const rawTurns = JSON.parse(activeModalLog.transcript || "[]");
-                      if (Array.isArray(rawTurns) && rawTurns.length > 0) {
-                        const turns: any[] = [];
-                        rawTurns.forEach((turn: any) => {
-                          const last = turns[turns.length - 1];
-                          if (last && last.speaker === turn.speaker) {
-                            last.text = (last.text + " " + turn.text).trim();
-                            if (turn.translation) {
-                              last.translation = ((last.translation || "") + " " + turn.translation).trim();
+              {/* Tab Contents */}
+              <div className="tab-content">
+                {modalDetailTab === "requirement" && (
+                  <div className="p-3 bg-light rounded-0 border-start border-primary border-3 mb-3 animate-fade">
+                    <p className="text-dark mb-0" style={{ fontSize: "13.5px", lineHeight: "1.5", whiteSpace: "pre-wrap" }}>
+                      {activeModalLog.analysis || "No requirements compiled for this call."}
+                    </p>
+                  </div>
+                )}
+
+                {modalDetailTab === "overall" && (
+                  <div className="p-3 bg-light rounded-0 border-start border-primary border-3 mb-3 animate-fade">
+                    {loadingOverall ? (
+                      <div className="d-flex align-items-center gap-2 py-2 text-primary">
+                        <div className="spinner-border spinner-border-sm" role="status">
+                          <span className="visually-hidden">Loading...</span>
+                        </div>
+                        <span style={{ fontSize: "13px" }}>Generating consolidated summary...</span>
+                      </div>
+                    ) : (
+                      <div className="text-dark mb-0 markdown-content" style={{ fontSize: "13.5px", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
+                        {overallSummary || "No overall summary generated yet."}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {modalDetailTab === "transcript" && (
+                  <div className="d-flex flex-column gap-3 animate-fade">
+                    {(() => {
+                      try {
+                        const rawTurns = JSON.parse(activeModalLog.transcript || "[]");
+                        if (Array.isArray(rawTurns) && rawTurns.length > 0) {
+                          const turns: any[] = [];
+                          rawTurns.forEach((turn: any) => {
+                            const last = turns[turns.length - 1];
+                            if (last && last.speaker === turn.speaker) {
+                              last.text = (last.text + " " + turn.text).trim();
+                              if (turn.translation) {
+                                last.translation = ((last.translation || "") + " " + turn.translation).trim();
+                              }
+                            } else {
+                              turns.push({ ...turn });
                             }
-                          } else {
-                            turns.push({ ...turn });
-                          }
-                        });
-                        return turns.map((turn: any, idx: number) => {
-                          const isAgent = turn.speaker === "Agent";
-                          const speakerName = isAgent ? activeModalLog.user?.name || "Agent" : selectedLead?.name || "Customer";
-                          return (
-                            <div key={idx} className={`p-3 rounded-3 ${isAgent ? "bg-white border-start border-primary border-3 shadow-sm" : "bg-success bg-opacity-10 border-end border-success border-3 text-end shadow-sm"}`}>
-                              <div className="fw-bold mb-1" style={{ fontSize: "10px", color: isAgent ? "#0d6efd" : "#198754" }}>
-                                {speakerName} • {turn.time}
+                          });
+                          return turns.map((turn: any, idx: number) => {
+                            const isAgent = turn.speaker === "Agent";
+                            const speakerName = isAgent ? activeModalLog.user?.name || "Agent" : selectedLead?.name || "Customer";
+                            return (
+                              <div key={idx} className={`p-3 ${isAgent ? "bg-light border-start border-primary border-3" : "bg-success bg-opacity-10 border-end border-success border-3 text-end"}`} style={{ borderRadius: 0 }}>
+                                <div className="fw-bold mb-1" style={{ fontSize: "10px", color: isAgent ? "#0d6efd" : "#198754" }}>
+                                  {speakerName} • {turn.time}
+                                </div>
+                                <div className="text-dark fw-medium" style={{ fontSize: "13.5px" }}>{turn.text}</div>
+                                {turn.translation && turn.translation !== turn.text && (
+                                  <div className="text-secondary mt-1.5 border-top pt-1.5" style={{ fontSize: "11px" }}>Translation: {turn.translation}</div>
+                                )}
                               </div>
-                              <div className="text-dark fw-medium" style={{ fontSize: "13.5px" }}>{turn.text}</div>
-                              {turn.translation && turn.translation !== turn.text && (
-                                <div className="text-secondary mt-1.5 border-top pt-1.5" style={{ fontSize: "11px" }}>Translation: {turn.translation}</div>
-                              )}
-                            </div>
-                          );
-                        });
-                      }
-                    } catch (e) {
-                      // ignore json error
-                    }
-                    return (
-                      <p className="small text-muted mb-0">{activeModalLog.translatedText || activeModalLog.transcript || "No transcript available."}</p>
-                    );
-                  })()}
-                </div>
-              ) : (
-                <div className="d-flex flex-column gap-3">
-                  <div className="p-3 bg-light rounded-3 border-0">
-                    <h6 className="fw-bold text-dark mb-2 small text-uppercase tracking-wider">Recording Details</h6>
-                    <div className="row g-2 text-secondary" style={{ fontSize: "12px" }}>
-                      <div className="col-6">
-                        <span className="fw-bold">Caller:</span> {activeModalLog.callerPhone || "+1 (555) 019-2834"}
-                      </div>
-                      <div className="col-6">
-                        <span className="fw-bold">Receiver:</span> {activeModalLog.receiverPhone || selectedLead?.phone}
-                      </div>
-                      <div className="col-6">
-                        <span className="fw-bold">Duration:</span> {activeModalLog.duration || 0} seconds
-                      </div>
-                      <div className="col-6">
-                        <span className="fw-bold">Date:</span> {new Date(activeModalLog.startTime || activeModalLog.createdAt).toLocaleString()}
+                            );
+                          });
+                        }
+                      } catch (e) {}
+                      return (
+                        <p className="text-secondary text-center my-4 small">
+                          No readable dialogue turns available.
+                        </p>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {modalDetailTab === "recording" && (
+                  <div className="d-flex flex-column gap-3 animate-fade">
+                    <div className="p-3 bg-light rounded-0 border-start border-primary border-3">
+                      <div className="row g-2 text-secondary" style={{ fontSize: "12px" }}>
+                        <div className="col-6">
+                          <span className="fw-bold">Caller:</span> {activeModalLog.callerPhone || "+1 (555) 019-2834"}
+                        </div>
+                        <div className="col-6">
+                          <span className="fw-bold">Receiver:</span> {activeModalLog.receiverPhone || selectedLead?.phone}
+                        </div>
+                        <div className="col-6">
+                          <span className="fw-bold">Duration:</span> {activeModalLog.duration || 0} seconds
+                        </div>
+                        <div className="col-6">
+                          <span className="fw-bold">Date:</span> {new Date(activeModalLog.startTime || activeModalLog.createdAt).toLocaleString()}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="d-flex flex-column align-items-center w-100 p-3 bg-light rounded-3">
-                    <span className="text-secondary fw-bold small uppercase mb-2" style={{ fontSize: "10px", letterSpacing: "1px" }}>PLAY RECORDING</span>
-                    <audio
-                      controls
-                      className="w-100"
-                      src={
-                        activeModalLog.jobId && !activeModalLog.jobId.startsWith("mock_")
-                          ? `/api/recordings/${activeModalLog.jobId}`
-                          : `/recordings/2026-06-10_17-20-59_CA4a1c848d5af71a94d102a3647ce98a47.wav`
-                      }
-                    />
+                    <div className="d-flex flex-column align-items-center w-100 p-3 bg-light rounded-0 border-start border-primary border-3">
+                      <span className="text-secondary fw-bold small uppercase mb-2" style={{ fontSize: "10px", letterSpacing: "1px" }}>PLAY RECORDING</span>
+                      <audio
+                        controls
+                        className="w-100"
+                        src={
+                          activeModalLog.jobId && !activeModalLog.jobId.startsWith("mock_")
+                            ? `/api/recordings/${activeModalLog.jobId}`
+                            : `/recordings/2026-06-10_17-20-59_CA4a1c848d5af71a94d102a3647ce98a47.wav`
+                        }
+                      />
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {/* Modal Footer */}

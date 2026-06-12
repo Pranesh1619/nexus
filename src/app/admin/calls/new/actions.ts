@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import twilio from "twilio";
+import { generateOverallSummaryFromLLM } from "@/lib/transcription";
 
 export async function saveCallLog(data: {
   leadId: string;
@@ -355,3 +356,30 @@ export async function getTwilioCallStatus(callSid: string) {
     return null;
   }
 }
+
+export async function getOverallSummary(leadId: string) {
+  try {
+    const lead = await prisma.lead.findUnique({
+      where: { id: leadId },
+      include: {
+        calls: {
+          orderBy: { createdAt: "asc" }
+        }
+      }
+    });
+
+    if (!lead) {
+      return "Lead not found.";
+    }
+
+    if (lead.calls.length === 0) {
+      return "No calls have been logged for this lead yet.";
+    }
+
+    return await generateOverallSummaryFromLLM(lead.name, lead.company, lead.calls);
+  } catch (error: any) {
+    console.error("Error in getOverallSummary Server Action:", error);
+    return `Failed to compile overall summary: ${error.message || error}`;
+  }
+}
+

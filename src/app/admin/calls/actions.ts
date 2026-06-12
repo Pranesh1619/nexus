@@ -86,3 +86,44 @@ export async function updateCallDocumentation(id: string, formData: FormData) {
   revalidatePath(`/admin/calls/${id}`);
   revalidatePath("/admin/calls");
 }
+
+export async function simulateCallAnalysis(id: string) {
+  const { revalidatePath } = await import("next/cache");
+  const { generateConversation } = await import("@/lib/transcription");
+
+  const call = await prisma.callLog.findUnique({
+    where: { id },
+    include: { lead: true, user: true }
+  });
+
+  if (!call) return;
+
+  const leadName = call.lead?.name || "Client";
+  const companyName = call.lead?.company || "N/A";
+  const agentName = call.user?.name || "Sales Representative";
+  
+  const mockResult = generateConversation(
+    leadName,
+    companyName,
+    agentName,
+    "English",
+    call.stage || "Interested"
+  );
+
+  await prisma.callLog.update({
+    where: { id },
+    data: {
+      transcript: mockResult.transcript,
+      translatedText: mockResult.translatedText,
+      detectedVoiceLanguage: mockResult.detectedVoiceLanguage,
+      translatedLanguage: mockResult.translatedLanguage,
+      wordCount: mockResult.wordCount,
+      analysis: mockResult.analysis,
+      aiScore: mockResult.aiScore,
+      notes: `Simulated validation successfully completed. Score: ${mockResult.aiScore}%`
+    }
+  });
+
+  revalidatePath(`/admin/calls/${id}`);
+  revalidatePath("/admin/calls");
+}

@@ -44,7 +44,7 @@ export default function DashboardLayout({ children, userRole = "ADMIN", userName
           path: "/admin/agents",
           ...(userRole === "ADMIN" ? {
             children: [
-              { title: "Lead Assign", icon: "bi-person-plus", path: "/admin/sales" }
+              { title: "Assign Leads", icon: "bi-person-plus", path: "/admin/sales" }
             ]
           } : {})
         },
