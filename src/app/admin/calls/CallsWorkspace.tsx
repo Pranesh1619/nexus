@@ -430,6 +430,7 @@ export default function CallsWorkspace({
         logToTerminal(`[RX] SIP/2.0 200 OK (Registered)`);
         logToTerminal(`     Contact: <sip:${sipConfig.username}@client.virpa.ai;transport=ws>;expires=3600`);
         logToTerminal(`[SIP] SIP Trunk Successfully Registered and Idle.`);
+        setSipStatus("Registered");
       }, 2200);
 
       return () => {
@@ -858,8 +859,8 @@ export default function CallsWorkspace({
                         }}
                         disabled={calling}
                         className={`lead-list-btn w-100 text-start border-0 px-3 py-3 d-flex flex-column gap-1 ${isSelected
-                            ? "bg-success bg-opacity-10"
-                            : "bg-transparent hover-bg-light"
+                          ? "bg-success bg-opacity-10"
+                          : "bg-transparent hover-bg-light"
                           }`}
                         style={{
                           cursor: "pointer",
@@ -1022,29 +1023,44 @@ export default function CallsWorkspace({
                               try {
                                 const turns = JSON.parse(lastCallSummary.transcript || "[]");
                                 if (Array.isArray(turns) && turns.length > 0) {
-                                  return turns.map((turn: any, idx: number) => {
-                                    const isAgent = turn.speaker === "Agent";
-                                    const speakerName = isAgent ? "Agent" : selectedLead?.name || "Client";
-                                    return (
-                                      <div key={idx} className={`p-2.5 small ${isAgent ? "bg-light border-start border-primary border-3 shadow-sm" : "bg-success bg-opacity-10 border-end border-success border-3 text-end shadow-sm"}`} style={{ borderRadius: 0 }}>
-                                        <div className="fw-bold mb-1" style={{ fontSize: "10px", color: isAgent ? "#2563eb" : "#16a34a" }}>
-                                          {speakerName}
+                                  const agentLines = turns.filter((t: any) => t.speaker === "Agent").map((t: any) => t.translation || t.text).join(" ");
+                                  const customerLines = turns.filter((t: any) => t.speaker !== "Agent").map((t: any) => t.translation || t.text).join(" ");
+                                  return (
+                                    <>
+                                      {agentLines && (
+                                        <div className="p-3 rounded-0 border-start border-3" style={{ borderColor: "#2563eb", backgroundColor: "#eff6ff" }}>
+                                          <div className="d-flex align-items-center gap-2 mb-2">
+                                            <i className="bi bi-headset" style={{ color: "#2563eb", fontSize: "14px" }}></i>
+                                            <span className="fw-bold text-uppercase" style={{ fontSize: "10px", color: "#2563eb", letterSpacing: "1px" }}>Agent</span>
+                                          </div>
+                                          <p className="small text-dark mb-0" style={{ lineHeight: "1.7" }}>{agentLines}</p>
                                         </div>
-                                        <div className="small" style={{ fontSize: "12.5px" }}>{turn.text}</div>
-                                      </div>
-                                    );
-                                  });
+                                      )}
+                                      {customerLines && (
+                                        <div className="p-3 rounded-0 border-start border-3" style={{ borderColor: "#16a34a", backgroundColor: "#f0fdf4" }}>
+                                          <div className="d-flex align-items-center gap-2 mb-2">
+                                            <i className="bi bi-person-fill" style={{ color: "#16a34a", fontSize: "14px" }}></i>
+                                            <span className="fw-bold text-uppercase" style={{ fontSize: "10px", color: "#16a34a", letterSpacing: "1px" }}>Customer</span>
+                                          </div>
+                                          <p className="small text-dark mb-0" style={{ lineHeight: "1.7" }}>{customerLines}</p>
+                                        </div>
+                                      )}
+                                    </>
+                                  );
                                 }
-                              } catch (e) {}
-                              return <p className="text-secondary small">No transcript turns available.</p>;
+                              } catch (e) { }
+                              return <p className="text-secondary small">No transcript data available.</p>;
                             })()}
                           </div>
                         )}
 
                         {postCallSummaryTab === "recording" && (
                           <div className="p-3 bg-light rounded-0 border-start border-primary border-3">
-                            {lastCallSummary.recordingUrl ? (
-                              <CustomAudioPlayer src={lastCallSummary.recordingUrl} initialDuration={lastCallSummary.duration} />
+                            {lastCallSummary.jobId || lastCallSummary.audioUrl ? (
+                              <CustomAudioPlayer
+                                src={lastCallSummary.jobId ? `/api/recordings/${lastCallSummary.jobId}` : lastCallSummary.audioUrl}
+                                initialDuration={lastCallSummary.duration || 0}
+                              />
                             ) : (
                               <p className="text-secondary small mb-0">No audio recording file available.</p>
                             )}
@@ -1358,18 +1374,18 @@ export default function CallsWorkspace({
 
       {/* Call Details Modal */}
       {activeModalLog && (
-        <div 
+        <div
           className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center animate-fade"
-          style={{ 
-            zIndex: 1060, 
-            backgroundColor: "rgba(15, 23, 42, 0.45)", 
+          style={{
+            zIndex: 1060,
+            backgroundColor: "rgba(15, 23, 42, 0.45)",
             backdropFilter: "blur(10px)",
             transition: "all 0.3s ease"
           }}
           onClick={() => setActiveModalLog(null)}
         >
-          <div 
-            className="card border-0 shadow-lg p-0 w-100 mx-3 bg-white" 
+          <div
+            className="card border-0 shadow-lg p-0 w-100 mx-3 bg-white"
             style={{ maxWidth: "680px", borderRadius: "20px", maxHeight: "85vh", overflow: "hidden" }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1383,8 +1399,8 @@ export default function CallsWorkspace({
                   Handled by Agent: <strong>{activeModalLog.user?.name || "System"}</strong> on {new Date(activeModalLog.createdAt).toLocaleString()}
                 </p>
               </div>
-              <button 
-                className="btn btn-light rounded-circle p-2 border-0" 
+              <button
+                className="btn btn-light rounded-circle p-2 border-0"
                 onClick={() => setActiveModalLog(null)}
                 style={{ width: "36px", height: "36px" }}
               >
@@ -1492,35 +1508,32 @@ export default function CallsWorkspace({
                       try {
                         const rawTurns = JSON.parse(activeModalLog.transcript || "[]");
                         if (Array.isArray(rawTurns) && rawTurns.length > 0) {
-                          const turns: any[] = [];
-                          rawTurns.forEach((turn: any) => {
-                            const last = turns[turns.length - 1];
-                            if (last && last.speaker === turn.speaker) {
-                              last.text = (last.text + " " + turn.text).trim();
-                              if (turn.translation) {
-                                last.translation = ((last.translation || "") + " " + turn.translation).trim();
-                              }
-                            } else {
-                              turns.push({ ...turn });
-                            }
-                          });
-                          return turns.map((turn: any, idx: number) => {
-                            const isAgent = turn.speaker === "Agent";
-                            const speakerName = isAgent ? activeModalLog.user?.name || "Agent" : selectedLead?.name || "Customer";
-                            return (
-                              <div key={idx} className={`p-3 ${isAgent ? "bg-light border-start border-primary border-3" : "bg-success bg-opacity-10 border-end border-success border-3 text-end"}`} style={{ borderRadius: 0 }}>
-                                <div className="fw-bold mb-1" style={{ fontSize: "10px", color: isAgent ? "#0d6efd" : "#198754" }}>
-                                  {speakerName} • {turn.time}
+                          const agentLines = rawTurns.filter((t: any) => t.speaker === "Agent").map((t: any) => t.translation || t.text).join(" ");
+                          const customerLines = rawTurns.filter((t: any) => t.speaker !== "Agent").map((t: any) => t.translation || t.text).join(" ");
+                          return (
+                            <>
+                              {agentLines && (
+                                <div className="p-3 rounded-0 border-start border-3" style={{ borderColor: "#2563eb", backgroundColor: "#eff6ff" }}>
+                                  <div className="d-flex align-items-center gap-2 mb-2">
+                                    <i className="bi bi-headset" style={{ color: "#2563eb", fontSize: "14px" }}></i>
+                                    <span className="fw-bold text-uppercase" style={{ fontSize: "10px", color: "#2563eb", letterSpacing: "1px" }}>Agent</span>
+                                  </div>
+                                  <p className="text-dark mb-0" style={{ fontSize: "13.5px", lineHeight: "1.7" }}>{agentLines}</p>
                                 </div>
-                                <div className="text-dark fw-medium" style={{ fontSize: "13.5px" }}>{turn.text}</div>
-                                {turn.translation && turn.translation !== turn.text && (
-                                  <div className="text-secondary mt-1.5 border-top pt-1.5" style={{ fontSize: "11px" }}>Translation: {turn.translation}</div>
-                                )}
-                              </div>
-                            );
-                          });
+                              )}
+                              {customerLines && (
+                                <div className="p-3 rounded-0 border-start border-3" style={{ borderColor: "#16a34a", backgroundColor: "#f0fdf4" }}>
+                                  <div className="d-flex align-items-center gap-2 mb-2">
+                                    <i className="bi bi-person-fill" style={{ color: "#16a34a", fontSize: "14px" }}></i>
+                                    <span className="fw-bold text-uppercase" style={{ fontSize: "10px", color: "#16a34a", letterSpacing: "1px" }}>Customer</span>
+                                  </div>
+                                  <p className="text-dark mb-0" style={{ fontSize: "13.5px", lineHeight: "1.7" }}>{customerLines}</p>
+                                </div>
+                              )}
+                            </>
+                          );
                         }
-                      } catch (e) {}
+                      } catch (e) { }
                       return (
                         <p className="text-secondary text-center my-4 small">
                           No readable dialogue turns available.
@@ -1577,9 +1590,9 @@ export default function CallsWorkspace({
                   View Details
                 </Link>
               )}
-              <button 
-                type="button" 
-                className="btn btn-secondary px-4" 
+              <button
+                type="button"
+                className="btn btn-secondary px-4"
                 onClick={() => setActiveModalLog(null)}
               >
                 Close

@@ -36,7 +36,7 @@ export default function DashboardLayout({ children, userRole = "ADMIN", userName
       title: "MAIN MENU",
       items: [
         { title: "Dashboard", icon: "bi-grid", path: "/admin" },
-        { title: "Call Logs", icon: "bi-telephone-outbound", path: "/admin/calls" },
+        { title: "Calls", icon: "bi-telephone-outbound", path: "/admin/calls" },
         { title: "Leads", icon: "bi-person-badge", path: "/admin/leads" },
         { 
           title: "Agents", 

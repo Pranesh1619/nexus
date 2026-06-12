@@ -111,6 +111,7 @@ export default function AgentDetailsWorkspace({ agent }: AgentDetailsWorkspacePr
   const [leadSearchQuery, setLeadSearchQuery] = useState("");
   const [callSearchQuery, setCallSearchQuery] = useState("");
   const [selectedCallDetail, setSelectedCallDetail] = useState<CallLog | null>(null);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
 
   const [isMounted, setIsMounted] = useState(false);
   React.useEffect(() => {
@@ -182,6 +183,17 @@ export default function AgentDetailsWorkspace({ agent }: AgentDetailsWorkspacePr
         l.phone.includes(q)
     );
   }, [agent.leads, leadSearchQuery]);
+
+  const selectedLead = useMemo(() => {
+    if (filteredLeads.length === 0) return null;
+    const found = filteredLeads.find((l) => l.id === selectedLeadId);
+    return found || filteredLeads[0];
+  }, [filteredLeads, selectedLeadId]);
+
+  const selectedLeadCalls = useMemo(() => {
+    if (!selectedLead) return [];
+    return agent.calls.filter((c) => c.leadId === selectedLead.id);
+  }, [agent.calls, selectedLead]);
 
   const filteredCalls = useMemo(() => {
     if (!callSearchQuery) return agent.calls;
@@ -303,115 +315,171 @@ export default function AgentDetailsWorkspace({ agent }: AgentDetailsWorkspacePr
               </div>
             </div>
 
-            <div className="card-body p-4 pt-2">
+            <div className="card-body p-0 border-top">
               {filteredLeads.length === 0 ? (
                 <div className="text-center py-5 text-secondary small">
                   No assigned leads match this search.
                 </div>
               ) : (
-                <div className="table-responsive">
-                  <table className="table table-hover align-middle mb-0">
-                    <thead className="table-light">
-                      <tr>
-                        <th className="border-0 small text-secondary">Lead Name</th>
-                        <th className="border-0 small text-secondary">Company</th>
-                        <th className="border-0 small text-secondary">Status</th>
-                        <th className="border-0 small text-secondary">Lead Temperature</th>
-                        <th className="border-0 small text-secondary">Calls Made</th>
-                        <th className="border-0 small text-secondary">Source</th>
-                        <th className="border-0 small text-secondary text-end">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                <div className="row g-0">
+                  {/* Left Sidebar (25% width) */}
+                  <div className="col-12 col-md-3 border-end" style={{ maxHeight: "550px", overflowY: "auto" }}>
+                    <div className="list-group list-group-flush">
                       {filteredLeads.map((lead) => {
-                        const isWon = lead.status === "WON" || lead.status === "CLOSED_WON";
-                        const isLost = lead.status === "LOST" || lead.status === "CLOSED_LOST";
-
-                        let pillBg = "rgba(0, 167, 111, 0.12)";
-                        let pillColor = "#00a76f";
-                        if (isWon) {
-                          pillBg = "rgba(255, 193, 7, 0.12)";
-                          pillColor = "#ffc107";
-                        } else if (isLost) {
-                          pillBg = "rgba(220, 53, 69, 0.12)";
-                          pillColor = "#dc3545";
-                        } else if (lead.status === "QUALIFIED") {
-                          pillBg = "rgba(13, 110, 253, 0.12)";
-                          pillColor = "#0d6efd";
-                        } else if (lead.status === "CONTACTED") {
-                          pillBg = "rgba(23, 162, 184, 0.12)";
-                          pillColor = "#17a2b8";
-                        }
-
-                        // Determine Temperature: Hot, Warm, Cold
+                        const isSelected = selectedLead && lead.id === selectedLead.id;
                         const hasCalls = lead.calls && lead.calls.length > 0;
+                        const isWon = lead.status === "WON" || lead.status === "CLOSED_WON";
+                        
+                        // Temperature badge logic
                         const maxAiScore = hasCalls
                           ? Math.max(...lead.calls.map(c => c.aiScore || 0))
                           : 0;
-                        
-                        let tempLabel = "Cold";
-                        let tempColor = "#0284c7"; // Cold Blue
-                        let tempBg = "rgba(2, 132, 199, 0.12)";
                         let tempIcon = "❄️";
-
+                        let tempColor = "#0284c7";
+                        let tempBg = "rgba(2, 132, 199, 0.12)";
                         if (isWon || maxAiScore >= 80) {
-                          tempLabel = "Hot";
-                          tempColor = "#dc3545"; // Hot Red
-                          tempBg = "rgba(220, 53, 69, 0.12)";
                           tempIcon = "🔥";
+                          tempColor = "#dc3545";
+                          tempBg = "rgba(220, 53, 69, 0.12)";
                         } else if (lead.status === "QUALIFIED" || lead.status === "CONTACTED" || maxAiScore >= 50) {
-                          tempLabel = "Warm";
-                          tempColor = "#f59e0b"; // Warm Orange
-                          tempBg = "rgba(245, 158, 11, 0.12)";
                           tempIcon = "☀️";
+                          tempColor = "#f59e0b";
+                          tempBg = "rgba(245, 158, 11, 0.12)";
                         }
 
                         return (
-                          <tr key={lead.id}>
-                            <td>
-                              <div>
-                                <div className="fw-bold text-dark" style={{ fontSize: "13.5px" }}>{lead.name}</div>
-                                <div className="text-secondary" style={{ fontSize: "11.5px" }}>{lead.phone}</div>
-                              </div>
-                            </td>
-                            <td className="text-secondary fw-semibold" style={{ fontSize: "13.5px" }}>
-                              {lead.company || "—"}
-                            </td>
-                            <td>
-                              <span className="badge rounded-pill px-3 py-1 fw-bold" style={{ backgroundColor: pillBg, color: pillColor, fontSize: "10.5px" }}>
-                                {lead.status}
+                          <button
+                            key={lead.id}
+                            onClick={() => setSelectedLeadId(lead.id)}
+                            className="list-group-item list-group-item-action border-0 px-3 py-3 d-flex flex-column gap-1 transition-all"
+                            style={{
+                              backgroundColor: isSelected ? "#f8fafc" : "transparent",
+                              borderLeft: isSelected ? "4px solid #00A76F" : "4px solid transparent",
+                              outline: "none"
+                            }}
+                            type="button"
+                          >
+                            <div className="d-flex justify-content-between align-items-center">
+                              <span className="fw-bold text-dark text-truncate" style={{ fontSize: "13px", maxWidth: "70%" }}>
+                                {lead.name}
                               </span>
-                            </td>
-                            <td>
-                              <span className="badge rounded-pill px-3 py-1 fw-bold" style={{ backgroundColor: tempBg, color: tempColor, fontSize: "10.5px" }}>
-                                <span className="me-1">{tempIcon}</span>{tempLabel}
+                              <span className="badge rounded-pill px-2 py-0.5 fw-bold" style={{ backgroundColor: tempBg, color: tempColor, fontSize: "9px" }}>
+                                {tempIcon}
                               </span>
-                            </td>
-                            <td>
-                              <span className="fw-bold text-dark" style={{ fontSize: "13.5px" }}>
-                                <i className="bi bi-telephone-outbound text-secondary me-2" style={{ fontSize: "12px" }}></i>
-                                {lead.calls.length} calls
-                              </span>
-                            </td>
-                            <td>
-                              <span className="badge bg-light text-secondary border px-2 py-1 text-uppercase font-monospace" style={{ fontSize: "10px" }}>
-                                {lead.source || "WEBSITE"}
-                              </span>
-                            </td>
-                            <td className="text-end">
-                              <Link
-                                href={`/admin/leads/${lead.id}`}
-                                className="btn btn-sm btn-light border-0 text-primary"
-                                title="View Lead Details"
-                              >
-                                <i className="bi bi-eye"></i>
-                              </Link>
-                            </td>
-                          </tr>
+                            </div>
+                            <div className="d-flex justify-content-between align-items-center text-secondary" style={{ fontSize: "11px" }}>
+                              <span className="text-truncate" style={{ maxWidth: "70%" }}>{lead.company || "No Company"}</span>
+                              <span className="fw-bold text-primary">{lead.calls.length} calls</span>
+                            </div>
+                          </button>
                         );
                       })}
-                    </tbody>
-                  </table>
+                    </div>
+                  </div>
+
+                  {/* Right Panel (75% width) */}
+                  <div className="col-12 col-md-9 p-4" style={{ minHeight: "450px", maxHeight: "550px", overflowY: "auto" }}>
+                    {selectedLead ? (
+                      <div>
+                        {/* Lead Overview Card */}
+                        <div className="card border border-light-subtle bg-light bg-opacity-25 p-3 mb-4 rounded-3 shadow-sm">
+                          <div className="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                            <div>
+                              <div className="d-flex align-items-center gap-2 mb-1">
+                                <h5 className="fw-bold text-dark mb-0">{selectedLead.name}</h5>
+                                <Link 
+                                  href={`/admin/leads/${selectedLead.id}`}
+                                  className="btn btn-sm btn-light border-0 text-primary p-0.5 rounded-circle d-inline-flex"
+                                  title="View Full Lead Profile"
+                                >
+                                  <i className="bi bi-arrow-up-right-square-fill fs-5"></i>
+                                </Link>
+                              </div>
+                              <p className="text-secondary small mb-0 d-flex flex-wrap align-items-center gap-3" style={{ fontSize: "12px" }}>
+                                {selectedLead.company && (
+                                  <span><i className="bi bi-building me-1"></i>{selectedLead.company}</span>
+                                )}
+                                <span><i className="bi bi-telephone me-1"></i>{selectedLead.phone}</span>
+                                {selectedLead.email && (
+                                  <span><i className="bi bi-envelope me-1"></i>{selectedLead.email}</span>
+                                )}
+                              </p>
+                            </div>
+                            
+                            <div className="d-flex gap-2 align-items-center">
+                              <span 
+                                className="badge rounded-pill px-2.5 py-1.5 fw-bold" 
+                                style={{ 
+                                  backgroundColor: selectedLead.status === "WON" || selectedLead.status === "CLOSED_WON" ? "rgba(0, 167, 111, 0.12)" : 
+                                                 selectedLead.status === "LOST" || selectedLead.status === "CLOSED_LOST" ? "rgba(220, 53, 69, 0.12)" :
+                                                 selectedLead.status === "QUALIFIED" ? "rgba(13, 110, 253, 0.12)" : "rgba(23, 162, 184, 0.12)", 
+                                  color: selectedLead.status === "WON" || selectedLead.status === "CLOSED_WON" ? "#00a76f" : 
+                                         selectedLead.status === "LOST" || selectedLead.status === "CLOSED_LOST" ? "#dc3545" :
+                                         selectedLead.status === "QUALIFIED" ? "#0d6efd" : "#17a2b8", 
+                                  fontSize: "10px" 
+                                }}
+                              >
+                                {selectedLead.status}
+                              </span>
+                              <span className="badge bg-light text-secondary border px-2.5 py-1.5 text-uppercase font-monospace" style={{ fontSize: "9.5px" }}>
+                                {selectedLead.source || "COLD_CALL"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Customer Requirements / Needs (Consolidated from Calls) */}
+                        <div className="mb-2">
+                          <h6 className="fw-bold text-dark mb-3" style={{ fontSize: "14px" }}>
+                            <i className="bi bi-clipboard-check text-primary me-2"></i>
+                            Customer Requirements & Discussion Topics
+                          </h6>
+                          
+                          {selectedLeadCalls.length === 0 ? (
+                            <div className="text-center py-5 bg-light rounded-3 text-secondary small border border-dashed">
+                              <i className="bi bi-info-circle fs-3 text-muted d-block mb-2"></i>
+                              No requirements gathered yet. Click "Start Call" above to log the first interaction.
+                            </div>
+                          ) : (
+                            <div className="d-flex flex-column gap-3">
+                              {selectedLeadCalls.map((call) => {
+                                const hasAnalysis = call.analysis && !call.analysis.includes("Waiting for Twilio");
+                                return (
+                                  <div key={call.id} className="card border-0 bg-light p-3 rounded-3">
+                                    <div className="d-flex justify-content-between align-items-center mb-2">
+                                      <span className="badge bg-white text-secondary border fw-bold" style={{ fontSize: "9.5px" }}>
+                                        STAGE: {call.stage}
+                                      </span>
+                                      <span className="x-small text-muted font-monospace">
+                                        {new Date(call.createdAt).toLocaleDateString("en-IN", {
+                                          day: "numeric",
+                                          month: "short",
+                                          year: "numeric"
+                                        })}
+                                      </span>
+                                    </div>
+                                    <p className="text-dark mb-0 small fw-medium" style={{ lineHeight: "1.5" }}>
+                                      {hasAnalysis ? call.analysis : "Call completed. No specific requirements were captured."}
+                                    </p>
+                                    {call.aiScore !== null && call.aiScore > 0 && (
+                                      <div className="mt-2 text-success fw-bold x-small d-flex align-items-center gap-1">
+                                        <i className="bi bi-robot"></i>
+                                        <span>AI Qualification Score: {call.aiScore}%</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-5 text-secondary small">
+                        Select a lead from the sidebar to view requirements.
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
