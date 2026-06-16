@@ -4,6 +4,7 @@ import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { deleteCallLog } from "./actions";
+import { CustomAudioPlayer } from "./CallsWorkspace";
 
 export interface CallLogListItem {
   id: string;
@@ -33,6 +34,7 @@ export interface CallLogListItem {
   receiverPhone?: string | null;
   startTime?: string | Date | null;
   jobId?: string | null;
+  audioUrl?: string | null;
 }
 
 // Consistent scoring logic for the list view
@@ -533,7 +535,7 @@ export default function CallList({ logs }: { logs: CallLogListItem[] }) {
               </div>
 
               {modalDetailTab === "transcript" ? (
-                <div className="d-flex flex-column gap-3">
+                <div className="d-flex flex-column gap-3 animate-fade">
                   {(() => {
                     try {
                       const rawTurns = JSON.parse(activeModalLog.transcript || "[]");
@@ -543,28 +545,70 @@ export default function CallList({ logs }: { logs: CallLogListItem[] }) {
                           const last = turns[turns.length - 1];
                           if (last && last.speaker === turn.speaker) {
                             last.text = (last.text + " " + turn.text).trim();
-                            if (turn.translation) {
-                              last.translation = ((last.translation || "") + " " + turn.translation).trim();
+                            if (turn.translation || last.translation) {
+                              last.translation = ((last.translation || "") + " " + (turn.translation || "")).trim();
                             }
                           } else {
                             turns.push({ ...turn });
                           }
                         });
-                        return turns.map((turn: any, idx: number) => {
-                          const isAgent = turn.speaker === "Agent";
-                          const speakerName = isAgent ? activeModalLog.user?.name : activeModalLog.lead.name;
-                          return (
-                            <div key={idx} className={`p-3 rounded-3 ${isAgent ? "bg-white border-start border-primary border-3 shadow-sm" : "bg-success bg-opacity-10 border-end border-success border-3 text-end shadow-sm"}`}>
-                              <div className="fw-bold mb-1" style={{ fontSize: "10px", color: isAgent ? "#0d6efd" : "#198754" }}>
-                                {speakerName} • {turn.time}
-                              </div>
-                              <div className="text-dark fw-medium" style={{ fontSize: "13.5px" }}>{turn.text}</div>
-                              {turn.translation && turn.translation !== turn.text && (
-                                <div className="text-secondary mt-1.5 border-top pt-1.5" style={{ fontSize: "11px" }}>Translation: {turn.translation}</div>
-                              )}
-                            </div>
-                          );
-                        });
+                        return (
+                          <div className="d-flex flex-column gap-3">
+                            {turns.map((turn: any, idx: number) => {
+                              const isAgent = turn.speaker === "Agent";
+                              const speakerName = isAgent ? (activeModalLog.user?.name || "Agent") : (activeModalLog.lead?.name || "Lead");
+                              const showTranslation = !!turn.translation && turn.translation !== turn.text;
+                              
+                              return (
+                                <div key={idx} className={`d-flex gap-3 align-items-start ${isAgent ? "" : "flex-row-reverse"}`}>
+                                  <div 
+                                    className={`rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center shadow-sm fw-bold text-white ${
+                                      isAgent ? "bg-primary" : "bg-success"
+                                    }`} 
+                                    style={{ width: 36, height: 36, fontSize: 13 }}
+                                  >
+                                    {isAgent ? "A" : "L"}
+                                  </div>
+                                  <div 
+                                    className={`p-3 rounded-4 flex-grow-1 shadow-sm border ${
+                                      isAgent 
+                                        ? "bg-white border-light-subtle text-start" 
+                                        : "bg-success bg-opacity-10 border-success border-opacity-20 text-end"
+                                    }`}
+                                    style={{ maxWidth: "80%" }}
+                                  >
+                                    <div className={`d-flex justify-content-between align-items-center mb-1.5 ${isAgent ? "" : "flex-row-reverse"}`}>
+                                      <span className={`fw-bold small ${isAgent ? "text-primary" : "text-success"}`}>
+                                        {speakerName}
+                                      </span>
+                                      <span className="x-small text-secondary font-monospace">{turn.time}</span>
+                                    </div>
+                                    <div className="d-flex flex-column gap-1">
+                                      {showTranslation && (
+                                        <div className={`x-small text-muted mb-0.5 ${isAgent ? "text-start" : "text-end"}`}>
+                                          <span className="badge bg-secondary bg-opacity-10 text-secondary" style={{ fontSize: "9px" }}>ORIGINAL SPEECH</span>
+                                        </div>
+                                      )}
+                                      <p className="small mb-0 text-dark fw-medium" style={{ wordBreak: "break-word", lineHeight: "1.5" }}>
+                                        {turn.text}
+                                      </p>
+                                    </div>
+                                    {showTranslation && (
+                                      <div className={`mt-2 pt-2 border-top border-secondary border-opacity-10 x-small text-muted ${isAgent ? "text-start" : "text-end"}`}>
+                                        <div className="mb-1">
+                                          <span className="badge bg-success bg-opacity-15" style={{ fontSize: "9px", letterSpacing: "0.5px" }}>TRANSLATED TO ENGLISH</span>
+                                        </div>
+                                        <div className="mt-1 font-monospace fw-semibold text-secondary" style={{ whiteSpace: "pre-wrap" }}>
+                                          {turn.translation}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
                       }
                     } catch (e) {
                       // ignore json error
@@ -596,14 +640,9 @@ export default function CallList({ logs }: { logs: CallLogListItem[] }) {
 
                   <div className="d-flex flex-column align-items-center w-100 p-3 bg-light rounded-3">
                     <span className="text-secondary fw-bold small uppercase mb-2" style={{ fontSize: "10px", letterSpacing: "1px" }}>PLAY RECORDING</span>
-                    <audio
-                      controls
-                      className="w-100"
-                      src={
-                        activeModalLog.jobId && !activeModalLog.jobId.startsWith("mock_")
-                          ? `/api/recordings/${activeModalLog.jobId}`
-                          : `/recordings/2026-06-10_17-20-59_CA4a1c848d5af71a94d102a3647ce98a47.wav`
-                      }
+                    <CustomAudioPlayer
+                      src={activeModalLog.jobId ? `/api/recordings/${activeModalLog.jobId}` : (activeModalLog.audioUrl || "")}
+                      initialDuration={activeModalLog.duration || 0}
                     />
                   </div>
                 </div>

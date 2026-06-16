@@ -21,7 +21,7 @@ export default function DashboardLayout({ children, userRole = "ADMIN", userName
       }
     }
     fetchCrmStatus();
-  }, [pathname]); // Refresh when page changes to keep status fresh
+  }, []); // Run once on mount to avoid triggering on every navigation
 
 
   interface SidebarItem {
@@ -48,7 +48,7 @@ export default function DashboardLayout({ children, userRole = "ADMIN", userName
             ]
           } : {})
         },
-        { title: "Deals", icon: "bi-kanban", path: "/admin/deals" },
+        // { title: "Deals", icon: "bi-kanban", path: "/admin/deals" },
         ...(userRole === "ADMIN" ? [
           { title: "Users", icon: "bi-people", path: "/admin/users" }
         ] : []),

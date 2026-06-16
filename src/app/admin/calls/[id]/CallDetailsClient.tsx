@@ -152,7 +152,7 @@ export default function CallDetailsClient({
 }: CallDetailsClientProps) {
   const router = useRouter();
   const [simulating, setSimulating] = useState(false);
-  const [activeTab, setActiveTab] = useState<"requirement" | "overall" | "transcript" | "recording">("requirement");
+  const [activeTab, setActiveTab] = useState<"requirement" | "overall" | "transcript" | "recording">("transcript");
   const [overallSummary, setOverallSummary] = useState<string>("");
   const [loadingOverall, setLoadingOverall] = useState<boolean>(false);
 

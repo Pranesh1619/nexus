@@ -20,7 +20,7 @@ interface CustomAudioPlayerProps {
   initialDuration?: number;
 }
 
-function CustomAudioPlayer({ src, initialDuration }: CustomAudioPlayerProps) {
+export function CustomAudioPlayer({ src, initialDuration }: CustomAudioPlayerProps) {
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -183,7 +183,7 @@ export default function CallsWorkspace({
   );
 
   const [activeModalLog, setActiveModalLog] = useState<any | null>(null);
-  const [modalDetailTab, setModalDetailTab] = useState<"requirement" | "overall" | "transcript" | "recording">("requirement");
+  const [modalDetailTab, setModalDetailTab] = useState<"requirement" | "overall" | "transcript" | "recording">("transcript");
 
   // Lead Selection
   const [selectedLeadId, setSelectedLeadId] = useState<string>(
@@ -262,14 +262,14 @@ export default function CallsWorkspace({
   const [loadingOverall, setLoadingOverall] = useState<boolean>(false);
 
   // States for Post-Call Summary Tabs
-  const [postCallSummaryTab, setPostCallSummaryTab] = useState<"requirement" | "overall" | "transcript" | "recording">("requirement");
+  const [postCallSummaryTab, setPostCallSummaryTab] = useState<"requirement" | "overall" | "transcript" | "recording">("transcript");
   const [postCallOverallSummary, setPostCallOverallSummary] = useState<string>("");
   const [loadingPostCallOverall, setLoadingPostCallOverall] = useState<boolean>(false);
 
   // Reset modal summary states when opening a different call log in modal
   useEffect(() => {
     if (activeModalLog) {
-      setModalDetailTab("requirement");
+      setModalDetailTab("transcript");
       setOverallSummary("");
       setLoadingOverall(false);
     }
@@ -278,7 +278,7 @@ export default function CallsWorkspace({
   // Reset post-call summary states when last call summary changes
   useEffect(() => {
     if (lastCallSummary) {
-      setPostCallSummaryTab("requirement");
+      setPostCallSummaryTab("transcript");
       setPostCallOverallSummary("");
       setLoadingPostCallOverall(false);
     }
@@ -1021,31 +1021,76 @@ export default function CallsWorkspace({
                           <div className="d-flex flex-column gap-3">
                             {(() => {
                               try {
-                                const turns = JSON.parse(lastCallSummary.transcript || "[]");
-                                if (Array.isArray(turns) && turns.length > 0) {
-                                  const agentLines = turns.filter((t: any) => t.speaker === "Agent").map((t: any) => t.translation || t.text).join(" ");
-                                  const customerLines = turns.filter((t: any) => t.speaker !== "Agent").map((t: any) => t.translation || t.text).join(" ");
+                                const rawTurns = JSON.parse(lastCallSummary.transcript || "[]");
+                                if (Array.isArray(rawTurns) && rawTurns.length > 0) {
+                                  const turns: any[] = [];
+                                  rawTurns.forEach((turn: any) => {
+                                    const last = turns[turns.length - 1];
+                                    if (last && last.speaker === turn.speaker) {
+                                      last.text = (last.text + " " + turn.text).trim();
+                                      if (turn.translation || last.translation) {
+                                        last.translation = ((last.translation || "") + " " + (turn.translation || "")).trim();
+                                      }
+                                    } else {
+                                      turns.push({ ...turn });
+                                    }
+                                  });
                                   return (
-                                    <>
-                                      {agentLines && (
-                                        <div className="p-3 rounded-0 border-start border-3" style={{ borderColor: "#2563eb", backgroundColor: "#eff6ff" }}>
-                                          <div className="d-flex align-items-center gap-2 mb-2">
-                                            <i className="bi bi-headset" style={{ color: "#2563eb", fontSize: "14px" }}></i>
-                                            <span className="fw-bold text-uppercase" style={{ fontSize: "10px", color: "#2563eb", letterSpacing: "1px" }}>Agent</span>
+                                    <div className="d-flex flex-column gap-3">
+                                      {turns.map((turn: any, idx: number) => {
+                                        const isAgent = turn.speaker === "Agent";
+                                        const speakerName = isAgent ? "Agent" : (selectedLead?.name || "Lead");
+                                        const showTranslation = !!turn.translation && turn.translation !== turn.text;
+                                        
+                                        return (
+                                          <div key={idx} className={`d-flex gap-3 align-items-start ${isAgent ? "" : "flex-row-reverse"}`}>
+                                            <div 
+                                              className={`rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center shadow-sm fw-bold text-white ${
+                                                isAgent ? "bg-primary" : "bg-success"
+                                              }`} 
+                                              style={{ width: 36, height: 36, fontSize: 13 }}
+                                            >
+                                              {isAgent ? "A" : "L"}
+                                            </div>
+                                            <div 
+                                              className={`p-3 rounded-4 flex-grow-1 shadow-sm border ${
+                                                isAgent 
+                                                  ? "bg-white border-light-subtle text-start" 
+                                                  : "bg-success bg-opacity-10 border-success border-opacity-20 text-end"
+                                              }`}
+                                              style={{ maxWidth: "80%" }}
+                                            >
+                                              <div className={`d-flex justify-content-between align-items-center mb-1.5 ${isAgent ? "" : "flex-row-reverse"}`}>
+                                                <span className={`fw-bold small ${isAgent ? "text-primary" : "text-success"}`}>
+                                                  {speakerName}
+                                                </span>
+                                                <span className="x-small text-secondary font-monospace">{turn.time}</span>
+                                              </div>
+                                              <div className="d-flex flex-column gap-1">
+                                                {showTranslation && (
+                                                  <div className={`x-small text-muted mb-0.5 ${isAgent ? "text-start" : "text-end"}`}>
+                                                    <span className="badge bg-secondary bg-opacity-10 text-secondary" style={{ fontSize: "9px" }}>ORIGINAL SPEECH</span>
+                                                  </div>
+                                                )}
+                                                <p className="small mb-0 text-dark fw-medium" style={{ wordBreak: "break-word", lineHeight: "1.5" }}>
+                                                  {turn.text}
+                                                </p>
+                                              </div>
+                                              {showTranslation && (
+                                                <div className={`mt-2 pt-2 border-top border-secondary border-opacity-10 x-small text-muted ${isAgent ? "text-start" : "text-end"}`}>
+                                                  <div className="mb-1">
+                                                    <span className="badge bg-success bg-opacity-15" style={{ fontSize: "9px", letterSpacing: "0.5px" }}>TRANSLATED TO ENGLISH</span>
+                                                  </div>
+                                                  <div className="mt-1 font-monospace fw-semibold text-secondary" style={{ whiteSpace: "pre-wrap" }}>
+                                                    {turn.translation}
+                                                  </div>
+                                                </div>
+                                              )}
+                                            </div>
                                           </div>
-                                          <p className="small text-dark mb-0" style={{ lineHeight: "1.7" }}>{agentLines}</p>
-                                        </div>
-                                      )}
-                                      {customerLines && (
-                                        <div className="p-3 rounded-0 border-start border-3" style={{ borderColor: "#16a34a", backgroundColor: "#f0fdf4" }}>
-                                          <div className="d-flex align-items-center gap-2 mb-2">
-                                            <i className="bi bi-person-fill" style={{ color: "#16a34a", fontSize: "14px" }}></i>
-                                            <span className="fw-bold text-uppercase" style={{ fontSize: "10px", color: "#16a34a", letterSpacing: "1px" }}>Customer</span>
-                                          </div>
-                                          <p className="small text-dark mb-0" style={{ lineHeight: "1.7" }}>{customerLines}</p>
-                                        </div>
-                                      )}
-                                    </>
+                                        );
+                                      })}
+                                    </div>
                                   );
                                 }
                               } catch (e) { }
@@ -1108,9 +1153,9 @@ export default function CallsWorkspace({
                       </div>
 
                       {/* 2. Outbound Telephony Dialer Widget */}
-                      <div className="row g-4">
-                        <div className="col-lg-6">
-                          <div className="card border p-4 h-100 bg-white" style={{ borderRadius: "16px", borderColor: "#cbd5e1" }}>
+                      <div className="row justify-content-center">
+                        <div className="col-12 col-md-8 col-lg-6">
+                          <div className="card border p-4 bg-white" style={{ borderRadius: "16px", borderColor: "#cbd5e1" }}>
 
                             {/* Calling Visualizer Header */}
                             <div className="text-center mb-4 pb-3 border-bottom">
@@ -1221,45 +1266,6 @@ export default function CallsWorkspace({
                               )}
                             </div>
 
-                          </div>
-                        </div>
-
-                        {/* Signaling Protocol Terminal Logs */}
-                        <div className="col-lg-6">
-                          <div className="card bg-dark border-0 shadow-sm h-100 d-flex flex-column" style={{ borderRadius: "16px", minHeight: "300px" }}>
-                            <div className="card-header bg-transparent border-bottom border-secondary border-opacity-25 py-2 px-3 d-flex justify-content-between align-items-center">
-                              <span className="text-secondary small fw-bold font-monospace">sip_protocol_logs.sh</span>
-                              <button onClick={clearTerminal} className="btn btn-outline-secondary btn-xs border-0 text-secondary" style={{ fontSize: "10px" }}>
-                                Clear
-                              </button>
-                            </div>
-
-                            <div
-                              ref={consoleContainerRef}
-                              className="card-body p-3 font-monospace overflow-auto bg-black bg-opacity-75 flex-grow-1"
-                              style={{ height: "240px", fontSize: "11px", color: "#00FF66", lineHeight: "1.4" }}
-                            >
-                              {terminalLogs.length === 0 ? (
-                                <div className="text-secondary opacity-50 text-center py-5">
-                                  -- Waiting for SIP session activity... --
-                                </div>
-                              ) : (
-                                terminalLogs.map((log, idx) => {
-                                  let logClass = "text-light-green";
-                                  if (log.includes("[TX]")) logClass = "text-cyan";
-                                  if (log.includes("[RX]")) logClass = "text-warning";
-                                  if (log.includes("[SYSTEM]")) logClass = "text-secondary opacity-75";
-                                  if (log.includes("[ERROR]")) logClass = "text-danger fw-bold";
-                                  if (log.includes("[MEDIA]")) logClass = "text-purple";
-
-                                  return (
-                                    <div key={idx} className={`mb-1 ${logClass}`} style={{ whiteSpace: "pre-wrap" }}>
-                                      {log}
-                                    </div>
-                                  );
-                                })
-                              )}
-                            </div>
                           </div>
                         </div>
                       </div>
@@ -1508,29 +1514,74 @@ export default function CallsWorkspace({
                       try {
                         const rawTurns = JSON.parse(activeModalLog.transcript || "[]");
                         if (Array.isArray(rawTurns) && rawTurns.length > 0) {
-                          const agentLines = rawTurns.filter((t: any) => t.speaker === "Agent").map((t: any) => t.translation || t.text).join(" ");
-                          const customerLines = rawTurns.filter((t: any) => t.speaker !== "Agent").map((t: any) => t.translation || t.text).join(" ");
+                          const turns: any[] = [];
+                          rawTurns.forEach((turn: any) => {
+                            const last = turns[turns.length - 1];
+                            if (last && last.speaker === turn.speaker) {
+                              last.text = (last.text + " " + turn.text).trim();
+                              if (turn.translation || last.translation) {
+                                last.translation = ((last.translation || "") + " " + (turn.translation || "")).trim();
+                              }
+                            } else {
+                              turns.push({ ...turn });
+                            }
+                          });
                           return (
-                            <>
-                              {agentLines && (
-                                <div className="p-3 rounded-0 border-start border-3" style={{ borderColor: "#2563eb", backgroundColor: "#eff6ff" }}>
-                                  <div className="d-flex align-items-center gap-2 mb-2">
-                                    <i className="bi bi-headset" style={{ color: "#2563eb", fontSize: "14px" }}></i>
-                                    <span className="fw-bold text-uppercase" style={{ fontSize: "10px", color: "#2563eb", letterSpacing: "1px" }}>Agent</span>
+                            <div className="d-flex flex-column gap-3">
+                              {turns.map((turn: any, idx: number) => {
+                                const isAgent = turn.speaker === "Agent";
+                                const speakerName = isAgent ? (activeModalLog.user?.name || "Agent") : (selectedLead?.name || "Lead");
+                                const showTranslation = !!turn.translation && turn.translation !== turn.text;
+                                
+                                return (
+                                  <div key={idx} className={`d-flex gap-3 align-items-start ${isAgent ? "" : "flex-row-reverse"}`}>
+                                    <div 
+                                      className={`rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center shadow-sm fw-bold text-white ${
+                                        isAgent ? "bg-primary" : "bg-success"
+                                      }`} 
+                                      style={{ width: 36, height: 36, fontSize: 13 }}
+                                    >
+                                      {isAgent ? "A" : "L"}
+                                    </div>
+                                    <div 
+                                      className={`p-3 rounded-4 flex-grow-1 shadow-sm border ${
+                                        isAgent 
+                                          ? "bg-white border-light-subtle text-start" 
+                                          : "bg-success bg-opacity-10 border-success border-opacity-20 text-end"
+                                      }`}
+                                      style={{ maxWidth: "80%" }}
+                                    >
+                                      <div className={`d-flex justify-content-between align-items-center mb-1.5 ${isAgent ? "" : "flex-row-reverse"}`}>
+                                        <span className={`fw-bold small ${isAgent ? "text-primary" : "text-success"}`}>
+                                          {speakerName}
+                                        </span>
+                                        <span className="x-small text-secondary font-monospace">{turn.time}</span>
+                                      </div>
+                                      <div className="d-flex flex-column gap-1">
+                                        {showTranslation && (
+                                          <div className={`x-small text-muted mb-0.5 ${isAgent ? "text-start" : "text-end"}`}>
+                                            <span className="badge bg-secondary bg-opacity-10 text-secondary" style={{ fontSize: "9px" }}>ORIGINAL SPEECH</span>
+                                          </div>
+                                        )}
+                                        <p className="small mb-0 text-dark fw-medium" style={{ wordBreak: "break-word", lineHeight: "1.5" }}>
+                                          {turn.text}
+                                        </p>
+                                      </div>
+                                      {showTranslation && (
+                                        <div className={`mt-2 pt-2 border-top border-secondary border-opacity-10 x-small text-muted ${isAgent ? "text-start" : "text-end"}`}>
+                                          <div className="mb-1">
+                                            <span className="badge bg-success bg-opacity-15" style={{ fontSize: "9px", letterSpacing: "0.5px" }}>TRANSLATED TO ENGLISH</span>
+                                          </div>
+                                          <div className="mt-1 font-monospace fw-semibold text-secondary" style={{ whiteSpace: "pre-wrap" }}>
+                                            {turn.translation}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
-                                  <p className="text-dark mb-0" style={{ fontSize: "13.5px", lineHeight: "1.7" }}>{agentLines}</p>
-                                </div>
-                              )}
-                              {customerLines && (
-                                <div className="p-3 rounded-0 border-start border-3" style={{ borderColor: "#16a34a", backgroundColor: "#f0fdf4" }}>
-                                  <div className="d-flex align-items-center gap-2 mb-2">
-                                    <i className="bi bi-person-fill" style={{ color: "#16a34a", fontSize: "14px" }}></i>
-                                    <span className="fw-bold text-uppercase" style={{ fontSize: "10px", color: "#16a34a", letterSpacing: "1px" }}>Customer</span>
-                                  </div>
-                                  <p className="text-dark mb-0" style={{ fontSize: "13.5px", lineHeight: "1.7" }}>{customerLines}</p>
-                                </div>
-                              )}
-                            </>
+                                );
+                              })}
+                            </div>
                           );
                         }
                       } catch (e) { }
@@ -1564,14 +1615,9 @@ export default function CallsWorkspace({
 
                     <div className="d-flex flex-column align-items-center w-100 p-3 bg-light rounded-0 border-start border-primary border-3">
                       <span className="text-secondary fw-bold small uppercase mb-2" style={{ fontSize: "10px", letterSpacing: "1px" }}>PLAY RECORDING</span>
-                      <audio
-                        controls
-                        className="w-100"
-                        src={
-                          activeModalLog.jobId && !activeModalLog.jobId.startsWith("mock_")
-                            ? `/api/recordings/${activeModalLog.jobId}`
-                            : `/recordings/2026-06-10_17-20-59_CA4a1c848d5af71a94d102a3647ce98a47.wav`
-                        }
+                      <CustomAudioPlayer
+                        src={activeModalLog.jobId ? `/api/recordings/${activeModalLog.jobId}` : (activeModalLog.audioUrl || "")}
+                        initialDuration={activeModalLog.duration || 0}
                       />
                     </div>
                   </div>

@@ -584,7 +584,7 @@ export async function transcribeAndAnalyzeRecording(
     // for direct, high-quality multimodal audio transcription and speaker classification.
     const geminiKey = process.env.GEMINI_API_KEY;
     if (geminiKey) {
-      console.log("[Gemini] GEMINI_API_KEY detected. Using Gemini 1.5 Flash for transcription and analysis...");
+      console.log("[Gemini] GEMINI_API_KEY detected. Using Gemini 2.5 Flash for transcription and analysis...");
       const uploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${geminiKey}`;
       const uploadMetadata = {
         file: {
@@ -627,7 +627,7 @@ export async function transcribeAndAnalyzeRecording(
       const fileName = uploadData.file.name;
       console.log(`[Gemini] Audio uploaded successfully. File URI: ${fileUri}`);
 
-      const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+      const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
       const promptText = `
 You are an advanced BPO quality analyst and CRM sync tool.
 Analyze this audio recording of a telephone sales call between Agent: "${agentName}" and Lead: "${leadName}".
@@ -734,30 +734,34 @@ Ensure the output is valid JSON. Do not include markdown code block syntax (like
     whisperFormData.append("model", whisperModel);
     whisperFormData.append("response_format", "verbose_json");
 
-    // Pin Whisper's language parameter based on targetLanguage for automated campaigns (non-WebRTC)
-    // to ensure high-accuracy transcription and avoid language-detection confusion.
-    // For live WebRTC calls, we pin language to English ("en") to translate any regional accents/Tamil
-    // into clean, high-confidence English text, and supply a real estate vocabulary prompt.
-    if (!isWebRTC) {
-      const langMap: Record<string, string> = {
-        English: "en",
-        Spanish: "es",
-        Hindi: "hi",
-        Tamil: "ta",
-        French: "fr",
-        German: "de",
-      };
-      const isoLang = langMap[targetLanguage];
-      if (isoLang) {
-        console.log(`[Whisper] Pinning Whisper language parameter to: ${isoLang} (${targetLanguage})`);
-        whisperFormData.append("language", isoLang);
-      } else {
-        console.log(`[Whisper] Omitting language parameter to enable automatic voice language detection.`);
-      }
+    const langMap: Record<string, string> = {
+      English: "en",
+      Spanish: "es",
+      Hindi: "hi",
+      Tamil: "ta",
+      French: "fr",
+      German: "de",
+    };
+    const isoLang = langMap[targetLanguage];
+    if (isoLang) {
+      console.log(`[Whisper] Pinning Whisper language parameter to: ${isoLang} (${targetLanguage})`);
+      whisperFormData.append("language", isoLang);
     } else {
-      console.log(`[Whisper] Live WebRTC call. Pinning Whisper language parameter to English (en) for auto-translation, and appending real estate vocabulary prompt.`);
-      whisperFormData.append("language", "en");
-      whisperFormData.append("prompt", "Pranesh, Coimbatore, Thudiyalur, Saravanampatti, Annur, plot, villa, flat, budget, 5 to 7 lakhs, amenities, parking, power, water, Friday site visit, slot booking.");
+      console.log(`[Whisper] Omitting language parameter to enable automatic voice language detection.`);
+    }
+
+    if (isWebRTC) {
+      const promptMap: Record<string, string> = {
+        English: "Pranesh, Coimbatore, Thudiyalur, Saravanampatti, Annur, plot, villa, flat, budget, 5 to 7 lakhs, amenities, parking, power, water, Friday site visit, slot booking.",
+        Tamil: "பிரனேஷ், கோயம்புத்தூர், துடியலூர், சரவணம்பட்டி, அன்னூர், மனை, வில்லா, பிளாட், பட்ஜெட், 5 முதல் 7 லட்சம், வசதிகள், பார்க்கிங், மின்சாரம், தண்ணீர், வெள்ளிக்கிழமை தள வருகை, ஸ்லாட் முன்பதிவு.",
+        Hindi: "प्रणेश, कोयंबटूर, तुडियालूर, सरवनमपट्टी, अन्नूर, प्लॉट, विला, फ्लैट, बजट, 5 से 7 लाख, सुविधाएं, पार्किंग, बिजली, पानी, शुक्रवार साइट विजिट, स्लॉट बुकिंग।",
+        Spanish: "Pranesh, Coimbatore, Thudiyalur, Saravanampatti, Annur, parcela, villa, piso, presupuesto, 5 a 7 lakhs, servicios, estacionamiento, energía, agua, visita al sitio el viernes, reserva de turno.",
+        French: "Pranesh, Coimbatore, Thudiyalur, Saravanampatti, Annur, terrain, villa, appartement, budget, 5 à 7 lakhs, commodités, parking, électricité, eau, visite du site le vendredi, réservation de créneau.",
+        German: "Pranesh, Coimbatore, Thudiyalur, Saravanampatti, Annur, Grundstück, Villa, Wohnung, Budget, 5 bis 7 Lakhs, Annehmlichkeiten, Parkplatz, Strom, Wasser, Besichtigung am Freitag, Slot-Buchung."
+      };
+      const whisperPrompt = promptMap[targetLanguage] || promptMap.English;
+      console.log(`[Whisper] Live WebRTC call. Appending real estate vocabulary prompt in ${targetLanguage}.`);
+      whisperFormData.append("prompt", whisperPrompt);
     }
 
     const whisperRes = await fetch(whisperEndpoint, {
@@ -823,7 +827,7 @@ Ensure the output is valid JSON. Do not include markdown code block syntax (like
         if (!txt) return null;
 
         // Discard low-confidence segments (silence/noise hallucinations) for WebRTC calls
-        if (isWebRTC && seg.avg_logprob && seg.avg_logprob < -1.35) {
+        if (isWebRTC && seg.avg_logprob && seg.avg_logprob < -2.0) {
           console.log(`[Whisper Filter] Discarding segment [${formatTime(seg.start)} - ${formatTime(seg.end)}] due to low avg_logprob (${seg.avg_logprob}): "${txt}"`);
           return null;
         }
@@ -925,7 +929,7 @@ Return ONLY a raw JSON object (do not wrap in markdown fences like \`\`\`json) m
 }`;
     } else if (isWebRTC) {
       prompt = `You are a CRM call analyzer. We have a list of transcribed audio segments with start timestamps from a real live WebRTC phone call between Agent "${agentName}" and Lead "${leadName}".
-The call is bilingual and was spoken in a mixture of English and Tamil (Tanglish), but the segments below are translated to English.
+The call is conducted in the target language "${targetLanguage}", and may contain a mixture of English and "${targetLanguage}".
 
 Segments with timestamps:
 ${formattedSegments}
@@ -937,10 +941,10 @@ Please perform the following operations:
    - The call is an outbound connection initiated by Agent "${agentName}" to Lead "${leadName}". The very first turn is spoken by the Agent.
    - PHONETIC NAME ERRORS: Whisper often transcribes regional names phonetically as common words (e.g. transcribing the lead name "Pranesh" as "Français" or "French" or "Pramesh"). You must recognize these homophone errors.
    - For example: if one speaker asks "Hello, is this Français?" or "Hello, is this Pranesh?", that is the Agent verifying the customer's identity. The speaker replying "Yes, this is Français/Pranesh. What is the matter?" is the Lead. Do not swap these roles.
-2. In the "text" key, reconstruct what the speakers originally said in their native spoken language (Tamil script for Tamil turns/phrases, English for English turns), representing a natural code-switched business call (e.g. converting "5 to 7 lakhs" back to "5 டு 7 லாக்ஸ்" or "5 to 7 lakhs", and "Annur is a bit far" back to "அன்னூர் கொஞ்சம் தூரமா இருக்கும்", and "Pramesh" back to "பிரணேஷ்" or "பிரமேஷ்").
-   - Under NO circumstances should you keep the "text" key in English if the original speech was in Tamil.
-3. In the "translation" key, keep the clean English translation.
-4. Detect the primary language of the Lead's speech and populate the "detectedVoiceLanguage" key ("Tamil" if they spoke mostly in Tamil/Tanglish).
+2. In the "text" key, keep/reconstruct what the speakers originally said in their native spoken language (e.g., using proper Tamil script for Tamil turns/phrases, English for English turns), representing a natural code-switched business call. Correct any phonetic transcription errors or spelling mistakes (e.g., "Pramesh" -> "Pranesh").
+   - Under NO circumstances should you translate the "text" key to English if the original speech was in another language.
+3. In the "translation" key, provide a clean, fluent English translation of that turn. If the turn is already in English, copy the text exactly into the "translation" key.
+4. Detect the primary language of the Lead's speech and populate the "detectedVoiceLanguage" key (e.g., "Tamil", "Hindi", "English", "Spanish", "French", "German", etc.).
 5. Extract the customer's specific requirements from the call (e.g., what services, features, pricing, support seats, or timeline they need). Do not write a general summary or analysis; focus purely on listing their explicit requirements as a clean bulleted list of points (using *).
 6. Calculate a quality score (0 to 100) representing the lead's level of interest or business qualification.
 
