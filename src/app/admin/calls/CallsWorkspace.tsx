@@ -486,6 +486,48 @@ export default function CallsWorkspace({
     };
   }, []);
 
+  // Poll lastCallSummary if it is in a placeholder state
+  useEffect(() => {
+    if (!lastCallSummary) return;
+    const isPlaceholder = !!(lastCallSummary.transcript && lastCallSummary.transcript.includes("Recording is being processed by Twilio"));
+    if (!isPlaceholder) return;
+
+    const intervalId = setInterval(async () => {
+      try {
+        const freshLog = await getCallLogStatus(lastCallSummary.id);
+        if (freshLog && freshLog.transcript && !freshLog.transcript.includes("Recording is being processed by Twilio")) {
+          setLastCallSummary(freshLog);
+          router.refresh();
+        }
+      } catch (err) {
+        console.error("Failed to poll last call summary status:", err);
+      }
+    }, 2000);
+
+    return () => clearInterval(intervalId);
+  }, [lastCallSummary, router]);
+
+  // Poll activeModalLog if it is in a placeholder state
+  useEffect(() => {
+    if (!activeModalLog) return;
+    const isPlaceholder = !!(activeModalLog.transcript && activeModalLog.transcript.includes("Recording is being processed by Twilio"));
+    if (!isPlaceholder) return;
+
+    const intervalId = setInterval(async () => {
+      try {
+        const freshLog = await getCallLogStatus(activeModalLog.id);
+        if (freshLog && freshLog.transcript && !freshLog.transcript.includes("Recording is being processed by Twilio")) {
+          setActiveModalLog(freshLog);
+          router.refresh();
+        }
+      } catch (err) {
+        console.error("Failed to poll active modal log status:", err);
+      }
+    }, 2000);
+
+    return () => clearInterval(intervalId);
+  }, [activeModalLog, router]);
+
   const logToTerminal = (msg: string) => {
     const timestamp = new Date().toLocaleTimeString();
     setTerminalLogs((prev) => [...prev, `[${timestamp}] ${msg}`]);

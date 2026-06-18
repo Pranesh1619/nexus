@@ -89,7 +89,7 @@ export async function updateCallDocumentation(id: string, formData: FormData) {
 
 export async function simulateCallAnalysis(id: string) {
   const { revalidatePath } = await import("next/cache");
-  const { generateConversation } = await import("@/lib/transcription");
+  const { generateConversation } = await import("@/lib/conversation_mock");
 
   const call = await prisma.callLog.findUnique({
     where: { id },
@@ -127,3 +127,14 @@ export async function simulateCallAnalysis(id: string) {
   revalidatePath(`/admin/calls/${id}`);
   revalidatePath("/admin/calls");
 }
+
+export async function getCallLogStatus(id: string) {
+  return await prisma.callLog.findUnique({
+    where: { id },
+    include: {
+      lead: true,
+      user: true,
+    },
+  });
+}
+

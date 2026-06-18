@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { saveCallLog, getActiveSipConfig, placeRealTwilioCall, syncSipCallLog, getCallLogStatus, endTwilioCall, getTwilioCallStatus } from "./actions";
 import { getLeadById } from "@/app/admin/leads/actions";
-import { generateConversation } from "@/lib/transcription";
+import { generateConversation } from "@/lib/conversation_mock";
 
 type LeadType = {
   id: string;

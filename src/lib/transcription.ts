@@ -1,19 +1,33 @@
-export interface DialogueTurn {
-  speaker: "Agent" | "Lead";
-  time: string;
-  text: string;
-  translation: string;
+import { AsyncLocalStorage } from "async_hooks";
+
+export const transcriptionLogStorage = new AsyncLocalStorage<(msg: string) => void>();
+
+const globalForJobs = globalThis as unknown as {
+  retranscribeJobs?: Map<string, {
+    status: "running" | "done" | "error";
+    logs: string[];
+    error?: string;
+    duration?: string;
+  }>;
+};
+
+if (!globalForJobs.retranscribeJobs) {
+  globalForJobs.retranscribeJobs = new Map();
 }
 
-export interface ConversationResult {
-  detectedVoiceLanguage: string;
-  translatedLanguage: string;
-  transcript: string; // JSON string of DialogueTurn[]
-  translatedText: string; // Text paragraph in English
-  wordCount: number;
-  analysis: string;
-  aiScore: number;
-}
+export const retranscribeJobs = globalForJobs.retranscribeJobs;
+
+// Intercept console.log and route to transcriptionLogStorage if active
+const originalLog = console.log;
+
+console.log = (...args: any[]) => {
+  originalLog(...args);
+  const onProgress = transcriptionLogStorage.getStore();
+  if (onProgress) {
+    onProgress(args.join(" "));
+  }
+};
+import { DialogueTurn, ConversationResult } from "./conversation_mock";
 
 // Conversation template datasets for different stages and languages
 const DIALOGUES_DATA: Record<
@@ -245,49 +259,6 @@ const DIALOGUES_DATA: Record<
   }
 };
 
-/**
- * Returns structured dialogue turns and metrics based on parameters.
- */
-export function generateConversation(
-  leadName: string,
-  companyName: string,
-  agentName: string,
-  language: string,
-  stage: string
-): ConversationResult {
-  const selectedLang = DIALOGUES_DATA[language] ? language : "English";
-  
-  // Map stage to group: positive, negative, or neutral
-  let group: "positive" | "neutral" | "negative" = "neutral";
-  if (["Interested", "Qualified", "Closed", "Desire"].includes(stage)) {
-    group = "positive";
-  } else if (stage === "Not Interested" || stage === "FAILED") {
-    group = "negative";
-  }
-
-  const dataset = DIALOGUES_DATA[selectedLang][group];
-  const turns = dataset.turns(leadName, companyName, agentName);
-  const analysisText = dataset.analysis(leadName, companyName);
-  
-  // Format translated text paragraph
-  const translatedText = turns
-    .map(turn => `${turn.speaker}: "${turn.translation}"`)
-    .join("\n\n");
-
-  // Word count of the transcript
-  const rawTextParagraph = turns.map(t => t.text).join(" ");
-  const wordCount = rawTextParagraph.split(/\s+/).filter(Boolean).length;
-
-  return {
-    detectedVoiceLanguage: selectedLang,
-    translatedLanguage: "English",
-    transcript: JSON.stringify(turns),
-    translatedText,
-    wordCount,
-    analysis: analysisText,
-    aiScore: dataset.aiScore
-  };
-}
 
 /**
  * Helper to find the ending boundary of the automated system greeting in the raw transcript.
@@ -551,6 +522,135 @@ function cleanGreetingPhrases(rawTranscript: string, leadName: string): string {
 }
 
 /**
+ * Helper to resample Float32Array audio data from one sample rate to another using linear interpolation.
+ */
+function resample(audioData: Float32Array, fromSampleRate: number, toSampleRate: number): Float32Array {
+  if (fromSampleRate === toSampleRate) {
+    return audioData;
+  }
+  const ratio = fromSampleRate / toSampleRate;
+  const newLength = Math.round(audioData.length / ratio);
+  const result = new Float32Array(newLength);
+  for (let i = 0; i < newLength; i++) {
+    const position = i * ratio;
+    const index = Math.floor(position);
+    const fraction = position - index;
+    if (index + 1 < audioData.length) {
+      result[i] = audioData[index] * (1 - fraction) + audioData[index + 1] * fraction;
+    } else {
+      result[i] = audioData[index];
+    }
+  }
+  return result;
+}
+
+/**
+ * Post-processes transcription text to deduplicate repetitive word/phrase loops.
+ */
+export function removeRepetitivePhrases(text: string): string {
+  if (!text) return "";
+  
+  // 1. Clean single word repetitions (e.g. "பார்க்கும் பார்க்கும் பார்க்கும்...")
+  const words = text.split(/\s+/).filter(Boolean);
+  const cleanWords: string[] = [];
+  let consecutiveWordCount = 0;
+  for (let i = 0; i < words.length; i++) {
+    if (cleanWords.length > 0 && words[i] === cleanWords[cleanWords.length - 1]) {
+      consecutiveWordCount++;
+      if (consecutiveWordCount < 3) {
+        cleanWords.push(words[i]);
+      }
+    } else {
+      consecutiveWordCount = 1;
+      cleanWords.push(words[i]);
+    }
+  }
+  let processedText = cleanWords.join(" ");
+  
+  // 2. Clean multi-word phrase repetitions (e.g. "ஏதுவான் அவர் தான் போடுங்கள்" repeating)
+  let changed = true;
+  let iterations = 0;
+  while (changed && iterations < 10) {
+    changed = false;
+    iterations++;
+    processedText = processedText.replace(/(.{8,60}?)\s+(?:\1\s*){2,}/g, (match, group) => {
+      changed = true;
+      return group + " ";
+    });
+  }
+  
+  return processedText.trim();
+}
+
+/**
+ * Parses a flat text transcript (e.g. from Gemini or elsewhere) containing timestamps and
+ * translations into a structured array of turns.
+ */
+export function parseFlatTranscriptToTurns(flatText: string): Array<{ speaker: string; time: string; text: string; translation: string }> {
+  if (!flatText) return [];
+
+  const lines = flatText.split("\n").map(l => l.trim()).filter(Boolean);
+  
+  let translationStartIndex = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].toLowerCase().includes("translation") || lines[i].toLowerCase().includes("english")) {
+      translationStartIndex = i;
+    }
+  }
+
+  const nativeTurnsMap = new Map<string, string>();
+  const translationTurnsMap = new Map<string, string>();
+
+  const timestampRegex = /(\d{1,2}:\d{2}(?::\d{2})?)/;
+
+  const limitIndex = translationStartIndex !== -1 ? translationStartIndex : lines.length;
+
+  for (let i = 0; i < limitIndex; i++) {
+    const match = lines[i].match(timestampRegex);
+    if (match) {
+      const time = match[1];
+      const timeIndex = lines[i].indexOf(time);
+      let content = lines[i].substring(timeIndex + time.length).replace(/^[—:\-\s]+/, "").trim();
+      nativeTurnsMap.set(time, content);
+    }
+  }
+
+  if (translationStartIndex !== -1) {
+    for (let i = translationStartIndex + 1; i < lines.length; i++) {
+      const match = lines[i].match(timestampRegex);
+      if (match) {
+        const time = match[1];
+        const timeIndex = lines[i].indexOf(time);
+        let content = lines[i].substring(timeIndex + time.length).replace(/^[—:\-\s]+/, "").trim();
+        content = content.replace(/\[\d+\]/g, "").trim();
+        translationTurnsMap.set(time, content);
+      }
+    }
+  }
+
+  const turns: any[] = [];
+  for (let i = 0; i < limitIndex; i++) {
+    const match = lines[i].match(timestampRegex);
+    if (match) {
+      const time = match[1];
+      const nativeText = nativeTurnsMap.get(time) || "";
+      const translationText = translationTurnsMap.get(time) || nativeText;
+      
+      if (!turns.some(t => t.time === time)) {
+        turns.push({
+          speaker: "Lead",
+          time: time,
+          text: nativeText,
+          translation: translationText
+        });
+      }
+    }
+  }
+
+  return turns;
+}
+
+/**
  * Downloads the actual audio from Twilio's public RecordingUrl, sends it to OpenAI Whisper,
  * and formats/translates/summarizes the conversation using GPT-4o-mini.
  */
@@ -563,28 +663,213 @@ export async function transcribeAndAnalyzeRecording(
   isWebRTC: boolean = false
 ) {
   try {
-    const mp3Url = recordingUrl.endsWith(".mp3") ? recordingUrl : `${recordingUrl}.mp3`;
-    console.log(`[Whisper] Downloading MP3 call recording from: ${mp3Url}`);
-    const twilioSid = process.env.TWILIO_ACCOUNT_SID || "";
-    const twilioToken = process.env.TWILIO_AUTH_TOKEN || "";
-    const authHeader = "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64");
+    let arrayBuffer: ArrayBuffer = new ArrayBuffer(0);
+    const useLocalWhisper = process.env.USE_LOCAL_WHISPER === "true";
+    const skipLlm = process.env.SKIP_LLM_ANALYSIS === "true";
+    let whisperData: any = null;
 
-    const audioRes = await fetch(mp3Url, {
-      headers: {
-        Authorization: authHeader
+    const promptMap: Record<string, string> = {
+      English: "Pranesh, Coimbatore, Thudiyalur, Saravanampatti, Annur, plot, villa, flat, budget, 5 to 7 lakhs, amenities, parking, power, water, Friday site visit, slot booking.",
+      Tamil: "பிரனேஷ், கோயம்புத்தூர், துடியலூர், சரவணம்பட்டி, அன்னூர், மனை, வில்லா, பிளாட், பட்ஜெட், 5 முதல் 7 லட்சம், வசதிகள், பார்க்கிங், மின்சாரம், தண்ணீர், வெள்ளிக்கிழமை தள வருகை, ஸ்லாட் முன்பதிவு.",
+      Hindi: "प्रणेश, कोयंबटूर, तुडियालूर, सरवनमपट्टी, अन्नूर, प्लॉट, विला, फ्लैट, बजट, 5 से 7 लाख, सुविधाएं, पार्किंग, बिजली, पानी, शुक्रवार साइट विजिट, स्लॉट बुकिंग।",
+      Spanish: "Pranesh, Coimbatore, Thudiyalur, Saravanampatti, Annur, parcela, villa, piso, presupuesto, 5 a 7 lakhs, servicios, estacionamiento, energía, agua, visita al sitio el viernes, reserva de turno.",
+      French: "Pranesh, Coimbatore, Thudiyalur, Saravanampatti, Annur, terrain, villa, appartement, budget, 5 à 7 lakhs, commodités, parking, électricité, eau, visite du site le vendredi, réservation de créneau.",
+      German: "Pranesh, Coimbatore, Thudiyalur, Saravanampatti, Annur, Grundstück, Villa, Wohnung, Budget, 5 bis 7 Lakhs, Annehmlichkeiten, Parkplatz, Strom, Wasser, Besichtigung am Freitag, Slot-Buchung."
+    };
+    const whisperPrompt = promptMap[targetLanguage] || promptMap.English;
+
+    if (useLocalWhisper) {
+      const wavUrl = recordingUrl.endsWith(".wav") ? recordingUrl : `${recordingUrl}.wav`;
+      console.log(`[Local Whisper] Downloading WAV call recording from: ${wavUrl}`);
+      const twilioSid = process.env.TWILIO_ACCOUNT_SID || "";
+      const twilioToken = process.env.TWILIO_AUTH_TOKEN || "";
+      const authHeader = "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64");
+
+      const audioRes = await fetch(wavUrl, {
+        headers: {
+          Authorization: authHeader
+        }
+      });
+      if (!audioRes.ok) {
+        throw new Error(`Failed to fetch WAV audio from Twilio: ${audioRes.status} ${audioRes.statusText}`);
       }
-    });
-    if (!audioRes.ok) {
-      throw new Error(`Failed to fetch audio from Twilio: ${audioRes.status} ${audioRes.statusText}`);
-    }
+      const wavBuffer = await audioRes.arrayBuffer();
 
-    const arrayBuffer = await audioRes.arrayBuffer();
+      console.log("[Local Whisper] Decoding WAV audio...");
+      const wavDecoder = require("node-wav");
+      const decoded = wavDecoder.decode(Buffer.from(wavBuffer));
+      let rawAudio = decoded.channelData[0];
+      if (decoded.channelData.length > 1) {
+        console.log(`[Local Whisper] Mixing down ${decoded.channelData.length} stereo channels to mono...`);
+        const chan0 = decoded.channelData[0];
+        const chan1 = decoded.channelData[1];
+        const mono = new Float32Array(chan0.length);
+        for (let i = 0; i < chan0.length; i++) {
+          mono[i] = (chan0[i] + chan1[i]) / 2;
+        }
+        rawAudio = mono;
+      }
+      const sampleRate = decoded.sampleRate;
+
+      console.log(`[Local Whisper] Resampling audio from ${sampleRate}Hz to 16000Hz...`);
+      const audioData = resample(rawAudio, sampleRate, 16000);
+      
+      console.log("[Local Whisper] Re-encoding resampled audio to 16kHz WAV...");
+      const encodedWavBuffer = wavDecoder.encode([audioData], { sampleRate: 16000 });
+
+      let pythonSuccess = false;
+      
+      try {
+        console.log("[Local Whisper] Attempting Python faster-whisper server at http://127.0.0.1:8000/transcribe...");
+        let pyModel = "medium";
+        const envModel = process.env.LOCAL_WHISPER_MODEL || "";
+        if (envModel.includes("small")) pyModel = "small";
+        else if (envModel.includes("base")) pyModel = "base";
+        else if (envModel.includes("large")) pyModel = "large-v3";
+        else if (envModel.includes("medium")) pyModel = "medium";
+        
+        const pyLanguage = targetLanguage.toLowerCase() === "tamil" ? "ta" : "en";
+
+        // Build multipart/form-data body manually to prevent Node.js native fetch/FormData stream hang bug
+        const boundary = "----WebKitFormBoundary" + Math.random().toString(36).substring(2);
+        const fileHeader = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="recording.wav"\r\nContent-Type: audio/wav\r\n\r\n`;
+        const modelPart = `\r\n--${boundary}\r\nContent-Disposition: form-data; name="model_name"\r\n\r\n${pyModel}`;
+        const langPart = `\r\n--${boundary}\r\nContent-Disposition: form-data; name="language"\r\n\r\n${pyLanguage}`;
+        const promptPart = `\r\n--${boundary}\r\nContent-Disposition: form-data; name="initial_prompt"\r\n\r\n${whisperPrompt}`;
+        const footer = `\r\n--${boundary}--\r\n`;
+
+        const multipartBody = Buffer.concat([
+          Buffer.from(fileHeader, "utf-8"),
+          Buffer.from(encodedWavBuffer),
+          Buffer.from(modelPart, "utf-8"),
+          Buffer.from(langPart, "utf-8"),
+          Buffer.from(promptPart, "utf-8"),
+          Buffer.from(footer, "utf-8")
+        ]);
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 mins
+
+        const resData = await new Promise<any>((resolve, reject) => {
+          const http = require("http");
+          const req = http.request({
+            hostname: "127.0.0.1",
+            port: 8000,
+            path: "/transcribe",
+            method: "POST",
+            headers: {
+              "Content-Type": `multipart/form-data; boundary=${boundary}`,
+              "Content-Length": multipartBody.length
+            }
+          }, (res: any) => {
+            if (res.statusCode < 200 || res.statusCode >= 300) {
+              reject(new Error(`Python server returned status ${res.statusCode}`));
+              return;
+            }
+            let body = "";
+            res.setEncoding("utf8");
+            res.on("data", (chunk: string) => { body += chunk; });
+            res.on("end", () => {
+              try {
+                resolve(JSON.parse(body));
+              } catch (e) {
+                reject(new Error("Failed to parse JSON response from Python server"));
+              }
+            });
+          });
+
+          req.on("error", (err: any) => {
+            reject(err);
+          });
+
+          controller.signal.addEventListener("abort", () => {
+            req.destroy();
+            reject(new Error("Request aborted"));
+          });
+
+          req.write(multipartBody);
+          req.end();
+        });
+        
+        clearTimeout(timeoutId);
+
+        if (resData) {
+          console.log("[Local Whisper] Python server transcription succeeded!");
+          whisperData = {
+            text: resData.segments.map((s: any) => s.text).join(" "),
+            segments: resData.segments.map((s: any) => ({
+              text: s.text || "",
+              start: s.start || 0,
+              end: s.end || 0
+            }))
+          };
+          pythonSuccess = true;
+        } else {
+          console.warn(`[Local Whisper] Python server returned empty response. Falling back to Node.js...`);
+        }
+      } catch (err: any) {
+        console.error("[Local Whisper] Python server connection failed:", err);
+      }
+
+      if (!pythonSuccess) {
+        console.log("[Local Whisper] Initializing local JS Whisper pipeline...");
+        const { pipeline, env } = await import("@xenova/transformers");
+        if (env.backends && env.backends.onnx) {
+          env.backends.onnx.logLevelInternal = "error";
+        }
+        let modelName = process.env.LOCAL_WHISPER_MODEL || "Xenova/whisper-base";
+        if (modelName === "small") modelName = "Xenova/whisper-small";
+        else if (modelName === "medium") modelName = "Xenova/whisper-medium";
+        else if (modelName === "base") modelName = "Xenova/whisper-base";
+        const transcriber = await pipeline("automatic-speech-recognition", modelName);
+
+        console.log(`[Local Whisper] Transcribing audio with model: ${modelName} and language: ${targetLanguage}...`);
+        const pipelineOptions: any = {
+          chunk_length_s: 30,
+          stride_length_s: 5,
+          return_timestamps: true,
+          task: "transcribe",
+        };
+        
+        if (targetLanguage && targetLanguage.toLowerCase() !== "auto") {
+          pipelineOptions.language = targetLanguage.toLowerCase();
+        }
+
+        const output = (await transcriber(audioData, pipelineOptions)) as any;
+        console.log("[Local Whisper] Local JS transcription complete!");
+
+        whisperData = {
+          text: output.text || "",
+          segments: (output.chunks || []).map((chunk: any) => ({
+            text: chunk.text || "",
+            start: chunk.timestamp ? chunk.timestamp[0] : 0,
+            end: chunk.timestamp ? chunk.timestamp[1] : 0,
+          }))
+        };
+      }
+    } else {
+      const mp3Url = recordingUrl.endsWith(".mp3") ? recordingUrl : `${recordingUrl}.mp3`;
+      console.log(`[Whisper] Downloading MP3 call recording from: ${mp3Url}`);
+      const twilioSid = process.env.TWILIO_ACCOUNT_SID || "";
+      const twilioToken = process.env.TWILIO_AUTH_TOKEN || "";
+      const authHeader = "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64");
+
+      const audioRes = await fetch(mp3Url, {
+        headers: {
+          Authorization: authHeader
+        }
+      });
+      if (!audioRes.ok) {
+        throw new Error(`Failed to fetch audio from Twilio: ${audioRes.status} ${audioRes.statusText}`);
+      }
+      arrayBuffer = await audioRes.arrayBuffer();
+    }
 
     // Check for Google Gemini API Key. If present, use Gemini 1.5 Flash
     // for direct, high-quality multimodal audio transcription and speaker classification.
     const geminiKey = process.env.GEMINI_API_KEY;
-    if (geminiKey) {
-      console.log("[Gemini] GEMINI_API_KEY detected. Using Gemini 2.5 Flash for transcription and analysis...");
+    if (geminiKey && !useLocalWhisper) {
+      console.log("[Gemini] GEMINI_API_KEY detected. Using Gemini 1.5 Flash for transcription and analysis...");
       const uploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${geminiKey}`;
       const uploadMetadata = {
         file: {
@@ -627,7 +912,6 @@ export async function transcribeAndAnalyzeRecording(
       const fileName = uploadData.file.name;
       console.log(`[Gemini] Audio uploaded successfully. File URI: ${fileUri}`);
 
-      const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
       const promptText = `
 You are an advanced BPO quality analyst and CRM sync tool.
 Analyze this audio recording of a telephone sales call between Agent: "${agentName}" and Lead: "${leadName}".
@@ -666,120 +950,162 @@ Provide your response in JSON format matching this schema:
 Ensure the output is valid JSON. Do not include markdown code block syntax (like \`\`\`json) in the response text itself, return only the raw JSON.
 `;
 
-      const generateRes = await fetch(generateUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
+      const candidateModels = [
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-3.5-flash",
+        "gemini-3.1-flash-lite"
+      ];
+
+      let generateRes: Response | null = null;
+      let generateData: any = null;
+      let successModel = "";
+      let lastError: any = null;
+
+      for (const model of candidateModels) {
+        console.log(`[Gemini] Attempting content generation with model: ${model}...`);
+        const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+        try {
+          const res = await fetch(generateUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              contents: [
                 {
-                  fileData: {
-                    mimeType: "audio/mp3",
-                    fileUri: fileUri
-                  }
-                },
-                {
-                  text: promptText
+                  parts: [
+                    {
+                      fileData: {
+                        mimeType: "audio/mp3",
+                        fileUri: fileUri
+                      }
+                    },
+                    {
+                      text: promptText
+                    }
+                  ]
                 }
-              ]
-            }
-          ],
-          generationConfig: {
-            responseMimeType: "application/json"
+              ],
+              generationConfig: {
+                responseMimeType: "application/json"
+              }
+            })
+          });
+
+          if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`Status ${res.status} - ${errText}`);
           }
-        })
-      });
+
+          generateRes = res;
+          generateData = await res.json();
+          successModel = model;
+          break; // Succeeded! Break out of candidate loop.
+        } catch (err: any) {
+          console.warn(`[Gemini] Model ${model} failed:`, err.message || err);
+          lastError = err;
+        }
+      }
 
       // Cleanup file from Gemini storage asynchronously
       fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${geminiKey}`, {
         method: "DELETE"
       }).catch(e => console.error("[Gemini] Failed to delete file:", e));
 
-      if (!generateRes.ok) {
-        const errText = await generateRes.text();
-        throw new Error(`Gemini content generation failed: ${generateRes.status} - ${errText}`);
+      if (!generateRes || !generateData) {
+        throw new Error(`All candidate Gemini models failed. Last error: ${lastError?.message || lastError}`);
       }
 
-      const generateData = await generateRes.json();
-      const rawText = generateData.candidates[0].content.parts[0].text;
-      const parsedResult = JSON.parse(rawText.trim());
+      console.log(`[Gemini] Content generation succeeded using model: ${successModel}`);
+
+      const rawText = (generateData.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+      
+      let parsedResult: any = null;
+      try {
+        parsedResult = JSON.parse(rawText);
+      } catch (e) {
+        console.warn("[Gemini] Failed to parse Gemini response as JSON. Attempting to parse flat text...");
+        const turns = parseFlatTranscriptToTurns(rawText);
+        parsedResult = {
+          detectedVoiceLanguage: targetLanguage || "Tamil",
+          aiScore: 50,
+          analysis: "Auto-parsed from Gemini flat text output.",
+          transcript: turns
+        };
+      }
+
+      // Check if transcript key is a flat string instead of an array
+      if (parsedResult && typeof parsedResult.transcript === "string") {
+        parsedResult.transcript = parseFlatTranscriptToTurns(parsedResult.transcript);
+      }
+
+      const finalTurns = parsedResult.transcript || [];
 
       return {
         detectedVoiceLanguage: parsedResult.detectedVoiceLanguage || "English",
         aiScore: parsedResult.aiScore || 50,
         analysis: parsedResult.analysis || "",
-        transcript: JSON.stringify(parsedResult.transcript || []),
-        translatedText: (parsedResult.transcript || [])
+        transcript: JSON.stringify(finalTurns),
+        translatedText: finalTurns
           .map((t: any) => `${t.speaker}: ${t.translation}`)
           .join("\n"),
-        wordCount: (parsedResult.transcript || [])
+        wordCount: finalTurns
           .reduce((acc: number, curr: any) => acc + (curr.text || "").split(" ").length, 0)
       };
     }
 
-    const fileBlob = new Blob([arrayBuffer], { type: "audio/mp3" });
+    const isGroq = apiKey ? apiKey.startsWith("gsk_") : false;
 
-    const isGroq = apiKey.startsWith("gsk_");
-    const whisperEndpoint = isGroq 
-      ? "https://api.groq.com/openai/v1/audio/transcriptions"
-      : "https://api.openai.com/v1/audio/transcriptions";
-    const whisperModel = isGroq ? "whisper-large-v3" : "whisper-1";
+    if (!useLocalWhisper) {
+      const fileBlob = new Blob([arrayBuffer], { type: "audio/mp3" });
+      const whisperEndpoint = isGroq 
+        ? "https://api.groq.com/openai/v1/audio/transcriptions"
+        : "https://api.openai.com/v1/audio/transcriptions";
+      const whisperModel = isGroq ? "whisper-large-v3-turbo" : "whisper-1";
 
-    console.log(`[Whisper] Submitting audio to ${isGroq ? "Groq" : "OpenAI"} Whisper API (${whisperModel}) with target language: ${targetLanguage}...`);
-    const whisperFormData = new FormData();
-    whisperFormData.append("file", fileBlob, "call_recording.mp3");
-    whisperFormData.append("model", whisperModel);
-    whisperFormData.append("response_format", "verbose_json");
+      console.log(`[Whisper] Submitting audio to ${isGroq ? "Groq" : "OpenAI"} Whisper API (${whisperModel}) with target language: ${targetLanguage}...`);
+      const whisperFormData = new FormData();
+      whisperFormData.append("file", fileBlob, "call_recording.mp3");
+      whisperFormData.append("model", whisperModel);
+      whisperFormData.append("response_format", "verbose_json");
 
-    const langMap: Record<string, string> = {
-      English: "en",
-      Spanish: "es",
-      Hindi: "hi",
-      Tamil: "ta",
-      French: "fr",
-      German: "de",
-    };
-    const isoLang = langMap[targetLanguage];
-    if (isoLang) {
-      console.log(`[Whisper] Pinning Whisper language parameter to: ${isoLang} (${targetLanguage})`);
-      whisperFormData.append("language", isoLang);
-    } else {
-      console.log(`[Whisper] Omitting language parameter to enable automatic voice language detection.`);
-    }
-
-    if (isWebRTC) {
-      const promptMap: Record<string, string> = {
-        English: "Pranesh, Coimbatore, Thudiyalur, Saravanampatti, Annur, plot, villa, flat, budget, 5 to 7 lakhs, amenities, parking, power, water, Friday site visit, slot booking.",
-        Tamil: "பிரனேஷ், கோயம்புத்தூர், துடியலூர், சரவணம்பட்டி, அன்னூர், மனை, வில்லா, பிளாட், பட்ஜெட், 5 முதல் 7 லட்சம், வசதிகள், பார்க்கிங், மின்சாரம், தண்ணீர், வெள்ளிக்கிழமை தள வருகை, ஸ்லாட் முன்பதிவு.",
-        Hindi: "प्रणेश, कोयंबटूर, तुडियालूर, सरवनमपट्टी, अन्नूर, प्लॉट, विला, फ्लैट, बजट, 5 से 7 लाख, सुविधाएं, पार्किंग, बिजली, पानी, शुक्रवार साइट विजिट, स्लॉट बुकिंग।",
-        Spanish: "Pranesh, Coimbatore, Thudiyalur, Saravanampatti, Annur, parcela, villa, piso, presupuesto, 5 a 7 lakhs, servicios, estacionamiento, energía, agua, visita al sitio el viernes, reserva de turno.",
-        French: "Pranesh, Coimbatore, Thudiyalur, Saravanampatti, Annur, terrain, villa, appartement, budget, 5 à 7 lakhs, commodités, parking, électricité, eau, visite du site le vendredi, réservation de créneau.",
-        German: "Pranesh, Coimbatore, Thudiyalur, Saravanampatti, Annur, Grundstück, Villa, Wohnung, Budget, 5 bis 7 Lakhs, Annehmlichkeiten, Parkplatz, Strom, Wasser, Besichtigung am Freitag, Slot-Buchung."
+      const langMap: Record<string, string> = {
+        English: "en",
+        Spanish: "es",
+        Hindi: "hi",
+        Tamil: "ta",
+        French: "fr",
+        German: "de",
       };
-      const whisperPrompt = promptMap[targetLanguage] || promptMap.English;
-      console.log(`[Whisper] Live WebRTC call. Appending real estate vocabulary prompt in ${targetLanguage}.`);
+      const isoLang = langMap[targetLanguage];
+      if (isoLang) {
+        console.log(`[Whisper] Pinning Whisper language parameter to: ${isoLang} (${targetLanguage})`);
+        whisperFormData.append("language", isoLang);
+      } else {
+        console.log(`[Whisper] Omitting language parameter to enable automatic voice language detection.`);
+      }
+
+      console.log(`[Whisper] Appending real estate vocabulary prompt in ${targetLanguage} for call transcription.`);
       whisperFormData.append("prompt", whisperPrompt);
+
+      const whisperRes = await fetch(whisperEndpoint, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: whisperFormData,
+      });
+
+      if (!whisperRes.ok) {
+        const errText = await whisperRes.text();
+        throw new Error(`Whisper API failure: ${whisperRes.status} - ${errText}`);
+      }
+
+      whisperData = await whisperRes.json();
     }
-
-    const whisperRes = await fetch(whisperEndpoint, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: whisperFormData,
-    });
-
-    if (!whisperRes.ok) {
-      const errText = await whisperRes.text();
-      throw new Error(`Whisper API failure: ${whisperRes.status} - ${errText}`);
-    }
-
-    const whisperData = await whisperRes.json();
-    let rawTranscript = whisperData.text || "";
-    console.log(`[Whisper] Raw Transcription: "${rawTranscript}"`);
+    let rawTranscript = removeRepetitivePhrases(whisperData.text || "");
+    console.log(`[Whisper] Raw Transcription (Repetition Filtered): "${rawTranscript}"`);
 
     // Clean up common Whisper silence hallucinations (e.g. Spanish/English phrases or subtitle credits during silence)
     const hallucinations = [
@@ -813,7 +1139,15 @@ Ensure the output is valid JSON. Do not include markdown code block syntax (like
     // Format segments with timestamps for LLM speaker classification
     let formattedSegments = "";
     if (whisperData.segments && Array.isArray(whisperData.segments)) {
-      formattedSegments = whisperData.segments.map((seg: any) => {
+      let lastTxt = "";
+      const cleanedSegments = whisperData.segments.map((seg: any) => {
+        let txt = removeRepetitivePhrases(seg.text || "");
+        if (txt === lastTxt) return null;
+        lastTxt = txt;
+        return { ...seg, text: txt };
+      }).filter(Boolean);
+
+      formattedSegments = cleanedSegments.map((seg: any) => {
         const formatTime = (secs: number) => {
           const m = Math.floor(secs / 60).toString().padStart(2, "0");
           const s = Math.floor(secs % 60).toString().padStart(2, "0");
@@ -877,6 +1211,84 @@ Ensure the output is valid JSON. Do not include markdown code block syntax (like
           aiScore: 10,
         };
       }
+    }
+
+    if (skipLlm) {
+      console.log("[Local Whisper] Skipping LLM analysis as requested. Formatting transcript directly...");
+      
+      let finalTurns: any[] = [];
+      let translatedText = "";
+      
+      if (!isWebRTC) {
+        const staticAgent = getStaticAgentTurn(targetLanguage, leadName);
+        finalTurns = [
+          {
+            speaker: "Agent",
+            text: staticAgent.text,
+            translation: staticAgent.translation,
+            time: "00:02"
+          }
+        ];
+        if (rawTranscript) {
+          finalTurns.push({
+            speaker: "Lead",
+            text: rawTranscript,
+            translation: rawTranscript,
+            time: "00:08"
+          });
+        }
+        translatedText = `Agent: ${staticAgent.translation}\nLead: ${rawTranscript}`;
+      } else {
+        const formatTime = (secs: number) => {
+          const m = Math.floor(secs / 60).toString().padStart(2, "0");
+          const s = Math.floor(secs % 60).toString().padStart(2, "0");
+          return `${m}:${s}`;
+        };
+        
+        let lastTxt = "";
+        const cleanedSegments = (whisperData?.segments || []).map((seg: any) => {
+          let txt = removeRepetitivePhrases(seg.text || "");
+          if (txt === lastTxt) return null;
+          lastTxt = txt;
+          return { ...seg, text: txt };
+        }).filter(Boolean);
+
+        finalTurns = cleanedSegments.map((seg: any, idx: number) => {
+          let txt = seg.text || "";
+          for (const regex of hallucinations) {
+            txt = txt.replace(regex, "");
+          }
+          return {
+            speaker: idx % 2 === 0 ? "Agent" : "Lead",
+            text: txt.trim(),
+            translation: txt.trim(),
+            time: formatTime(seg.start || 0)
+          };
+        }).filter((t: any) => t.text.length > 0);
+        
+        if (finalTurns.length === 0 && rawTranscript) {
+          finalTurns = [
+            {
+              speaker: "Lead",
+              text: rawTranscript,
+              translation: rawTranscript,
+              time: "00:00"
+            }
+          ];
+        }
+        
+        translatedText = finalTurns.map((t: any) => `${t.speaker}: ${t.translation}`).join("\n");
+      }
+      
+      return {
+        detectedVoiceLanguage: targetLanguage,
+        translatedLanguage: "English",
+        transcript: JSON.stringify(finalTurns),
+        translatedText: translatedText,
+        wordCount: rawTranscript.split(/\s+/).filter(Boolean).length,
+        analysis: "Local Whisper transcription completed. LLM analysis bypassed.",
+        aiScore: 50
+      };
     }
 
     // Since we've cleaned the greeting, the remaining rawTranscript is entirely the Lead's speech.
@@ -1152,7 +1564,6 @@ ${turns}`;
     const geminiKey = process.env.GEMINI_API_KEY;
     if (geminiKey) {
       console.log("[Gemini] Generating overall summary...");
-      const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
       const promptText = `You are a professional BPO client manager and CRM assistant.
 We have conducted ${calls.length} phone calls with a client named "${leadName}" (Company: "${companyName || "Unknown"}").
 Here is the history of all call details and transcripts:
@@ -1166,30 +1577,63 @@ You must strictly follow this format:
 
 Do not include any extra sections, timelines, action plans, or introductions. Keep it short, focused, and professional.`;
 
-      const generateRes = await fetch(generateUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: promptText
-                }
-              ]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.2
-          }
-        })
-      });
+      const candidateModels = [
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-3.5-flash",
+        "gemini-3.1-flash-lite"
+      ];
 
-      if (generateRes.ok) {
-        const generateData = await generateRes.json();
+      let generateRes: Response | null = null;
+      let generateData: any = null;
+      let successModel = "";
+      let lastError: any = null;
+
+      for (const model of candidateModels) {
+        console.log(`[Gemini] Attempting overall summary generation with model: ${model}...`);
+        const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+        try {
+          const res = await fetch(generateUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    {
+                      text: promptText
+                    }
+                  ]
+                }
+              ],
+              generationConfig: {
+                temperature: 0.2
+              }
+            })
+          });
+
+          if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`Status ${res.status} - ${errText}`);
+          }
+
+          generateRes = res;
+          generateData = await res.json();
+          successModel = model;
+          break; // Succeeded! Break out of candidate loop.
+        } catch (err: any) {
+          console.warn(`[Gemini] Model ${model} overall summary generation failed:`, err.message || err);
+          lastError = err;
+        }
+      }
+
+      if (generateRes && generateData) {
+        console.log(`[Gemini] Overall summary generation succeeded using model: ${successModel}`);
         return generateData.candidates[0].content.parts[0].text.trim();
+      } else {
+        console.error(`All candidate Gemini models failed to generate overall summary. Last error: ${lastError?.message || lastError}`);
       }
     }
 

@@ -30,5 +30,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "twilio"]
+  "exclude": ["node_modules", "twilio", "scratch", "backup_retranscribe_temp"]
 }

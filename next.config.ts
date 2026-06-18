@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["@xenova/transformers"],
   allowedDevOrigins: [
     "localhost:3000",
     "*.ngrok-free.app",

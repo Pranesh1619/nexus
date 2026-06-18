@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { generateConversation, transcribeAndAnalyzeRecording } from "@/lib/transcription";
+import { transcribeAndAnalyzeRecording } from "@/lib/transcription";
 
 export async function POST(request: Request) {
   try {
@@ -86,24 +86,24 @@ export async function POST(request: Request) {
 
     // 3. Generate or transcribe conversation
     let conversation;
-    const openAiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY;
 
-    if (openAiKey && recordingUrl) {
+    if (apiKey && recordingUrl) {
       try {
         conversation = await transcribeAndAnalyzeRecording(
           recordingUrl,
-          openAiKey,
+          apiKey,
           lead.name,
           agentName,
           lang,
           isWebRTC
         );
       } catch (err: any) {
-        console.error("OpenAI real transcription failed:", err);
+        console.error("Transcription failed:", err);
         
-        let errorMessage = "OpenAI Speech Transcription error.";
+        let errorMessage = "Speech Transcription error.";
         if (err.message && err.message.includes("429")) {
-          errorMessage = "OpenAI API Quota Exceeded (Billing Error 429). Please add credits to your OpenAI account at platform.openai.com/settings/organization/billing";
+          errorMessage = "API Quota Exceeded (Billing Error 429). Please verify your billing settings or API key limits.";
         } else if (err.message) {
           errorMessage = err.message;
         }
@@ -126,7 +126,7 @@ export async function POST(request: Request) {
         };
       }
     } else {
-      let errorMessage = "OpenAI API Key is missing. Please add OPENAI_API_KEY to your .env file.";
+      let errorMessage = "API Key is missing. Please configure GEMINI_API_KEY or OPENAI_API_KEY in your .env file.";
       if (!recordingUrl) {
         errorMessage = "No recording audio file found from Twilio.";
       }

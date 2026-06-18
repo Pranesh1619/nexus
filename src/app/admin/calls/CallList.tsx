@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { deleteCallLog } from "./actions";
+import { deleteCallLog, getCallLogStatus } from "./actions";
 import { CustomAudioPlayer } from "./CallsWorkspace";
 
 export interface CallLogListItem {
@@ -75,6 +75,27 @@ export default function CallList({ logs }: { logs: CallLogListItem[] }) {
   const [expandedLeadIds, setExpandedLeadIds] = useState<Record<string, boolean>>({});
   const [activeModalLog, setActiveModalLog] = useState<CallLogListItem | null>(null);
   const [modalDetailTab, setModalDetailTab] = useState<"transcript" | "recording">("transcript");
+
+  // Poll active modal log if it is in a placeholder state
+  React.useEffect(() => {
+    if (!activeModalLog) return;
+    const isPlaceholder = !!(activeModalLog.transcript && activeModalLog.transcript.includes("Recording is being processed by Twilio"));
+    if (!isPlaceholder) return;
+
+    const intervalId = setInterval(async () => {
+      try {
+        const freshLog = await getCallLogStatus(activeModalLog.id);
+        if (freshLog && freshLog.transcript && !freshLog.transcript.includes("Recording is being processed by Twilio")) {
+          setActiveModalLog(freshLog as any);
+          router.refresh(); // Refresh the list in the background
+        }
+      } catch (err) {
+        console.error("Failed to poll active modal log status:", err);
+      }
+    }, 2000);
+
+    return () => clearInterval(intervalId);
+  }, [activeModalLog, router]);
 
   const handleDelete = async () => {
     if (deleteId) {

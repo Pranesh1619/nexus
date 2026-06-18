@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import CallProgression from "./CallProgression";
@@ -156,6 +156,79 @@ export default function CallDetailsClient({
   const [overallSummary, setOverallSummary] = useState<string>("");
   const [loadingOverall, setLoadingOverall] = useState<boolean>(false);
 
+  // Retranscription states
+  const [retranscribing, setRetranscribing] = useState(false);
+  const [retranscribingLogs, setRetranscribingLogs] = useState<string[]>([]);
+  const [retranscribeDuration, setRetranscribeDuration] = useState<string | null>(null);
+  const [retranscribeError, setRetranscribeError] = useState<string | null>(null);
+  const [showFailedLogs, setShowFailedLogs] = useState(false);
+  const [showRetranscribeModal, setShowRetranscribeModal] = useState(false);
+
+  // Poll retranscription status on mount and if running
+  useEffect(() => {
+    let intervalId: any = null;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/calls/${id}/retranscribe`);
+        if (res.ok) {
+          const data = await res.json();
+          setRetranscribingLogs(data.logs || []);
+          
+          if (data.status === "running") {
+            setRetranscribing(true);
+            setRetranscribeError(null);
+          } else if (data.status === "done") {
+            setRetranscribing(false);
+            setRetranscribeDuration(data.duration);
+            if (intervalId) clearInterval(intervalId);
+            router.refresh();
+          } else if (data.status === "error") {
+            setRetranscribing(false);
+            setRetranscribeError(data.error || "Retranscription failed.");
+            if (intervalId) clearInterval(intervalId);
+          } else {
+            setRetranscribing(false);
+            if (intervalId) clearInterval(intervalId);
+          }
+        }
+      } catch (e) {
+        console.error("Error polling retranscription status:", e);
+      }
+    };
+
+    // Check status immediately
+    poll();
+
+    // Set up polling interval every 2 seconds
+    intervalId = setInterval(poll, 2000);
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [id, router, retranscribing]);
+
+  const startRetranscription = async () => {
+    setRetranscribing(true);
+    setRetranscribingLogs(["[System] Starting background transcription job..."]);
+    setRetranscribeDuration(null);
+    setRetranscribeError(null);
+    setShowRetranscribeModal(true); // Open the log modal
+
+    try {
+      const response = await fetch(`/api/calls/${id}/retranscribe`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to start background transcription.");
+      }
+    } catch (err: any) {
+      setRetranscribing(false);
+      setRetranscribeError(err.message || "Request failed.");
+    }
+  };
+
   const handleTabChange = async (tab: "requirement" | "overall" | "transcript" | "recording") => {
     setActiveTab(tab);
     if (tab === "overall" && !overallSummary && call.leadId) {
@@ -171,22 +244,23 @@ export default function CallDetailsClient({
     }
   };
 
-  // Group consecutive turns from the same speaker (Agent/Lead)
-  const groupedTurns = React.useMemo(() => {
-    if (!parsedTurns) return null;
-    const turns: any[] = [];
-    parsedTurns.forEach((turn: any) => {
-      const last = turns[turns.length - 1];
-      if (last && last.speaker === turn.speaker) {
-        last.text = (last.text + " " + turn.text).trim();
-        if (turn.translation) {
-          last.translation = ((last.translation || "") + " " + turn.translation).trim();
-        }
-      } else {
-        turns.push({ ...turn });
-      }
-    });
-    return turns;
+  // Combine all turns by speaker into one paragraph
+  const combinedAgentTurns = React.useMemo(() => {
+    if (!parsedTurns) return { text: "", translation: "" };
+    const agentTurns = parsedTurns.filter((t: any) => t.speaker === "Agent");
+    return {
+      text: agentTurns.map((t: any) => t.text).join(" ").trim(),
+      translation: agentTurns.map((t: any) => t.translation || t.text).join(" ").trim()
+    };
+  }, [parsedTurns]);
+
+  const combinedLeadTurns = React.useMemo(() => {
+    if (!parsedTurns) return { text: "", translation: "" };
+    const leadTurns = parsedTurns.filter((t: any) => t.speaker === "Lead");
+    return {
+      text: leadTurns.map((t: any) => t.text).join(" ").trim(),
+      translation: leadTurns.map((t: any) => t.translation || t.text).join(" ").trim()
+    };
   }, [parsedTurns]);
 
   // Formatting date-time
@@ -209,6 +283,29 @@ export default function CallDetailsClient({
         <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mt-3">
           <h3 className="fw-bold mb-0">{call.lead.name} Call Analysis</h3>
           <div className="d-flex flex-wrap align-items-center gap-2">
+            <button
+              onClick={() => {
+                if (retranscribing) {
+                  setShowRetranscribeModal(true);
+                } else {
+                  startRetranscription();
+                }
+              }}
+              className="btn btn-light border px-3 py-1.5 small fw-bold d-flex align-items-center gap-2"
+              style={{ borderRadius: "8px" }}
+            >
+              {retranscribing ? (
+                <>
+                  <div className="spinner-border spinner-border-sm text-primary" role="status"></div>
+                  <span>Retranscribing... (View Console)</span>
+                </>
+              ) : (
+                <>
+                  <i className="bi bi-arrow-clockwise text-success"></i>
+                  <span>Re-transcribe</span>
+                </>
+              )}
+            </button>
             <Link href={`/admin/calls/${id}/edit`} className="btn btn-light border px-3 py-1.5 small fw-bold d-flex align-items-center gap-2" style={{ borderRadius: "8px" }}>
               <i className="bi bi-pencil-square text-info"></i><span>Edit Log</span>
             </Link>
@@ -370,6 +467,40 @@ export default function CallDetailsClient({
 
                 {activeTab === "transcript" && (
                   <>
+                    {retranscribing && (
+                      <div className="alert alert-info border-0 shadow-sm p-3 mb-4 rounded-3 d-flex align-items-center justify-content-between animate-fade" style={{ fontSize: "13px" }}>
+                        <div className="d-flex align-items-center gap-2 text-primary fw-semibold">
+                          <div className="spinner-border spinner-border-sm text-primary" role="status"></div>
+                          <span>Gemini AI is re-transcribing this call in the background...</span>
+                        </div>
+                        <button 
+                          type="button" 
+                          onClick={() => setShowRetranscribeModal(true)}
+                          className="btn btn-outline-primary btn-sm border-0 fw-bold px-3 py-1"
+                          style={{ borderRadius: "6px" }}
+                        >
+                          View Console Logs
+                        </button>
+                      </div>
+                    )}
+
+                    {retranscribeError && (
+                      <div className="alert alert-danger border-0 shadow-sm p-3 mb-4 rounded-3 d-flex align-items-center justify-content-between animate-fade" style={{ fontSize: "13px" }}>
+                        <div className="d-flex align-items-center gap-2 text-danger fw-semibold">
+                          <i className="bi bi-x-circle-fill fs-6"></i>
+                          <span>Retranscription failed: {retranscribeError}</span>
+                        </div>
+                        <button 
+                          type="button" 
+                          onClick={() => setShowRetranscribeModal(true)}
+                          className="btn btn-outline-danger btn-sm border-0 fw-bold px-3 py-1"
+                          style={{ borderRadius: "6px" }}
+                        >
+                          View Console Logs
+                        </button>
+                      </div>
+                    )}
+
                     {call.detectedVoiceLanguage && (
                       <div className="d-flex flex-wrap gap-3 mb-4 p-3 bg-light rounded-3 border animate-fade">
                         <div>
@@ -396,64 +527,92 @@ export default function CallDetailsClient({
                     )}
 
                     <div className="transcript-wrapper pe-2 animate-fade" style={{ maxHeight: "450px", overflowY: "auto" }}>
-                      {groupedTurns ? (
-                        <div className="d-flex flex-column gap-3">
-                          {groupedTurns.map((turn, idx) => {
-                            const isAgent = turn.speaker === "Agent";
-                            const speakerName = isAgent ? (call.user?.name || "Agent") : (call.lead?.name || "Lead");
-                            const showTranslation = !!turn.translation;
-                            
-                            return (
-                              <div key={idx} className={`d-flex gap-3 align-items-start ${isAgent ? "" : "flex-row-reverse"}`}>
-                                <div 
-                                  className={`rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center shadow-sm fw-bold text-white ${
-                                    isAgent ? "bg-primary" : "bg-success"
-                                  }`} 
-                                  style={{ width: 36, height: 36, fontSize: 13 }}
-                                >
-                                  {isAgent ? "A" : "L"}
-                                </div>
-                                <div 
-                                  className={`p-3 rounded-4 flex-grow-1 shadow-sm border ${
-                                    isAgent 
-                                      ? "bg-white border-light-subtle" 
-                                      : "bg-success bg-opacity-10 border-success border-opacity-20 text-end"
-                                  }`}
-                                  style={{ maxWidth: "80%" }}
-                                >
-                                  <div className={`d-flex justify-content-between align-items-center mb-1.5 ${isAgent ? "" : "flex-row-reverse"}`}>
-                                    <span className={`fw-bold small ${isAgent ? "text-primary" : "text-success"}`}>
-                                      {speakerName}
-                                    </span>
-                                    <span className="x-small text-secondary font-monospace">{turn.time}</span>
-                                  </div>
-                                  <div className="d-flex flex-column gap-1">
-                                    {showTranslation && (
-                                      <div className={`x-small text-muted mb-0.5 ${isAgent ? "text-start" : "text-end"}`}>
-                                        <span className="badge bg-secondary bg-opacity-10 text-secondary" style={{ fontSize: "9px" }}>ORIGINAL SPEECH</span>
-                                      </div>
-                                    )}
-                                    <p className="small mb-0 text-dark fw-medium" style={{ wordBreak: "break-word", lineHeight: "1.5" }}>
-                                      {turn.text}
-                                    </p>
-                                  </div>
-                                  {showTranslation && (
-                                    <div className={`mt-2 pt-2 border-top border-secondary border-opacity-10 x-small text-muted ${isAgent ? "text-start" : "text-end"}`}>
-                                      <div className="mb-1">
-                                        <span className="badge bg-success bg-opacity-15 " style={{ fontSize: "9px", letterSpacing: "0.5px" }}>TRANSLATED TO ENGLISH</span>
-                                      </div>
-                                      <div className="mt-1 font-monospace fw-semibold text-secondary" style={{ whiteSpace: "pre-wrap" }}>
-                                        {turn.translation}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
+                      {parsedTurns && parsedTurns.length > 0 ? (
+                        <div className="d-flex flex-column gap-4">
+                          {/* Agent Bubble */}
+                          {combinedAgentTurns.text && (
+                            <div className="d-flex gap-3 align-items-start">
+                              <div 
+                                className="rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center shadow-sm fw-bold text-white bg-primary" 
+                                style={{ width: 36, height: 36, fontSize: 13 }}
+                              >
+                                A
                               </div>
-                            );
-                          })}
+                              <div 
+                                className="p-3 rounded-4 flex-grow-1 shadow-sm border bg-white border-light-subtle"
+                                style={{ maxWidth: "80%" }}
+                              >
+                                <div className="d-flex justify-content-between align-items-center mb-1.5">
+                                  <span className="fw-bold small text-primary">
+                                    {call.user?.name || "Agent"} (Agent)
+                                  </span>
+                                  <span className="x-small text-secondary font-monospace">00:00</span>
+                                </div>
+                                <div className="d-flex flex-column gap-1">
+                                  <div className="x-small text-muted mb-0.5 text-start">
+                                    <span className="badge bg-secondary bg-opacity-10 text-secondary" style={{ fontSize: "9px" }}>ORIGINAL SPEECH</span>
+                                  </div>
+                                  <p className="small mb-0 text-dark fw-medium" style={{ wordBreak: "break-word", lineHeight: "1.5" }}>
+                                    {combinedAgentTurns.text}
+                                  </p>
+                                </div>
+                                {combinedAgentTurns.translation && combinedAgentTurns.translation !== combinedAgentTurns.text && (
+                                  <div className="mt-2 pt-2 border-top border-secondary border-opacity-10 x-small text-muted text-start">
+                                    <div className="mb-1">
+                                      <span className="badge bg-success bg-opacity-15" style={{ fontSize: "9px", letterSpacing: "0.5px" }}>TRANSLATED TO ENGLISH</span>
+                                    </div>
+                                    <div className="mt-1 font-monospace fw-semibold text-secondary" style={{ whiteSpace: "pre-wrap" }}>
+                                      {combinedAgentTurns.translation}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Lead Bubble */}
+                          {combinedLeadTurns.text && (
+                            <div className="d-flex gap-3 align-items-start flex-row-reverse">
+                              <div 
+                                className="rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center shadow-sm fw-bold text-white bg-success" 
+                                style={{ width: 36, height: 36, fontSize: 13 }}
+                              >
+                                L
+                              </div>
+                              <div 
+                                className="p-3 rounded-4 flex-grow-1 shadow-sm border bg-success bg-opacity-10 border-success border-opacity-20 text-end"
+                                style={{ maxWidth: "80%" }}
+                              >
+                                <div className="d-flex justify-content-between align-items-center mb-1.5 flex-row-reverse">
+                                  <span className="fw-bold small text-success">
+                                    {call.lead?.name || "Lead"} (Lead)
+                                  </span>
+                                  <span className="x-small text-secondary font-monospace">00:01</span>
+                                </div>
+                                <div className="d-flex flex-column gap-1">
+                                  <div className="x-small text-muted mb-0.5 text-end">
+                                    <span className="badge bg-secondary bg-opacity-10 text-secondary" style={{ fontSize: "9px" }}>ORIGINAL SPEECH</span>
+                                  </div>
+                                  <p className="small mb-0 text-dark fw-medium" style={{ wordBreak: "break-word", lineHeight: "1.5" }}>
+                                    {combinedLeadTurns.text}
+                                  </p>
+                                </div>
+                                {combinedLeadTurns.translation && combinedLeadTurns.translation !== combinedLeadTurns.text && (
+                                  <div className="mt-2 pt-2 border-top border-secondary border-opacity-10 x-small text-muted text-end">
+                                    <div className="mb-1">
+                                      <span className="badge bg-success bg-opacity-15" style={{ fontSize: "9px", letterSpacing: "0.5px" }}>TRANSLATED TO ENGLISH</span>
+                                    </div>
+                                    <div className="mt-1 font-monospace fw-semibold text-secondary" style={{ whiteSpace: "pre-wrap" }}>
+                                      {combinedLeadTurns.translation}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ) : call.translatedText || call.transcript ? (
-                        <div className="bg-light p-4 rounded-4 border shadow-sm mb-3">
+                        <div className="bg-light p-4 rounded-4 border shadow-sm mb-3 animate-fade">
                           <div className="d-flex justify-content-between mb-2 pb-2 border-bottom">
                             <span className="fw-bold small text-primary">Call Audio Transcript / Translated Text</span>
                             <span className="x-small text-secondary">{new Date(call.createdAt).toLocaleTimeString()}</span>
@@ -507,6 +666,104 @@ export default function CallDetailsClient({
           </div>
         </div>
       </div>
+
+      {showRetranscribeModal && (
+        <div className="modal show d-block animate-fade" tabIndex={-1} style={{ backgroundColor: "rgba(15, 23, 42, 0.7)", backdropFilter: "blur(4px)", zIndex: 1050 }}>
+          <div className="modal-dialog modal-lg modal-dialog-centered">
+            <div className="modal-content border-0 shadow-lg" style={{ borderRadius: "16px", overflow: "hidden" }}>
+              <div className="modal-header border-0 d-flex justify-content-between align-items-center py-3 px-4" style={{ backgroundColor: "#0f172a", color: "#f8fafc" }}>
+                <h6 className="modal-title fw-bold m-0 d-flex align-items-center gap-2">
+                  <i className="bi bi-terminal-fill text-info"></i>
+                  <span>Gemini AI Transcription Console</span>
+                </h6>
+                <button 
+                  type="button" 
+                  className="btn-close btn-close-white shadow-none" 
+                  onClick={() => setShowRetranscribeModal(false)}
+                  aria-label="Close"
+                ></button>
+              </div>
+              <div className="modal-body p-4" style={{ backgroundColor: "#1e293b", color: "#e2e8f0" }}>
+                {/* Console Log Area */}
+                <div 
+                  className="p-3 font-monospace rounded-3 mb-3 border border-secondary border-opacity-20"
+                  style={{ 
+                    backgroundColor: "#0f172a", 
+                    height: "350px", 
+                    overflowY: "auto", 
+                    fontSize: "12.5px", 
+                    lineHeight: "1.6" 
+                  }}
+                  ref={(el) => {
+                    if (el) el.scrollTop = el.scrollHeight;
+                  }}
+                >
+                  {retranscribingLogs.map((logLine, i) => {
+                    let textClass = "text-light";
+                    if (logLine.includes("[ERROR]")) textClass = "text-danger";
+                    else if (logLine.includes("[WARN]")) textClass = "text-warning";
+                    else if (logLine.includes("[System]")) textClass = "text-info fw-bold";
+                    else if (logLine.includes("succeeded") || logLine.includes("complete")) textClass = "text-success fw-bold";
+                    
+                    return (
+                      <div key={i} className={`${textClass} mb-1`}>
+                        {logLine}
+                      </div>
+                    );
+                  })}
+                  {retranscribing && (
+                    <div className="text-info d-flex align-items-center gap-2 mt-2">
+                      <div className="spinner-border spinner-border-sm text-info" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                      </div>
+                      <span>Processing audio...</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Status bar */}
+                <div className="d-flex align-items-center justify-content-between">
+                  <div className="small">
+                    {retranscribing ? (
+                      <span className="text-info d-flex align-items-center gap-2">
+                        <div className="spinner-border spinner-border-sm text-info" style={{ width: "12px", height: "12px" }}></div>
+                        Transcribing call logs using Gemini AI...
+                      </span>
+                    ) : retranscribeError ? (
+                      <span className="text-danger fw-semibold">
+                        <i className="bi bi-x-circle-fill"></i> Retranscription failed.
+                      </span>
+                    ) : (
+                      <span className="text-success fw-semibold">
+                        <i className="bi bi-check-circle-fill"></i> Successfully retranscribed in {retranscribeDuration || "0"}s!
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="d-flex gap-2">
+                    {retranscribing && (
+                      <button 
+                        className="btn btn-primary fw-bold px-3 border-0 animate-fade" 
+                        style={{ borderRadius: "8px", fontSize: "13px" }}
+                        onClick={() => setShowRetranscribeModal(false)}
+                      >
+                        Run in Background
+                      </button>
+                    )}
+                    <button 
+                      className="btn btn-light fw-bold px-3 border-0" 
+                      style={{ borderRadius: "8px", fontSize: "13px", backgroundColor: "#f8fafc", color: "#0f172a" }}
+                      onClick={() => setShowRetranscribeModal(false)}
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Auto-refresher client hook if call details are in placeholder stage */}
       <CallRefresher isPlaceholder={isPlaceholder} />
