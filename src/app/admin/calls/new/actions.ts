@@ -279,11 +279,8 @@ export async function getCallLogStatus(id: string) {
 
 export async function endTwilioCall(callSid: string) {
   try {
-    const sipConfig = await prisma.sipTrunkConfig.findFirst({
-      where: { isActive: true }
-    });
     const useRealTwilio = process.env.USE_REAL_TWILIO === "true";
-    const mockTwilioUrl = !useRealTwilio ? ((sipConfig as any)?.mockTwilioUrl || process.env.MOCK_TWILIO_URL || "http://localhost:5050") : null;
+    const mockTwilioUrl = !useRealTwilio ? (process.env.MOCK_TWILIO_URL || "http://localhost:5050") : null;
 
     const accountSid = process.env.TWILIO_ACCOUNT_SID || "AC_mock_sid";
     const authToken = process.env.TWILIO_AUTH_TOKEN || "mock_token";
@@ -324,11 +321,8 @@ export async function endTwilioCall(callSid: string) {
 
 export async function getTwilioCallStatus(callSid: string) {
   try {
-    const sipConfig = await prisma.sipTrunkConfig.findFirst({
-      where: { isActive: true }
-    });
     const useRealTwilio = process.env.USE_REAL_TWILIO === "true";
-    const mockTwilioUrl = !useRealTwilio ? ((sipConfig as any)?.mockTwilioUrl || process.env.MOCK_TWILIO_URL || "http://localhost:5050") : null;
+    const mockTwilioUrl = !useRealTwilio ? (process.env.MOCK_TWILIO_URL || "http://localhost:5050") : null;
 
     const accountSid = process.env.TWILIO_ACCOUNT_SID || "AC_mock_sid";
     const authToken = process.env.TWILIO_AUTH_TOKEN || "mock_token";
