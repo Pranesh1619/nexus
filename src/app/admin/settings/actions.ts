@@ -31,21 +31,32 @@ export async function updateUserInfo(formData: FormData) {
   }
 }
 
-export async function updatePassword(formData: FormData) {
+export async function updateUserEmail(formData: FormData) {
   const userId = formData.get("userId") as string;
-  const newPassword = formData.get("newPassword") as string;
+  const newEmail = formData.get("newEmail") as string;
 
-  if (!userId || !newPassword) return { error: "Data missing" };
+  if (!userId || !newEmail) return { error: "Data missing" };
 
   try {
+    const existing = await prisma.user.findFirst({
+      where: {
+        email: newEmail.trim(),
+        NOT: { id: userId }
+      }
+    });
+
+    if (existing) {
+      return { error: "This email address is already in use" };
+    }
+
     await prisma.user.update({
       where: { id: userId },
-      data: { password: newPassword }, // Hash this in real apps!
+      data: { email: newEmail.trim() },
     });
     revalidatePath("/admin/settings");
     return { success: true };
   } catch {
-    return { error: "Failed to update password" };
+    return { error: "Failed to update email address" };
   }
 }
 

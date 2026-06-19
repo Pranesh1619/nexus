@@ -15,8 +15,12 @@ model User {
   password  String
   role      String   @default("SALES") // ADMIN, SALES
   status    String   @default("ACTIVE") // ACTIVE, INACTIVE
+  companyId String?
+  phone     String?
   leads     Lead[]
   calls     CallLog[]
+  otpCode   String?
+  otpExpires DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

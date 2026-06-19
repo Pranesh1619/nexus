@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { exchangeZohoRefreshToken, performZohoSync, getStoredZohoConfig } from "./actions";
+import { exchangeZohoRefreshToken, performZohoSync, getStoredZohoConfig, disconnectZohoConfig } from "./actions";
 
 interface MigrationLog {
   id: string;
@@ -37,6 +37,24 @@ export default function MigrationPage() {
 
   // Simulation controls
   const [syncCount, setSyncCount] = useState({ fetched: 0, updated: 0, pushed: 0 });
+
+  // Load query params to show OAuth feedback
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("zoho_connected") === "1") {
+      setTokenFeedback({
+        type: "success",
+        text: "Successfully connected to Zoho CRM via secure OAuth!"
+      });
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (params.get("zoho_error")) {
+      setTokenFeedback({
+        type: "danger",
+        text: `OAuth connection failed: ${decodeURIComponent(params.get("zoho_error") || "")}`
+      });
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
 
   // Load persistent credentials from the database on mount (0 env or browser cache fallbacks)
   useEffect(() => {
@@ -142,6 +160,27 @@ export default function MigrationPage() {
     }
   };
 
+  const handleDisconnect = async () => {
+    if (window.confirm("Are you sure you want to disconnect your Zoho CRM Integration? This will clear your custom API keys from this account.")) {
+      const res = await disconnectZohoConfig();
+      if (res.success) {
+        setClientId("");
+        setClientSecret("");
+        setRefreshToken("");
+        setAccessToken("");
+        setTokenFeedback({
+          type: "warning",
+          text: "Zoho CRM Integration disconnected successfully."
+        });
+      } else {
+        setTokenFeedback({
+          type: "danger",
+          text: "Failed to disconnect Zoho CRM Integration."
+        });
+      }
+    }
+  };
+
   // Is migrating active/complete
   const isMigrating = migrationStage !== "idle";
 
@@ -175,7 +214,53 @@ export default function MigrationPage() {
                 </div>
                 <div>
                   <h5 className="fw-bold text-dark mb-0.5" style={{ fontSize: "15.5px" }}>Bigin Zoho API Authentication</h5>
-                  <p className="text-secondary mb-0" style={{ fontSize: "12px" }}>Provide developer console client credentials and handshake keys.</p>
+                  <p className="text-secondary mb-0" style={{ fontSize: "12px" }}>Connect automatically via Zoho OAuth or provide developer console client credentials manually.</p>
+                </div>
+              </div>
+
+              {/* Seamless Zoho OAuth Connection */}
+              <div className="bg-light p-3 rounded-4 mb-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
+                <div>
+                  <h6 className="fw-bold text-dark mb-1" style={{ fontSize: "13.5px" }}>Seamless Zoho OAuth Connection</h6>
+                  <p className="text-secondary mb-0" style={{ fontSize: "12px" }}>
+                    {accessToken 
+                      ? "Your Zoho Bigin account is successfully authorized and connected to your account."
+                      : "Authorize and connect your Zoho Bigin account instantly without manual key input."
+                    }
+                  </p>
+                </div>
+                <div>
+                  {accessToken ? (
+                    <button
+                      onClick={handleDisconnect}
+                      className="btn btn-outline-danger fw-bold px-4 d-flex align-items-center justify-content-center gap-2"
+                      style={{
+                        height: "42px",
+                        borderRadius: "10px",
+                        fontSize: "13px",
+                        transition: "all 0.2s"
+                      }}
+                    >
+                      <i className="bi bi-trash"></i>
+                      Disconnect Zoho
+                    </button>
+                  ) : (
+                    <a
+                      href="/api/auth/zoho"
+                      className="btn btn-success fw-bold px-4 text-white d-flex align-items-center justify-content-center gap-2"
+                      style={{
+                        height: "42px",
+                        borderRadius: "10px",
+                        fontSize: "13px",
+                        backgroundColor: "#00A76F",
+                        borderColor: "#00A76F",
+                        transition: "all 0.2s"
+                      }}
+                    >
+                      <i className="bi bi-box-arrow-in-right"></i>
+                      Connect Zoho
+                    </a>
+                  )}
                 </div>
               </div>
 

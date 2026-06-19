@@ -14,7 +14,7 @@ interface User {
   status: string;
 }
 
-export default function EditUserForm({ user, success }: { user: User; success?: boolean }) {
+export default function EditUserForm({ user, success, currentUserRole = "ADMIN" }: { user: User; success?: boolean; currentUserRole?: string }) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -50,18 +50,33 @@ export default function EditUserForm({ user, success }: { user: User; success?: 
           <form onSubmit={handleSubmit}>
             <div className="row g-3">
               <div className="col-md-6">
-                <label className="form-label">Full Name</label>
+                <label className="form-label">Full Name <span className="text-danger">*</span></label>
                 <input name="name" type="text" className="form-control form-control-sm bg-light border-0 small px-3 py-2" defaultValue={user.name} required />
               </div>
               <div className="col-md-6">
-                <label className="form-label">Email Address</label>
+                <label className="form-label">Email Address <span className="text-danger">*</span></label>
                 <input name="email" type="email" className="form-control form-control-sm bg-light border-0 small px-3 py-2" defaultValue={user.email} required />
               </div>
               <div className="col-md-6">
-                <label className="form-label">Access Role</label>
+                <label className="form-label">Access Role <span className="text-danger">*</span></label>
                 <select name="role" className="form-select form-select-sm bg-light border-0 small px-3 py-2" defaultValue={user.role}>
-                  <option value="SALES">Sales Agent</option>
-                  <option value="ADMIN">Administrator</option>
+                  {(() => {
+                    const roles = [];
+                    if (currentUserRole === "SUPER_ADMIN") {
+                      roles.push(
+                        { value: "SUPER_ADMIN", label: "Super Admin" },
+                        { value: "COMPANY_ADMIN", label: "Company Admin" }
+                      );
+                    } else {
+                      // Company Admin, Admin, etc. can only assign/edit to Sales Agent
+                      roles.push(
+                        { value: "SALES", label: "Sales Agent" }
+                      );
+                    }
+                    return roles.map(r => (
+                      <option key={r.value} value={r.value}>{r.label}</option>
+                    ));
+                  })()}
                 </select>
               </div>
               <div className="col-md-6">

@@ -3,14 +3,29 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import AgentsWorkspace from "./AgentsWorkspace";
 
+import { cookies } from "next/headers";
+
 export const dynamic = "force-dynamic";
 
 export default async function AgentsPage() {
+  const cookieStore = await cookies();
+  const userRole = cookieStore.get("user_role")?.value;
+  const userCompanyId = cookieStore.get("user_company_id")?.value;
+
+  const whereClause: any = {
+    status: { in: ["ACTIVE", "Active", "active"] },
+  };
+
+  if (userRole !== "SUPER_ADMIN" && userCompanyId) {
+    whereClause.companyId = userCompanyId;
+    whereClause.role = "SALES";
+  } else if (userRole === "SUPER_ADMIN") {
+    whereClause.role = { in: ["SUPER_ADMIN", "COMPANY_ADMIN"] };
+  }
+
   // Fetch active sales/admin agents along with their leads and calls
   const agents = await prisma.user.findMany({
-    where: {
-      status: { in: ["ACTIVE", "Active", "active"] },
-    },
+    where: whereClause,
     include: {
       leads: {
         include: {

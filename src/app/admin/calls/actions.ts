@@ -3,19 +3,23 @@
 import { prisma } from "@/lib/db";
 
 export async function getCallLogs(userId?: string) {
+  const { cookies } = await import("next/headers");
+  const cookieStore = await cookies();
+  const userRole = cookieStore.get("user_role")?.value;
+  const userCompanyId = cookieStore.get("user_company_id")?.value;
+
+  const whereClause: any = {};
+
   if (userId) {
-    return await prisma.callLog.findMany({
-      where: { userId },
-      include: {
-        lead: true,
-        user: true,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+    whereClause.userId = userId;
+  } else if (userRole !== "SUPER_ADMIN" && userCompanyId) {
+    whereClause.user = {
+      companyId: userCompanyId
+    };
   }
+
   return await prisma.callLog.findMany({
+    where: whereClause,
     include: {
       lead: true,
       user: true,

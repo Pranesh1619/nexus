@@ -15,13 +15,35 @@ export async function createUser(formData: FormData) {
   const password = formData.get("password") as string;
   const role = formData.get("role") as string;
 
-  await prisma.user.create({
+  if (!name || !email || !password || !role) {
+    throw new Error("All fields (Name, Email, Password, and Role) are mandatory.");
+  }
+
+  const { cookies } = await import("next/headers");
+  const cookieStore = await cookies();
+  const creatorCompanyId = cookieStore.get("user_company_id")?.value;
+
+  const newUser = await prisma.user.create({
     data: {
-      name,
-      email,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
       password,
       role,
     },
+  });
+
+  // Assign companyId: New Company Admin starts their own company,
+  // whereas Sales agents belong to the creator's company.
+  let assignedCompanyId: string;
+  if (role === "COMPANY_ADMIN") {
+    assignedCompanyId = newUser.id;
+  } else {
+    assignedCompanyId = creatorCompanyId || "nexus";
+  }
+
+  await prisma.user.update({
+    where: { id: newUser.id },
+    data: { companyId: assignedCompanyId },
   });
 
   revalidatePath("/admin/users");

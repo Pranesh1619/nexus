@@ -238,9 +238,7 @@ body {
 
 /* Forms */
 .form-label {
-  font-size: 11px !important;
   font-weight: 600 !important;
-  text-transform: uppercase !important;
   color: var(--text-secondary) !important;
   margin-bottom: 0.6rem !important;
   letter-spacing: 0.5px;

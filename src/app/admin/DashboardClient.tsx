@@ -64,7 +64,7 @@ interface DashboardClientProps {
   initialUsers: User[];
 }
 
-export default function DashboardClient({ initialCalls }: DashboardClientProps) {
+export default function DashboardClient({ initialCalls, initialLeads, initialUsers }: DashboardClientProps) {
   // 1. Top Filters State
   const [activeModule, setActiveModule] = useState<"all" | "sales" | "support" | "leads">("all");
   const [timePeriod, setTimePeriod] = useState<"7days" | "30days" | "thisyear">("7days");
@@ -84,7 +84,7 @@ export default function DashboardClient({ initialCalls }: DashboardClientProps) 
     if (activeModule === "sales") {
       calls = initialCalls.filter(c => 
         ["Qualified", "Interested", "Closed", "New Lead", "Attempted Contact"].includes(c.stage) || 
-        c.user.role === "SALES"
+        c.user?.role === "SALES"
       );
     } else if (activeModule === "support") {
       calls = initialCalls.filter(c => 
@@ -97,10 +97,9 @@ export default function DashboardClient({ initialCalls }: DashboardClientProps) 
       );
     }
 
-    // B. Fallback data in case the DB is fresh/empty, to keep the UI looking premium and rich
-    const totalCallsCount = Math.max(calls.length, activeModule === "all" ? 248 : activeModule === "sales" ? 142 : activeModule === "support" ? 74 : 32);
-    const connectedCallsCount = Math.round(totalCallsCount * (activeModule === "sales" ? 0.78 : activeModule === "support" ? 0.92 : 0.65));
-    const connectivityRate = Math.round((connectedCallsCount / totalCallsCount) * 100);
+    const totalCallsCount = calls.length;
+    const connectedCallsCount = calls.filter(c => c.status === "CONNECTED").length;
+    const connectivityRate = totalCallsCount > 0 ? Math.round((connectedCallsCount / totalCallsCount) * 100) : 0;
     
     let avgDurationSecs = 0;
     let avgAiScore = 0;
@@ -111,95 +110,103 @@ export default function DashboardClient({ initialCalls }: DashboardClientProps) 
 
       const aiScoreSum = calls.reduce((acc, curr) => acc + (curr.aiScore || 0), 0);
       avgAiScore = Math.round(aiScoreSum / calls.length);
-    } else {
-      avgDurationSecs = activeModule === "sales" ? 312 : activeModule === "support" ? 425 : 185;
-      avgAiScore = activeModule === "sales" ? 82 : activeModule === "support" ? 89 : 76;
     }
 
     // C. Recent calls list
-    const recentCallsList = calls.length > 0 ? calls.slice(0, 5) : [
-      {
-        id: "mock1",
-        lead: { name: "Robert Fox", phone: "+1 (555) 019-2834" },
-        user: { name: "Pranesh" },
-        duration: 345,
-        status: "CONNECTED",
-        stage: activeModule === "support" ? "Technical Support" : "Qualified",
-        aiScore: 92,
-        createdAt: new Date("2026-05-11T04:00:00Z")
-      },
-      {
-        id: "mock2",
-        lead: { name: "Jane Cooper", phone: "+1 (555) 014-3912" },
-        user: { name: "Sarah Connor" },
-        duration: 520,
-        status: "CONNECTED",
-        stage: activeModule === "support" ? "Billing Inquiry" : "Interested",
-        aiScore: 84,
-        createdAt: new Date("2026-05-11T03:00:00Z")
-      },
-      {
-        id: "mock3",
-        lead: { name: "Cody Fisher", phone: "+1 (555) 012-9482" },
-        user: { name: "John Doe" },
-        duration: 0,
-        status: "MISSED",
-        stage: "Attempted Contact",
-        aiScore: 0,
-        createdAt: new Date("2026-05-11T02:00:00Z")
-      },
-      {
-        id: "mock4",
-        lead: { name: "Esther Howard", phone: "+1 (555) 015-8491" },
-        user: { name: "Pranesh" },
-        duration: 185,
-        status: "CONNECTED",
-        stage: activeModule === "support" ? "Incident Resolved" : "New Lead",
-        aiScore: 78,
-        createdAt: new Date("2026-05-11T00:00:00Z")
+    const recentCallsList = calls.slice(0, 5);
+
+    // D. Monthly Performance Charts data based on Active Module and real data
+    const getChartData = () => {
+      if (calls.length === 0) {
+        if (timePeriod === "thisyear") {
+          return [
+            { name: "Jan", volume: 0 }, { name: "Feb", volume: 0 }, { name: "Mar", volume: 0 },
+            { name: "Apr", volume: 0 }, { name: "May", volume: 0 }, { name: "Jun", volume: 0 },
+            { name: "Jul", volume: 0 }, { name: "Aug", volume: 0 }, { name: "Sep", volume: 0 },
+            { name: "Oct", volume: 0 }, { name: "Nov", volume: 0 }, { name: "Dec", volume: 0 }
+          ];
+        } else if (timePeriod === "30days") {
+          return [
+            { name: "Week 1", volume: 0 }, { name: "Week 2", volume: 0 },
+            { name: "Week 3", volume: 0 }, { name: "Week 4", volume: 0 }
+          ];
+        } else {
+          return [
+            { name: "Mon", volume: 0 }, { name: "Tue", volume: 0 }, { name: "Wed", volume: 0 },
+            { name: "Thu", volume: 0 }, { name: "Fri", volume: 0 }, { name: "Sat", volume: 0 },
+            { name: "Sun", volume: 0 }
+          ];
+        }
       }
-    ];
 
-    // D. Monthly Performance Charts data based on Active Module
-    const chartData = timePeriod === "thisyear" 
-      ? [
-          { name: "Jan", volume: activeModule === "support" ? 220 : 350 },
-          { name: "Feb", volume: activeModule === "support" ? 280 : 410 },
-          { name: "Mar", volume: activeModule === "support" ? 310 : 490 },
-          { name: "Apr", volume: activeModule === "support" ? 290 : 520 },
-          { name: "May", volume: activeModule === "support" ? 340 : 580 },
-          { name: "Jun", volume: activeModule === "support" ? 410 : 640 },
-          { name: "Jul", volume: activeModule === "support" ? 430 : 690 },
-          { name: "Aug", volume: activeModule === "support" ? 480 : 710 },
-          { name: "Sep", volume: activeModule === "support" ? 390 : 620 },
-          { name: "Oct", volume: activeModule === "support" ? 420 : 680 },
-          { name: "Nov", volume: activeModule === "support" ? 460 : 740 },
-          { name: "Dec", volume: activeModule === "support" ? 510 : 820 },
-        ]
-      : timePeriod === "30days"
-      ? [
-          { name: "Week 1", volume: activeModule === "support" ? 85 : 120 },
-          { name: "Week 2", volume: activeModule === "support" ? 95 : 145 },
-          { name: "Week 3", volume: activeModule === "support" ? 110 : 165 },
-          { name: "Week 4", volume: activeModule === "support" ? 130 : 190 },
-        ]
-      : [
-          { name: "Mon", volume: activeModule === "support" ? 12 : 24 },
-          { name: "Tue", volume: activeModule === "support" ? 18 : 31 },
-          { name: "Wed", volume: activeModule === "support" ? 15 : 28 },
-          { name: "Thu", volume: activeModule === "support" ? 22 : 36 },
-          { name: "Fri", volume: activeModule === "support" ? 25 : 42 },
-          { name: "Sat", volume: activeModule === "support" ? 10 : 15 },
-          { name: "Sun", volume: activeModule === "support" ? 8 : 12 },
-        ];
+      const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-    // E. Agent leader board
-    const leaders = [
-      { name: "Pranesh (You)", role: "Super Admin", calls: activeModule === "all" ? 84 : activeModule === "sales" ? 48 : activeModule === "support" ? 36 : 12, ai: 91, avatar: "P", color: "#00A76F" },
-      { name: "Sarah Connor", role: "Sales Specialist", calls: activeModule === "all" ? 72 : activeModule === "sales" ? 62 : activeModule === "support" ? 10 : 8, ai: 88, avatar: "S", color: "#1890FF" },
-      { name: "John Doe", role: "Support Representative", calls: activeModule === "all" ? 65 : activeModule === "sales" ? 15 : activeModule === "support" ? 50 : 5, ai: 84, avatar: "J", color: "#FFC107" },
-      { name: "Emily Watson", role: "Leads Coordinator", calls: activeModule === "all" ? 48 : activeModule === "sales" ? 10 : activeModule === "support" ? 8 : 30, ai: 81, avatar: "E", color: "#FF4842" },
-    ].sort((a, b) => b.calls - a.calls);
+      if (timePeriod === "thisyear") {
+        const counts = Array(12).fill(0);
+        calls.forEach(c => {
+          const date = new Date(c.createdAt);
+          counts[date.getMonth()] += 1;
+        });
+        return months.map((m, idx) => ({ name: m, volume: counts[idx] }));
+      } else if (timePeriod === "30days") {
+        const counts = Array(4).fill(0);
+        calls.forEach(c => {
+          const date = new Date(c.createdAt);
+          const wk = Math.min(3, Math.floor(date.getDate() / 8));
+          counts[wk] += 1;
+        });
+        return counts.map((count, idx) => ({ name: `Week ${idx + 1}`, volume: count }));
+      } else {
+        const counts = Array(7).fill(0);
+        calls.forEach(c => {
+          const date = new Date(c.createdAt);
+          counts[date.getDay()] += 1;
+        });
+        const order = [1, 2, 3, 4, 5, 6, 0];
+        return order.map(dayIdx => ({ name: days[dayIdx], volume: counts[dayIdx] }));
+      }
+    };
+    const chartData = getChartData();
+
+    // E. Agent leader board based on real company agents and calls
+    const agentCallCounts: Record<string, { name: string; role: string; calls: number; totalAi: number; avatar: string }> = {};
+    
+    initialUsers.forEach(u => {
+      if (u.role === "SALES" || u.role === "COMPANY_ADMIN") {
+        agentCallCounts[u.id] = {
+          name: u.name,
+          role: u.role === "COMPANY_ADMIN" ? "Company Admin" : "Sales Agent",
+          calls: 0,
+          totalAi: 0,
+          avatar: u.name.charAt(0).toUpperCase()
+        };
+      }
+    });
+
+    calls.forEach(c => {
+      if (agentCallCounts[c.userId]) {
+        agentCallCounts[c.userId].calls += 1;
+        agentCallCounts[c.userId].totalAi += c.aiScore || 0;
+      } else {
+        agentCallCounts[c.userId] = {
+          name: c.user?.name || "Agent",
+          role: c.user?.role === "SUPER_ADMIN" ? "Super Admin" : "Agent",
+          calls: 1,
+          totalAi: c.aiScore || 0,
+          avatar: (c.user?.name || "A").charAt(0).toUpperCase()
+        };
+      }
+    });
+
+    const leaders = Object.values(agentCallCounts).map(l => ({
+      name: l.name,
+      role: l.role,
+      calls: l.calls,
+      ai: l.calls > 0 ? Math.round(l.totalAi / l.calls) : 0,
+      avatar: l.avatar,
+      color: "#00A76F"
+    })).sort((a, b) => b.calls - a.calls);
 
     return {
       totalCalls: totalCallsCount,
@@ -210,7 +217,7 @@ export default function DashboardClient({ initialCalls }: DashboardClientProps) 
       chartData,
       leaders
     };
-  }, [activeModule, timePeriod, initialCalls]);
+  }, [activeModule, timePeriod, initialCalls, initialUsers]);
 
   return (
     <div className="container-fluid p-0">
@@ -521,8 +528,17 @@ export default function DashboardClient({ initialCalls }: DashboardClientProps) 
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredMetrics.recentCalls.map((call: any, idx: number) => (
-                    <tr key={call.id || idx}>
+                  {filteredMetrics.recentCalls.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center py-5 text-secondary">
+                        <i className="bi bi-telephone-x fs-3 d-block mb-2 text-muted"></i>
+                        <span className="small fw-semibold text-dark">No calls recorded yet</span>
+                        <p className="small text-secondary mb-0 mt-1">Make a call in the dialer workspace to see call center metrics.</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredMetrics.recentCalls.map((call: any, idx: number) => (
+                      <tr key={call.id || idx}>
                       <td>
                         <div>
                           <div className="fw-semibold small text-dark">{call.lead.name}</div>
@@ -569,7 +585,7 @@ export default function DashboardClient({ initialCalls }: DashboardClientProps) 
                         )}
                       </td>
                     </tr>
-                  ))}
+                  )))}
                 </tbody>
               </table>
             </div>

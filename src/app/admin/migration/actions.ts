@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/db";
+import { cookies } from "next/headers";
 
 /**
  * Retrieves the stored Zoho API credentials from the Database (Prisma Raw SQL).
@@ -8,6 +9,26 @@ import { prisma } from "@/lib/db";
  */
 export async function getStoredZohoConfig() {
   try {
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("user_id")?.value;
+
+    if (userId) {
+      const rows = await prisma.$queryRawUnsafe<any[]>(
+        `SELECT "clientId", "clientSecret", "refreshToken", "accessToken" FROM "ZohoConfig" WHERE id = $1 LIMIT 1`,
+        userId
+      );
+      const config = rows && rows[0];
+      if (config) {
+        return {
+          clientId: config.clientId || "",
+          clientSecret: config.clientSecret || "",
+          refreshToken: config.refreshToken || "",
+          accessToken: config.accessToken || ""
+        };
+      }
+    }
+
+    // Fallback to legacy/global default config
     const rows = await prisma.$queryRawUnsafe<any[]>(
       `SELECT "clientId", "clientSecret", "refreshToken", "accessToken" FROM "ZohoConfig" WHERE id = 'default_zoho_config' LIMIT 1`
     );
@@ -35,6 +56,9 @@ export async function exchangeZohoRefreshToken(clientId: string, clientSecret: s
   if (!clientId || !clientSecret || !refreshToken) {
     throw new Error("Missing credentials. Please fill in Client ID, Client Secret, and Refresh Token.");
   }
+
+  const cookieStore = await cookies();
+  const userId = cookieStore.get("user_id")?.value || "default_zoho_config";
 
   const cleanClientId = clientId.trim();
   const cleanClientSecret = clientSecret.trim();
@@ -80,23 +104,24 @@ export async function exchangeZohoRefreshToken(clientId: string, clientSecret: s
                 const permanentRefreshToken = dataCode.refresh_token || cleanRefreshToken;
                 const accessToken = dataCode.access_token;
 
-                // Persist the real permanent refresh token in your Database!
+                // Persist the real permanent refresh token in your Database under userId!
                 await prisma.$executeRawUnsafe(
                   `INSERT INTO "ZohoConfig" (id, "clientId", "clientSecret", "refreshToken", "accessToken", "updatedAt")
-                   VALUES ('default_zoho_config', $1, $2, $3, $4, NOW())
+                   VALUES ($1, $2, $3, $4, $5, NOW())
                    ON CONFLICT (id) DO UPDATE SET
                      "clientId" = EXCLUDED."clientId",
                      "clientSecret" = EXCLUDED."clientSecret",
                      "refreshToken" = EXCLUDED."refreshToken",
                      "accessToken" = EXCLUDED."accessToken",
                      "updatedAt" = NOW()`,
+                  userId,
                   cleanClientId,
                   cleanClientSecret,
                   permanentRefreshToken,
                   accessToken
                 );
                 
-                console.log("[ZOHO DB PERSIST] Successfully saved permanent Refresh Token and Access Token to Database!");
+                console.log(`[ZOHO DB PERSIST] Successfully saved permanent Refresh Token and Access Token to Database for user: ${userId}`);
                 return {
                   success: true,
                   accessToken: accessToken,
@@ -116,13 +141,14 @@ export async function exchangeZohoRefreshToken(clientId: string, clientSecret: s
         if (accessToken) {
           await prisma.$executeRawUnsafe(
             `INSERT INTO "ZohoConfig" (id, "clientId", "clientSecret", "refreshToken", "accessToken", "updatedAt")
-             VALUES ('default_zoho_config', $1, $2, $3, $4, NOW())
+             VALUES ($1, $2, $3, $4, $5, NOW())
              ON CONFLICT (id) DO UPDATE SET
                "clientId" = EXCLUDED."clientId",
                "clientSecret" = EXCLUDED."clientSecret",
                "refreshToken" = EXCLUDED."refreshToken",
                "accessToken" = EXCLUDED."accessToken",
                "updatedAt" = NOW()`,
+            userId,
             cleanClientId,
             cleanClientSecret,
             cleanRefreshToken,
@@ -306,7 +332,12 @@ export async function performZohoSync(accessToken: string) {
   syncCount.fetched = fetchedContacts.length;
 
   // Retrieve current local leads
-  const localLeads = await prisma.lead.findMany();
+  const cookieStore = await cookies();
+  const userId = cookieStore.get("user_id")?.value;
+
+  const localLeads = await prisma.lead.findMany({
+    where: userId ? { assignedTo: userId } : {}
+  });
   const matchedLocalLeadIds = new Set<string>();
 
   // B. Save / Reconcile Zoho Bigin Records with Local Site Database (Prisma)
@@ -491,7 +522,8 @@ export async function performZohoSync(accessToken: string) {
             email: zEmail || null,
             company,
             source,
-            status
+            status,
+            assignedTo: userId || null
           }
         });
         syncCount.updated++;
@@ -581,4 +613,25 @@ export async function performZohoSync(accessToken: string) {
     syncCount,
     logs
   };
+}
+
+/**
+ * Disconnects the Zoho Integration for the currently logged in user by deleting their ZohoConfig.
+ */
+export async function disconnectZohoConfig() {
+  try {
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("user_id")?.value;
+    if (userId) {
+      // Use raw SQL or delete to remove ZohoConfig for current userId
+      await prisma.$executeRawUnsafe(
+        `DELETE FROM "ZohoConfig" WHERE id = $1`,
+        userId
+      );
+      return { success: true };
+    }
+  } catch (err: any) {
+    console.error("Failed to delete user ZohoConfig:", err.message);
+  }
+  return { success: false };
 }

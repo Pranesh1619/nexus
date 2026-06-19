@@ -26,7 +26,7 @@ export async function updateAgentLead(id: string, data: {
 
   if (lead && lead.phone) {
     try {
-      await updateZohoBiginStatus(lead.phone, data.status);
+      await updateZohoBiginStatus(lead.phone, data.status, lead.assignedTo || undefined);
     } catch (e) {
       console.error("[ZOHO SYNC] Error syncing lead status during agent update:", e);
     }
@@ -73,7 +73,7 @@ export async function logAgentLeadCall(data: {
 
   if (lead && lead.phone) {
     try {
-      await updateZohoBiginStatus(lead.phone, leadStatus);
+      await updateZohoBiginStatus(lead.phone, leadStatus, lead.assignedTo || undefined);
     } catch (e) {
       console.error("[ZOHO SYNC] Error syncing lead status during call log:", e);
     }

@@ -20,76 +20,83 @@ export default function RegisterPage() {
     }
   };
 
-  const [showPassword, setShowPassword] = useState(false);
-
   return (
     <div className="min-vh-100 d-flex align-items-center justify-content-center bg-light p-3">
-      <div className="card border-0 shadow-lg p-4 w-100" style={{ maxWidth: "400px" }}>
+      <div className="card border-0 shadow-lg p-4 w-100" style={{ maxWidth: "420px", borderRadius: "16px" }}>
         <div className="text-center mb-4">
           <i className="bi bi-intersect text-success fs-1"></i>
-          <h2 className="fw-bold mt-2">Get started free</h2>
-          <p className="text-secondary small">Create your Virpa account.</p>
+          <h2 className="fw-bold mt-3 fs-3">Create your account</h2>
         </div>
 
         {error && (
-          <div className="alert alert-danger small py-2" role="alert">
+          <div className="alert alert-danger small py-2 px-3 rounded-3 mb-4" role="alert">
+            <i className="bi bi-exclamation-triangle-fill me-2"></i>
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
-          <div className="mb-3">
-            <label className="form-label x-small fw-bold text-secondary uppercase">Full Name</label>
-            <input 
-              name="name"
-              type="text" 
-              className="form-control form-control-sm bg-light border-0 px-3 py-2" 
-              required
-              placeholder="John Doe" 
-            />
+          <div className="row g-2 mb-3">
+            <div className="col-md-6">
+              <label className="form-label x-small fw-bold text-secondary">
+                First Name <span className="text-danger fw-bold">*</span>
+              </label>
+              <input 
+                name="firstName"
+                type="text" 
+                className="form-control form-control-sm bg-light border-0 px-3 py-2" 
+                required
+                placeholder="John" 
+                style={{ height: "42px", borderRadius: "8px" }}
+              />
+            </div>
+            <div className="col-md-6">
+              <label className="form-label x-small fw-bold text-secondary">Last Name</label>
+              <input 
+                name="lastName"
+                type="text" 
+                className="form-control form-control-sm bg-light border-0 px-3 py-2" 
+                placeholder="Doe" 
+                style={{ height: "42px", borderRadius: "8px" }}
+              />
+            </div>
           </div>
 
           <div className="mb-3">
-            <label className="form-label x-small fw-bold text-secondary uppercase">Email address</label>
+            <label className="form-label x-small fw-bold text-secondary">
+              Email address <span className="text-danger fw-bold">*</span>
+            </label>
             <input 
               name="email"
               type="email" 
               className="form-control form-control-sm bg-light border-0 px-3 py-2" 
               required
               placeholder="john@example.com" 
+              style={{ height: "42px", borderRadius: "8px" }}
             />
           </div>
 
-          <div className="mb-3">
-            <label className="form-label x-small fw-bold text-secondary uppercase">Password</label>
-            <div className="position-relative">
-              <input 
-                name="password"
-                type={showPassword ? "text" : "password"} 
-                className="form-control form-control-sm bg-light border-0 px-3 py-2 pe-5" 
-                required
-                placeholder="••••••••" 
-              />
-              <button
-                type="button"
-                className="btn btn-link position-absolute end-0 top-50 translate-middle-y text-secondary text-decoration-none py-0 px-3"
-                onClick={() => setShowPassword(!showPassword)}
-                style={{ zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" }}
-              >
-                <i className={`bi ${showPassword ? "bi-eye-slash-fill" : "bi-eye-fill"}`} style={{ fontSize: "1.1rem" }}></i>
-              </button>
-            </div>
+          <div className="mb-4">
+            <label className="form-label x-small fw-bold text-secondary">Phone Number</label>
+            <input 
+              name="phone"
+              type="tel" 
+              className="form-control form-control-sm bg-light border-0 px-3 py-2" 
+              placeholder="+1 (555) 019-2834" 
+              style={{ height: "42px", borderRadius: "8px" }}
+            />
           </div>
 
           <button 
             type="submit" 
-            className="btn btn-primary w-100 py-2 mt-2"
+            className="btn btn-primary w-100 py-2.5 fw-bold d-flex align-items-center justify-content-center gap-2"
             disabled={loading}
+            style={{ height: "48px", borderRadius: "10px", fontSize: "16px" }}
           >
             {loading ? (
-              <span className="spinner-border spinner-border-sm me-2"></span>
+              <span className="spinner-border spinner-border-sm"></span>
             ) : null}
-            Create account
+            <span>Create account</span>
           </button>
         </form>
 

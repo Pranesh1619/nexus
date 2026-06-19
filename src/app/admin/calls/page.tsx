@@ -26,8 +26,17 @@ export default async function CallLogsPage({
   let dbError = false;
 
   try {
+    const userCompanyId = cookieStore.get("user_company_id")?.value;
+    const leadsWhereClause: any = {};
+    if (userRole !== "SUPER_ADMIN" && userCompanyId) {
+      leadsWhereClause.salesPerson = {
+        companyId: userCompanyId
+      };
+    }
+
     logs = await getCallLogs(userRole === "SALES" ? userId : undefined);
     leads = await prisma.lead.findMany({
+      where: leadsWhereClause,
       orderBy: { name: "asc" }
     });
     sipConfig = await getActiveSipConfig();

@@ -1,11 +1,19 @@
 import React from "react";
 import { getUserById } from "../../actions";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import EditUserForm from "./EditUserForm";
+import { cookies } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
 export default async function EditUserPage({ params, searchParams }: { params: Promise<{ id: string }>, searchParams: Promise<{ success?: string }> }) {
+  const cookieStore = await cookies();
+  const userRole = cookieStore.get("user_role")?.value;
+
+  if (!userRole || !["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"].includes(userRole)) {
+    redirect("/admin");
+  }
+
   const { id } = await params;
   const { success } = await searchParams;
   const user = await getUserById(id);
@@ -23,5 +31,5 @@ export default async function EditUserPage({ params, searchParams }: { params: P
     status: user.status || "Active"
   };
 
-  return <EditUserForm user={typedUser} success={success === "true"} />;
+  return <EditUserForm user={typedUser} success={success === "true"} currentUserRole={userRole} />;
 }

@@ -42,14 +42,14 @@ export default function DashboardLayout({ children, userRole = "ADMIN", userName
           title: "Agents", 
           icon: "bi-headset", 
           path: "/admin/agents",
-          ...(userRole === "ADMIN" ? {
+          ...((userRole === "ADMIN" || userRole === "SUPER_ADMIN" || userRole === "COMPANY_ADMIN") ? {
             children: [
               { title: "Assign Leads", icon: "bi-person-plus", path: "/admin/sales" }
             ]
           } : {})
         },
         // { title: "Deals", icon: "bi-kanban", path: "/admin/deals" },
-        ...(userRole === "ADMIN" ? [
+        ...((userRole === "ADMIN" || userRole === "SUPER_ADMIN" || userRole === "COMPANY_ADMIN") ? [
           { title: "Users", icon: "bi-people", path: "/admin/users" }
         ] : []),
         { title: "CRM Sync", icon: "bi-cloud-arrow-up", path: "/admin/migration" }

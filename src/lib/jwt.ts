@@ -23,7 +23,7 @@ function base64urlDecode(str: string): string {
 /**
  * Cryptographically signs a payload with HMAC-SHA256 and returns a JSON Web Token (JWT).
  */
-export function signToken(payload: Record<string, unknown>, expiresInSeconds: number = 86400): string {
+export function signToken(payload: Record<string, unknown>, expiresInSeconds: number = 604800): string {
   const header = { alg: "HS256", typ: "JWT" };
   const exp = Math.floor(Date.now() / 1000) + expiresInSeconds;
   const fullPayload = { ...payload, exp };

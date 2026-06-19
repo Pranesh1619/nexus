@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { cookies } from "next/headers";
 
 export interface ZohoLead {
   id?: string;
@@ -32,14 +33,40 @@ export function isZohoConfigured(): boolean {
   );
 }
 
-// Get Zoho Config from Database
-export async function getDbConfig() {
+// Get Zoho Config from Database, supporting multi-tenant user-specific credentials
+export async function getDbConfig(userIdParam?: string) {
   try {
-    const config = await prisma.zohoConfig.findUnique({
+    let userId = userIdParam;
+    if (!userId) {
+      try {
+        const cookieStore = await cookies();
+        userId = cookieStore.get("user_id")?.value;
+      } catch (cookieErr) {
+        // cookies() is not available (e.g. background job context)
+      }
+    }
+
+    if (userId) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { companyId: true }
+      });
+      const targetConfigId = user?.companyId || userId;
+
+      const config = await prisma.zohoConfig.findUnique({
+        where: { id: targetConfigId },
+      });
+      if (config && config.clientId && config.clientSecret && config.refreshToken) {
+        return config;
+      }
+    }
+
+    // Fallback to legacy/global default config
+    const globalConfig = await prisma.zohoConfig.findUnique({
       where: { id: "default_zoho_config" },
     });
-    if (config && config.clientId && config.clientSecret && config.refreshToken) {
-      return config;
+    if (globalConfig && globalConfig.clientId && globalConfig.clientSecret && globalConfig.refreshToken) {
+      return globalConfig;
     }
   } catch (err) {
     console.error("Failed to read Zoho config from DB:", err);
@@ -70,14 +97,14 @@ export async function refreshZohoToken(clientId: string, clientSecret: string, r
 }
 
 // Get Active Access Token (from DB config or fall back to .env)
-export async function getActiveZohoAccessToken(): Promise<string | null> {
-  const dbConfig = await getDbConfig();
+export async function getActiveZohoAccessToken(userIdParam?: string): Promise<string | null> {
+  const dbConfig = await getDbConfig(userIdParam);
   if (dbConfig) {
     const accessToken = await refreshZohoToken(dbConfig.clientId, dbConfig.clientSecret, dbConfig.refreshToken);
     if (accessToken) {
       try {
         await prisma.zohoConfig.update({
-          where: { id: "default_zoho_config" },
+          where: { id: dbConfig.id },
           data: { accessToken }
         });
       } catch (dbErr) {
@@ -90,8 +117,8 @@ export async function getActiveZohoAccessToken(): Promise<string | null> {
 }
 
 // Check if Zoho Bigin is connected (either DB or Env)
-export async function isZohoConnected(): Promise<boolean> {
-  const dbConfig = await getDbConfig();
+export async function isZohoConnected(userIdParam?: string): Promise<boolean> {
+  const dbConfig = await getDbConfig(userIdParam);
   if (dbConfig) return true;
   return isZohoConfigured();
 }
@@ -124,7 +151,15 @@ async function getZohoAccessToken(): Promise<string | null> {
     }
 }
 
-export async function syncWithZoho() {
+export async function syncWithZoho(userIdParam?: string) {
+  let userId = userIdParam;
+  if (!userId) {
+    try {
+      const cookieStore = await cookies();
+      userId = cookieStore.get("user_id")?.value;
+    } catch {}
+  }
+
   const logs: string[] = [];
   let importedCount = 0;
   let skippedCount = 0;
@@ -147,7 +182,7 @@ export async function syncWithZoho() {
   }
 
   // Check connection status
-  const connected = await isZohoConnected();
+  const connected = await isZohoConnected(userId);
   if (!connected) {
     logs.push(`[ERROR] Zoho Bigin is not connected.`);
     return {
@@ -164,16 +199,11 @@ export async function syncWithZoho() {
   }
 
   // Get active access token (updates database cache if needed)
-  const accessToken = await getActiveZohoAccessToken();
-  if (!accessToken) {
-    logs.push(`[ERROR] Failed to obtain an active Zoho access token.`);
-    return { success: false, logs, importedCount, skippedCount, exportedCount };
-  }
+  const accessToken = await getActiveZohoAccessToken(userId);
+  if (accessToken) {
+    logs.push(`[OAUTH] Successfully authenticated. Session Token is active.`);
 
-  logs.push(`[OAUTH] Successfully authenticated. Session Token is active.`);
-
-  try {
-
+    try {
       const apiUrl = process.env.ZOHO_API_URL || "https://www.zohoapis.com";
 
       // A. Pull leads from Zoho Bigin
@@ -212,7 +242,7 @@ export async function syncWithZoho() {
             continue;
           }
 
-          // Uniqueness Check (uniqueness on email or phone)
+          // Uniqueness Check (uniqueness on email or phone, scoped to current user if SaaS mode)
           const orConditions: any[] = [{ phone: zPhone }];
           if (zEmail) {
             orConditions.push({ email: zEmail });
@@ -221,6 +251,7 @@ export async function syncWithZoho() {
           const existingLead = await prisma.lead.findFirst({
             where: {
               OR: orConditions,
+              ...(userId ? { assignedTo: userId } : {})
             },
           });
 
@@ -244,7 +275,7 @@ export async function syncWithZoho() {
               skippedCount++;
             }
           } else {
-            // Import unique Zoho lead locally
+            // Import unique Zoho lead locally (assigning to the user running sync)
             await prisma.lead.create({
               data: {
                 name: zName,
@@ -253,6 +284,7 @@ export async function syncWithZoho() {
                 company: zCompany,
                 source: zSource,
                 status: zStatus,
+                assignedTo: userId || null,
               },
             });
             logs.push(`[IMPORT] Created unique lead: "${zName}" successfully synced from Zoho Bigin.`);
@@ -264,9 +296,11 @@ export async function syncWithZoho() {
         logs.push(`[WARN] Failed to fetch leads from Zoho API. Status: ${getLeadsResponse.status}, Error: ${errText}`);
       }
 
-      // B. Push local leads to Zoho
+      // B. Push local leads to Zoho (only push leads assigned to this user)
       logs.push(`[PUSH] Scanning local database for unsynced leads to export...`);
-      const localLeads = await prisma.lead.findMany();
+      const localLeads = await prisma.lead.findMany({
+        where: userId ? { assignedTo: userId } : {}
+      });
       logs.push(`[PUSH] Found ${localLeads.length} total local leads. Synchronizing exports...`);
 
       for (const lead of localLeads) {
@@ -301,7 +335,6 @@ export async function syncWithZoho() {
                   Email: lead.email || "",
                   Lead_Source: lead.source || "WEBSITE",
                   Contact_Status: lead.status === "WON" ? "Closed Won" : lead.status === "LOST" ? "Closed Lost" : "New Lead",
-                  // If you create a custom text field named "Company" (as text), you can pass:
                   Company: lead.company || "Independent",
                 },
               ],
@@ -326,6 +359,7 @@ export async function syncWithZoho() {
 
     logs.push(`[SYSTEM] Sync finished successfully!`);
     return { success: true, logs, importedCount, skippedCount, exportedCount };
+  }
 
   // 2. Fallback to Simulated/Sandbox Mode (Elegant Live Demonstration)
   logs.push(`[CONFIG] Zoho API variables not configured in .env. Running in Interactive Sandbox Mode.`);
@@ -382,6 +416,7 @@ export async function syncWithZoho() {
     const existingLead = await prisma.lead.findFirst({
       where: {
         OR: orConditions,
+        ...(userId ? { assignedTo: userId } : {})
       },
     });
 
@@ -398,6 +433,7 @@ export async function syncWithZoho() {
           company: zLead.company,
           source: zLead.source,
           status: zLead.status,
+          assignedTo: userId || null,
         },
       });
       logs.push(`[IMPORT] Success! Registered new unique lead: "${zLead.name}" into our pipeline.`);
@@ -407,7 +443,9 @@ export async function syncWithZoho() {
 
   // Push local leads to Zoho Bigin
   logs.push(`[PUSH] Scanning local database for unsynced leads to export to Zoho Bigin...`);
-  const localLeads = await prisma.lead.findMany();
+  const localLeads = await prisma.lead.findMany({
+    where: userId ? { assignedTo: userId } : {}
+  });
   logs.push(`[PUSH] Evaluated ${localLeads.length} local leads. Commencing Zoho synchronization...`);
 
   for (const lead of localLeads) {
@@ -425,8 +463,24 @@ export async function syncWithZoho() {
 }
 
 // Update Contact Status inside Zoho Bigin when Closed Won / Lost in our app
-export async function updateZohoBiginStatus(leadPhone: string, status: string) {
+export async function updateZohoBiginStatus(leadPhone: string, status: string, userIdParam?: string) {
   if (!leadPhone) return;
+
+  let userId = userIdParam;
+  if (!userId) {
+    try {
+      const lead = await prisma.lead.findUnique({
+        where: { phone: leadPhone },
+        select: { assignedTo: true }
+      });
+      if (lead?.assignedTo) {
+        userId = lead.assignedTo;
+      } else {
+        const cookieStore = await cookies();
+        userId = cookieStore.get("user_id")?.value;
+      }
+    } catch {}
+  }
 
   const zohoStatusMap: Record<string, string> = {
     WON: "Closed Won",
@@ -438,10 +492,10 @@ export async function updateZohoBiginStatus(leadPhone: string, status: string) {
 
   const zStatus = zohoStatusMap[status.toUpperCase()] || "New Lead";
 
-  const isConnected = await isZohoConnected();
+  const isConnected = await isZohoConnected(userId);
   if (isConnected) {
     try {
-      const accessToken = await getActiveZohoAccessToken();
+      const accessToken = await getActiveZohoAccessToken(userId);
       if (!accessToken) return;
 
       const apiUrl = process.env.ZOHO_API_URL || "https://www.zohoapis.com";
@@ -472,7 +526,7 @@ export async function updateZohoBiginStatus(leadPhone: string, status: string) {
               ],
             }),
           });
-          console.log(`[ZOHO SYNC] Updated status of ${leadPhone} in Zoho Bigin to ${zStatus}`);
+          console.log(`[ZOHO SYNC] Updated status of ${leadPhone} in Zoho Bigin to ${zStatus} for user ${userId}`);
         }
       }
     } catch (err) {
@@ -491,8 +545,24 @@ export async function updateZohoBiginContact(leadPhone: string, leadData: {
   email: string | null;
   company: string | null;
   status: string;
-}) {
+}, userIdParam?: string) {
   if (!leadPhone) return;
+
+  let userId = userIdParam;
+  if (!userId) {
+    try {
+      const lead = await prisma.lead.findUnique({
+        where: { phone: leadPhone },
+        select: { assignedTo: true }
+      });
+      if (lead?.assignedTo) {
+        userId = lead.assignedTo;
+      } else {
+        const cookieStore = await cookies();
+        userId = cookieStore.get("user_id")?.value;
+      }
+    } catch {}
+  }
 
   const zohoStatusMap: Record<string, string> = {
     WON: "Closed Won",
@@ -511,10 +581,10 @@ export async function updateZohoBiginContact(leadPhone: string, leadData: {
   const firstName = nameSplit.length > 1 ? nameSplit[0] : "";
   const lastName = nameSplit.length > 1 ? nameSplit.slice(1).join(" ") : nameSplit[0] || "Contact";
 
-  const isConnected = await isZohoConnected();
+  const isConnected = await isZohoConnected(userId);
   if (isConnected) {
     try {
-      const accessToken = await getActiveZohoAccessToken();
+      const accessToken = await getActiveZohoAccessToken(userId);
       if (!accessToken) return;
 
       const apiUrl = process.env.ZOHO_API_URL || "https://www.zohoapis.com";
@@ -551,7 +621,7 @@ export async function updateZohoBiginContact(leadPhone: string, leadData: {
             }),
           });
           if (updateRes.ok) {
-            console.log(`[ZOHO SYNC] Fully updated contact ${leadPhone} (New Phone: ${leadData.phone || leadPhone}) in Zoho Bigin`);
+            console.log(`[ZOHO SYNC] Fully updated contact ${leadPhone} (New Phone: ${leadData.phone || leadPhone}) in Zoho Bigin for user ${userId}`);
           } else {
             console.error(`[ZOHO SYNC] Full contact update rejected by Zoho:`, await updateRes.text());
           }

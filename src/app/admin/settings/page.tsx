@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import SettingsClient from "./SettingsClient";
 import ProfileClient from "./ProfileClient";
@@ -7,8 +8,20 @@ import { getSipTrunkConfig } from "./actions";
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  // Mocking "current user" for demo purposes
-  const user = await prisma.user.findFirst();
+  const cookieStore = await cookies();
+  const userId = cookieStore.get("user_id")?.value;
+
+  let user = null;
+  if (userId) {
+    user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+  }
+
+  if (!user) {
+    user = await prisma.user.findFirst();
+  }
+
   const sipConfig = await getSipTrunkConfig();
 
   if (!user) {

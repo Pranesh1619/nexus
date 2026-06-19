@@ -40,7 +40,7 @@ export default function ForgotPasswordPage() {
 
           <form onSubmit={handleSubmit}>
             <div className="mb-3">
-              <label className="form-label x-small fw-bold text-secondary uppercase">Email Address</label>
+              <label className="form-label x-small fw-bold text-secondary">Email Address</label>
               <input 
                 name="email" 
                 type="email" 
@@ -50,8 +50,19 @@ export default function ForgotPasswordPage() {
               />
             </div>
 
+            <div className="mb-3">
+              <label className="form-label x-small fw-bold text-secondary">Verification Code (OTP)</label>
+              <input 
+                name="otp" 
+                type="text" 
+                className="form-control form-control-sm bg-light border-0 px-3 py-2" 
+                placeholder="758369" 
+                required 
+              />
+            </div>
+
             <div className="mb-4">
-              <label className="form-label x-small fw-bold text-secondary uppercase">New Password</label>
+              <label className="form-label x-small fw-bold text-secondary">New Password</label>
               <input 
                 name="password" 
                 type="password" 

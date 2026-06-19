@@ -11,9 +11,29 @@ export default async function AdminDashboardPage() {
   const userRole = cookieStore.get("user_role")?.value;
   const isSales = userRole === "SALES";
 
+  const userCompanyId = cookieStore.get("user_company_id")?.value;
+
+  const callsWhere: any = {};
+  const leadsWhere: any = {};
+  const usersWhere: any = {};
+
+  if (isSales) {
+    callsWhere.userId = userId;
+    leadsWhere.assignedTo = userId;
+    usersWhere.id = userId;
+  } else if (userRole !== "SUPER_ADMIN" && userCompanyId) {
+    callsWhere.user = {
+      companyId: userCompanyId
+    };
+    leadsWhere.salesPerson = {
+      companyId: userCompanyId
+    };
+    usersWhere.companyId = userCompanyId;
+  }
+
   // Fetch real calls, leads, and users from the database
   const calls = await prisma.callLog.findMany({
-    where: isSales ? { userId } : {},
+    where: callsWhere,
     include: {
       lead: true,
       user: true,
@@ -22,12 +42,12 @@ export default async function AdminDashboardPage() {
   });
 
   const leads = await prisma.lead.findMany({
-    where: isSales ? { assignedTo: userId } : {},
+    where: leadsWhere,
     orderBy: { createdAt: "desc" },
   });
 
   const users = await prisma.user.findMany({
-    where: isSales ? { id: userId } : {},
+    where: usersWhere,
     orderBy: { createdAt: "desc" },
   });
 

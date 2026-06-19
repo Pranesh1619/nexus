@@ -1,21 +1,25 @@
 "use client";
 
 import React, { useState } from "react";
-import { updatePassword, deleteUserAccount } from "./actions";
+import { updateUserEmail, deleteUserAccount } from "./actions";
 import StatusModal from "@/components/StatusModal";
 import { useRouter } from "next/navigation";
 
 export default function SettingsClient({ userId }: { userId: string }) {
-  const [showPassForm, setShowPassForm] = useState(false);
-  const [passSuccess, setPassSuccess] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [delSuccess, setDelSuccess] = useState(false);
   const router = useRouter();
 
-  async function handlePassSubmit(formData: FormData) {
-    const res = await updatePassword(formData);
+  async function handleEmailSubmit(formData: FormData) {
+    setError(null);
+    const res = await updateUserEmail(formData);
     if (res.success) {
-      setPassSuccess(true);
-      setShowPassForm(false);
+      setEmailSuccess(true);
+      setShowEmailForm(false);
+    } else {
+      setError(res.error || "Failed to update email address");
     }
   }
 
@@ -33,27 +37,36 @@ export default function SettingsClient({ userId }: { userId: string }) {
     <>
       <div className="card mb-4 border-0 shadow-sm">
         <div className="card-body p-4">
-          <h6 className="fw-bold mb-3 small uppercase text-secondary">Security Settings</h6>
-          <p className="text-secondary x-small mb-4">Manage your password and authentication requirements.</p>
+          <h6 className="fw-bold mb-3 small uppercase text-secondary">Account Security</h6>
+          <p className="text-secondary x-small mb-4">Manage your authentication credentials and primary contact email.</p>
           
-          {!showPassForm ? (
+          {!showEmailForm ? (
             <button 
-              onClick={() => setShowPassForm(true)}
+              onClick={() => {
+                setShowEmailForm(true);
+                setError(null);
+              }}
               className="btn btn-light border w-100 text-start d-flex justify-content-between align-items-center py-2 px-3 small fw-bold"
             >
-              <span>Update Password</span>
+              <span>Update Email Address</span>
               <i className="bi bi-chevron-right small text-secondary"></i>
             </button>
           ) : (
-            <form action={handlePassSubmit} className="bg-light p-3 rounded-3 border">
+            <form action={handleEmailSubmit} className="bg-light p-3 rounded-3 border">
               <input type="hidden" name="userId" value={userId} />
               <div className="mb-3">
-                <label className="form-label x-small fw-bold text-secondary text-uppercase mb-2">New Password</label>
-                <input name="newPassword" type="password" className="form-control form-control-sm border-0 bg-white" placeholder="••••••••" required />
+                <label className="form-label x-small fw-bold text-secondary text-uppercase mb-2">New Email Address</label>
+                <input name="newEmail" type="email" className="form-control form-control-sm border-0 bg-white" placeholder="admin@virpa.com" required />
               </div>
+              {error && (
+                <div className="alert alert-danger py-1.5 px-3 rounded-3 x-small mb-3">
+                  <i className="bi bi-exclamation-circle me-1"></i>
+                  {error}
+                </div>
+              )}
               <div className="d-flex gap-2">
-                <button type="submit" className="btn btn-primary btn-sm px-4 fw-bold shadow-sm">Save Password</button>
-                <button type="button" onClick={() => setShowPassForm(false)} className="btn btn-light btn-sm px-3 fw-bold border">Cancel</button>
+                <button type="submit" className="btn btn-primary btn-sm px-4 fw-bold shadow-sm">Save Email</button>
+                <button type="button" onClick={() => setShowEmailForm(false)} className="btn btn-light btn-sm px-3 fw-bold border">Cancel</button>
               </div>
             </form>
           )}
@@ -83,12 +96,12 @@ export default function SettingsClient({ userId }: { userId: string }) {
         onConfirm={handleConfirmDelete}
       />
 
-      {passSuccess && (
+      {emailSuccess && (
         <StatusModal 
-          id="passSuccessModal" 
+          id="emailSuccessModal" 
           type="success" 
-          title="Password Updated!" 
-          message="Your security credentials have been successfully updated."
+          title="Email Updated!" 
+          message="Your login and contact email address has been successfully updated."
         />
       )}
 

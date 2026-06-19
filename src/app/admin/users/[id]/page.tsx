@@ -2,10 +2,18 @@ import React from "react";
 import { getUserById, deleteUser } from "../actions";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { cookies } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
 export default async function UserDetailsPage({ params }: { params: { id: string } }) {
+  const cookieStore = await cookies();
+  const userRole = cookieStore.get("user_role")?.value;
+
+  if (!userRole || !["SUPER_ADMIN", "COMPANY_ADMIN", "ADMIN"].includes(userRole)) {
+    redirect("/admin");
+  }
+
   const { id } = await params;
   const user = await getUserById(id);
 

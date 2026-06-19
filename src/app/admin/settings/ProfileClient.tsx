@@ -53,8 +53,10 @@ export default function ProfileClient({ user }: { user: ProfileUser }) {
           <div className="col-md-6">
             <label className="form-label">Assigned Role</label>
             <select name="role" className="form-select form-select-sm bg-light border-0 px-3 py-2 small" defaultValue={user.role}>
-              <option value="SALES">SALES</option>
+              <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+              <option value="COMPANY_ADMIN">COMPANY_ADMIN</option>
               <option value="ADMIN">ADMIN</option>
+              <option value="SALES">SALES</option>
             </select>
           </div>
           <div className="col-md-6">
