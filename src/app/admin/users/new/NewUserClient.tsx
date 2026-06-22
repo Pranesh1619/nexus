@@ -28,7 +28,8 @@ export default function NewUserClient({ currentUserRole }: { currentUserRole: st
     if (currentUserRole === "SUPER_ADMIN") {
       return [
         { value: "SUPER_ADMIN", label: "Super Admin" },
-        { value: "COMPANY_ADMIN", label: "Company Admin" }
+        { value: "COMPANY_ADMIN", label: "Company Admin" },
+        { value: "SALES", label: "Sales Agent" }
       ];
     }
     // Company Admin, Admin, etc. can only create Sales Agent
@@ -70,6 +71,10 @@ export default function NewUserClient({ currentUserRole }: { currentUserRole: st
               <div className="col-md-6">
                 <label className="form-label">Initial Password <span className="text-danger">*</span></label>
                 <input name="password" type="password" className="form-control form-control-sm bg-light border-0 small px-3 py-2" placeholder="••••••••" required />
+              </div>
+              <div className="col-md-6">
+                <label className="form-label">Phone Number</label>
+                <input name="phone" type="tel" className="form-control form-control-sm bg-light border-0 small px-3 py-2" placeholder="e.g. +919876543210" />
               </div>
             </div>
             <div className="d-grid d-md-flex justify-content-md-end mt-4 pt-3 border-top">

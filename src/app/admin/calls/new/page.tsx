@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { saveCallLog, getActiveSipConfig, placeRealTwilioCall, syncSipCallLog, getCallLogStatus, endTwilioCall, getTwilioCallStatus } from "./actions";
+import { saveCallLog, getActiveSipConfig, placeRealTwilioCall, placeClickToCall, getCurrentAgent, syncSipCallLog, getCallLogStatus, endTwilioCall, getTwilioCallStatus, assignLeadToAgent } from "./actions";
 import { getLeadById } from "@/app/admin/leads/actions";
 import { generateConversation } from "@/lib/conversation_mock";
 
@@ -35,11 +35,13 @@ function NewCallContent() {
   const [isDataLoaded, setIsDataLoaded] = useState(false);
 
   // Dialer and call state
-  const [dialMode, setDialMode] = useState<"SIP" | "AI">("AI");
+  const [dialMode, setDialMode] = useState<"SIP" | "AI" | "CTC">("AI");
+  const [agentPhone, setAgentPhone] = useState("");
   const [calling, setCalling] = useState(false);
   const [timer, setTimer] = useState(0);
   const [status, setStatus] = useState("Ready to dial");
   const [sipStatus, setSipStatus] = useState("Disconnected");
+  const [callError, setCallError] = useState<string | null>(null);
 
   const [showOutcome, setShowOutcome] = useState(false);
   const [selectedStage, setSelectedStage] = useState("Interested");
@@ -55,6 +57,7 @@ function NewCallContent() {
   const consoleContainerRef = useRef<HTMLDivElement>(null);
   const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
   const deviceRef = useRef<any>(null);
+  const [currentAgentId, setCurrentAgentId] = useState<string>("");
 
   // Soundwave and pipeline state
   const [pipelineConnected, setPipelineConnected] = useState(false);
@@ -66,6 +69,12 @@ function NewCallContent() {
         if (leadId) {
           const l = await getLeadById(leadId);
           if (l) setLead(l as LeadType);
+        }
+
+        const agent = await getCurrentAgent();
+        if (agent) {
+          if (agent.phone) setAgentPhone(agent.phone);
+          setCurrentAgentId(agent.id);
         }
         
         const activeSip = await getActiveSipConfig();
@@ -278,6 +287,12 @@ function NewCallContent() {
     setPipelineConnected(false);
     setLiveTurns([]);
     setCallSid(null);
+    setCallError(null);
+
+    // Auto-assign lead to the current agent when call starts
+    if (currentAgentId && leadId) {
+      assignLeadToAgent(leadId, currentAgentId);
+    }
 
     const destPhone = lead ? lead.phone : "Unknown Destination";
     const sipUser = sipConfig ? sipConfig.username : "guest";
@@ -315,7 +330,7 @@ function NewCallContent() {
             destPhone: formattedPhone,
             leadId: leadId,
             lang: callLanguage,
-            userId: "placeholder"
+            userId: currentAgentId || "placeholder"
           }
         }).then((twilioCall: any) => {
           twilioCall.on("accept", () => {
@@ -336,7 +351,7 @@ function NewCallContent() {
                 callSid: sid,
                 duration: 0,
                 stage: selectedStage,
-                userId: "placeholder"
+                userId: currentAgentId || "placeholder"
               });
             }
           });
@@ -362,6 +377,7 @@ function NewCallContent() {
         }).catch((err: any) => {
           logToTerminal(`[ERROR] Failed to start WebRTC session: ${err.message}`);
           setStatus("Failed to connect");
+          setCallError(err.message);
           setSipStatus("Registered");
           setCalling(false);
         });
@@ -387,10 +403,11 @@ function NewCallContent() {
       } else {
         // Trigger the mock Twilio voice outbound call
         const origin = typeof window !== "undefined" ? window.location.origin : "";
-        placeRealTwilioCall(leadId, origin, callLanguage).then((res) => {
+        placeRealTwilioCall(leadId, origin, callLanguage, currentAgentId || undefined).then((res) => {
           if (res.error) {
             logToTerminal(`[ERROR] Twilio Trunk rejected request: ${res.error}`);
             setStatus("Failed to connect");
+            setCallError(res.error);
             setSipStatus("Registered");
             setCalling(false);
           } else {
@@ -448,6 +465,61 @@ function NewCallContent() {
 
         timeoutsRef.current = [t1, t2, t3, t4, t5];
       }
+    } else if (dialMode === "CTC") {
+      setStatus("Calling Agent Mobile...");
+      logToTerminal(`[CTC] Initiating Click-to-Call sequence via Twilio REST API...`);
+      logToTerminal(`[CTC] Calling Agent mobile: ${agentPhone}`);
+
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      placeClickToCall({
+        leadId,
+        agentPhone,
+        language: callLanguage,
+        userId: currentAgentId || "placeholder",
+        currentHost: origin
+      }).then((res) => {
+        if (res.error) {
+          logToTerminal(`[ERROR] Twilio Click-to-Call failed: ${res.error}`);
+          setStatus("Failed to connect");
+          setCallError(res.error);
+          setCalling(false);
+        } else {
+          setCallSid(res.callSid || null);
+          logToTerminal(`[CTC] Outbound call placed to Agent. Call SID: ${res.callSid}`);
+          setStatus("Calling Agent...");
+
+          // Register initial call log entry in the background
+          if (res.callSid) {
+            syncSipCallLog({
+              leadId,
+              callSid: res.callSid,
+              duration: 0,
+              stage: selectedStage,
+              userId: currentAgentId || "placeholder"
+            });
+          }
+
+          // In mock mode, simulate agent answering, dialing customer, and bridging
+          if (!sipConfig?.useRealTwilio) {
+            const t1 = setTimeout(() => {
+              setStatus("Agent Answered. Dialing Customer...");
+              logToTerminal(`[CTC] Agent answered. Dialing customer: ${destPhone}`);
+            }, 2000);
+
+            const t2 = setTimeout(() => {
+              setStatus("Connected - Audio Active");
+              setPipelineConnected(true);
+              logToTerminal(`[CTC] Customer answered. Bridged successfully.`);
+            }, 5500);
+
+            timeoutsRef.current = [t1, t2];
+          } else {
+            // For real Twilio, we'll mark pipeline connected so timer and status show correctly
+            setStatus("Bridging Customer...");
+            setPipelineConnected(true);
+          }
+        }
+      });
     } else {
       // AI dialer simulator
       setStatus("AI Dialing...");
@@ -477,14 +549,16 @@ function NewCallContent() {
     const sipUser = sipConfig ? sipConfig.username : "guest";
     const sipDom = sipConfig ? sipConfig.domain : "simulated.voice";
 
-    if (dialMode === "SIP" && sipConfig) {
-      setStatus("SIP: Sending BYE...");
-      setSipStatus("Registered");
-      logToTerminal(`[TX] BYE sip:${destPhone}@${sipDom} SIP/2.0`);
-      logToTerminal(`     From: "${sipUser}" <sip:${sipUser}@${sipDom}>;tag=hangup`);
-      logToTerminal(`     To: <sip:${destPhone}@${sipDom}>`);
+    if ((dialMode === "SIP" || dialMode === "CTC") && sipConfig) {
+      setStatus(dialMode === "SIP" ? "SIP: Sending BYE..." : "Ending Twilio Session...");
+      if (dialMode === "SIP") {
+        setSipStatus("Registered");
+        logToTerminal(`[TX] BYE sip:${destPhone}@${sipDom} SIP/2.0`);
+        logToTerminal(`     From: "${sipUser}" <sip:${sipUser}@${sipDom}>;tag=hangup`);
+        logToTerminal(`     To: <sip:${destPhone}@${sipDom}>`);
+      }
       
-      if (sipConfig.useRealTwilio && deviceRef.current) {
+      if (dialMode === "SIP" && sipConfig.useRealTwilio && deviceRef.current) {
         logToTerminal(`[SYSTEM] Disconnecting WebRTC call device...`);
         deviceRef.current.disconnectAll();
       }
@@ -501,9 +575,13 @@ function NewCallContent() {
       }
       
       setTimeout(() => {
-        logToTerminal(`[RX] SIP/2.0 200 OK (BYE Processed)`);
-        logToTerminal(`[MEDIA] WebRTC connection terminated.`);
-        logToTerminal(`[SIP] Trunk Idle.`);
+        if (dialMode === "SIP") {
+          logToTerminal(`[RX] SIP/2.0 200 OK (BYE Processed)`);
+          logToTerminal(`[MEDIA] WebRTC connection terminated.`);
+          logToTerminal(`[SIP] Trunk Idle.`);
+        } else {
+          logToTerminal(`[SYSTEM] Twilio Click-to-Call session terminated.`);
+        }
         setStatus("Call ended. Ready.");
       }, 500);
     } else {
@@ -517,14 +595,14 @@ function NewCallContent() {
     setStatus("AI Analysis & Sync in progress...");
 
     let result;
-    if (dialMode === "SIP" && callSid) {
+    if ((dialMode === "SIP" || dialMode === "CTC") && callSid) {
       // Sync the real call via its callSid, either updating the callback data or establishing a placeholder
       result = await syncSipCallLog({
         leadId,
         callSid,
         duration: timer,
         stage: selectedStage,
-        userId: "placeholder"
+        userId: currentAgentId || "placeholder"
       });
     } else {
       // Generate the final conversation matching the selected outcome stage and language (AI Simulator fallback)
@@ -538,7 +616,7 @@ function NewCallContent() {
       
       result = await saveCallLog({
         leadId,
-        userId: "placeholder",
+        userId: currentAgentId || "placeholder",
         duration: timer,
         status: selectedStage === "Not Interested" ? "FAILED" : "CONNECTED",
         stage: selectedStage, 
@@ -604,6 +682,19 @@ function NewCallContent() {
           <div className="btn-group shadow-sm" role="group">
             <button
               type="button"
+              className={`btn btn-sm px-3 fw-bold ${dialMode === "CTC" ? "btn-primary text-white" : "btn-light border"}`}
+              onClick={() => {
+                if (!calling) {
+                  setDialMode("CTC");
+                  logToTerminal(`[SYSTEM] Telephony Mode toggled: Click-to-Call (Mobile First)`);
+                }
+              }}
+              disabled={calling}
+            >
+              <i className="bi bi-phone-fill me-1.5"></i> Click-to-Call
+            </button>
+            <button
+              type="button"
               className={`btn btn-sm px-3 fw-bold ${dialMode === "SIP" ? "btn-primary text-white" : "btn-light border"}`}
               onClick={() => {
                 if (!calling) {
@@ -649,8 +740,12 @@ function NewCallContent() {
                 {lead ? lead.phone : "No Phone Number"}
               </p>
               <div className="d-flex justify-content-center align-items-center gap-2">
-                <span className={`badge ${dialMode === "SIP" ? "bg-primary text-white" : "bg-dark bg-opacity-75"} small px-2.5 py-1`}>
-                  {dialMode === "SIP" ? "SIP TRUNK" : "AI SIMULATOR"}
+                <span className={`badge ${
+                  dialMode === "SIP" ? "bg-primary text-white" :
+                  dialMode === "CTC" ? "bg-success text-white" : "bg-dark bg-opacity-75"
+                } small px-2.5 py-1`}>
+                  {dialMode === "SIP" ? "SIP TRUNK" :
+                   dialMode === "CTC" ? "CLICK-TO-CALL" : "AI SIMULATOR"}
                 </span>
                 {dialMode === "SIP" && (
                   <span className={`badge px-2.5 py-1 small ${
@@ -663,7 +758,58 @@ function NewCallContent() {
                   </span>
                 )}
               </div>
+              {callError && (
+                <div className="alert alert-danger bg-danger bg-opacity-10 border-danger border-opacity-10 py-2 px-3 mt-3 mb-0 rounded-3 text-start mx-auto" style={{ maxWidth: "450px" }}>
+                  <div className="d-flex gap-2 align-items-start">
+                    <i className="bi bi-exclamation-triangle-fill text-danger fs-6 mt-0.5"></i>
+                    <div className="small text-danger fw-semibold" style={{ fontSize: "11.5px", lineHeight: "1.4" }}>
+                      {callError}
+                      {callError.includes("unverified") && (
+                        <div className="mt-2 text-secondary fw-normal">
+                          To resolve this:
+                          <ol className="ps-3 mb-0 mt-1">
+                            <li>Go to your <strong>Twilio Console</strong>.</li>
+                            <li>Navigate to <strong>Phone Numbers &gt; Verified Caller IDs</strong>.</li>
+                            <li>Add and verify this number: <strong>{agentPhone}</strong>.</li>
+                            <li>Or upgrade your Twilio account to a paid plan.</li>
+                          </ol>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* Click-to-Call Agent Mobile Settings Widget */}
+            {dialMode === "CTC" && (
+              <div className="card bg-light border-0 mb-4" style={{ borderRadius: "12px" }}>
+                <div className="card-body p-3">
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <span className="small text-secondary fw-bold text-uppercase">
+                      <i className="bi bi-phone-fill text-success me-2"></i>Agent Device Number
+                    </span>
+                    <span className="badge bg-success bg-opacity-10 text-success x-small fw-bold">Mobile Ring First</span>
+                  </div>
+                  <div className="row g-2">
+                    <div className="col-12">
+                      <label className="x-small text-secondary fw-bold mb-1">Your Mobile Phone Number</label>
+                      <input
+                        type="tel"
+                        className="form-control form-control-sm border-0 bg-white"
+                        placeholder="e.g. +919876543210 or +14155552671"
+                        value={agentPhone}
+                        onChange={(e) => setAgentPhone(e.target.value)}
+                        disabled={calling}
+                        style={{ fontSize: "12px", borderRadius: "8px", height: "34px" }}
+                        required
+                      />
+                      <div className="x-small text-muted mt-1">Twilio will call this phone number first. When you answer, it will connect the customer.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* SIP Active Config Widget */}
             {dialMode === "SIP" && sipConfig && (
@@ -742,17 +888,31 @@ function NewCallContent() {
                       />
                     )}
 
-                    {/* Node 1: Browser */}
-                    <circle cx="20" cy="25" r="8" fill="#ffffff" stroke="#212529" strokeWidth="3" />
+                    {/* Node 1: Browser/Agent */}
+                    <circle 
+                      cx="20" 
+                      cy="25" 
+                      r="8" 
+                      fill="#ffffff" 
+                      stroke={dialMode === "CTC" ? "#198754" : "#212529"} 
+                      strokeWidth="3" 
+                    />
                     {/* Node 2: Trunk */}
-                    <circle cx="200" cy="25" r="8" fill="#ffffff" stroke="#0d6efd" strokeWidth="3" />
+                    <circle 
+                      cx="200" 
+                      cy="25" 
+                      r="8" 
+                      fill="#ffffff" 
+                      stroke={dialMode === "CTC" ? "#198754" : "#0d6efd"} 
+                      strokeWidth="3" 
+                    />
                     {/* Node 3: Target */}
                     <circle cx="380" cy="25" r="8" fill="#ffffff" stroke="#198754" strokeWidth="3" />
                   </svg>
                   
                   <div className="d-flex justify-content-between px-1 x-small fw-bold text-secondary mt-1">
-                    <span>Softphone Browser</span>
-                    <span>{dialMode === "SIP" ? "SIP Proxy Gateway" : "AI Dial Server"}</span>
+                    <span>{dialMode === "CTC" ? "Agent Mobile" : "Softphone Browser"}</span>
+                    <span>{dialMode === "SIP" ? "SIP Proxy Gateway" : dialMode === "CTC" ? "Twilio Cloud" : "AI Dial Server"}</span>
                     <span>Customer Trunk</span>
                   </div>
                 </div>
@@ -817,10 +977,14 @@ function NewCallContent() {
               {!calling && !showOutcome && (
                 <button 
                   className={`btn btn-lg w-100 py-3 rounded-pill fw-bold text-white shadow d-flex align-items-center justify-content-center gap-2 ${
-                    dialMode === "SIP" ? "btn-primary" : "btn-success"
+                    dialMode === "SIP" ? "btn-primary" :
+                    dialMode === "CTC" ? "btn-success" : "btn-dark"
                   }`} 
                   onClick={startCall}
-                  disabled={dialMode === "SIP" && sipStatus !== "Registered"}
+                  disabled={
+                    (dialMode === "SIP" && sipStatus !== "Registered") ||
+                    (dialMode === "CTC" && !agentPhone)
+                  }
                 >
                   {dialMode === "SIP" && sipStatus !== "Registered" ? (
                     <span className="spinner-border spinner-border-sm me-1.5" role="status" aria-hidden="true"></span>
@@ -830,6 +994,8 @@ function NewCallContent() {
                   <span>
                     {dialMode === "SIP" 
                       ? (sipStatus === "Registered" ? "Initiate Trunk Call" : "Registering SIP softphone...") 
+                      : dialMode === "CTC"
+                      ? "Start Click-to-Call"
                       : "Launch AI Call"}
                   </span>
                 </button>

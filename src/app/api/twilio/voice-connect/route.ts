@@ -3,16 +3,29 @@ import { prisma } from "@/lib/db";
 
 export async function POST(request: Request) {
   try {
-    const formData = await request.formData();
-    console.log("[Voice Connect] Webhook received parameters:", Array.from(formData.entries()));
+    const { searchParams } = new URL(request.url);
+    let formData: FormData | null = null;
+    
+    try {
+      if (request.method === "POST") {
+        formData = await request.formData();
+      }
+    } catch (e) {
+      console.warn("[Voice Connect] Could not parse form data:", e);
+    }
 
-    let to = formData.get("destPhone") as string || formData.get("To") as string || "";
+    console.log("[Voice Connect] Webhook received query parameters:", Array.from(searchParams.entries()));
+    if (formData) {
+      console.log("[Voice Connect] Webhook received form parameters:", Array.from(formData.entries()));
+    }
+
+    let to = searchParams.get("destPhone") || formData?.get("destPhone") as string || formData?.get("To") as string || "";
     if (to.startsWith("AP")) {
       to = "";
     }
-    const leadId = formData.get("leadId") as string || "";
-    const lang = formData.get("lang") as string || "English";
-    const userId = formData.get("userId") as string || "";
+    const leadId = searchParams.get("leadId") || formData?.get("leadId") as string || "";
+    const lang = searchParams.get("lang") || formData?.get("lang") as string || "English";
+    const userId = searchParams.get("userId") || formData?.get("userId") as string || "";
 
     if (!to) {
       console.warn("[Voice Connect] No destination phone number provided.");
@@ -28,7 +41,7 @@ export async function POST(request: Request) {
       where: { isActive: true }
     });
     
-    const callerId = sipConfig?.callerId || process.env.TWILIO_NUMBER || formData.get("From") || "";
+    const callerId = sipConfig?.callerId || process.env.TWILIO_NUMBER || formData?.get("From") || "";
 
     console.log(`[Voice Connect] Routing call from ${callerId} to customer ${to}. Bridge recording enabled.`);
 

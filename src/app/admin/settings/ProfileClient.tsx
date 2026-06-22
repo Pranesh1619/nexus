@@ -10,6 +10,7 @@ interface ProfileUser {
   email: string;
   role: string;
   status: string;
+  phone?: string | null;
 }
 
 export default function ProfileClient({ user }: { user: ProfileUser }) {
@@ -47,6 +48,17 @@ export default function ProfileClient({ user }: { user: ProfileUser }) {
               className="form-control form-control-sm bg-light border-0 px-3 py-2 small" 
               defaultValue={user.email} 
               required 
+            />
+          </div>
+
+          <div className="col-md-12">
+            <label className="form-label">Mobile Phone Number (for Click-to-Call)</label>
+            <input 
+              name="phone" 
+              type="tel" 
+              className="form-control form-control-sm bg-light border-0 px-3 py-2 small" 
+              defaultValue={user.phone || ""} 
+              placeholder="e.g. +14155552671"
             />
           </div>
 

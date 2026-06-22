@@ -17,8 +17,49 @@ export async function POST(request: Request) {
     const recordingDurationSec = parseInt(formData.get("RecordingDuration") as string) || 0;
     const callSid = formData.get("CallSid") as string;
 
-    if (!leadId) {
-      return NextResponse.json({ error: "Missing leadId parameter" }, { status: 400 });
+    const fromPhone = (formData.get("From") as string) || (formData.get("Caller") as string) || "";
+    const toPhone = (formData.get("To") as string) || "";
+
+    let resolvedLeadId = leadId;
+    let lead = null;
+
+    if (resolvedLeadId) {
+      lead = await prisma.lead.findUnique({
+        where: { id: resolvedLeadId }
+      });
+    } else if (fromPhone) {
+      // Look up Lead by phone number (format-independent lookup by last 10 digits)
+      const cleanFrom = fromPhone.replace(/\D/g, "");
+      const last10Digits = cleanFrom.slice(-10);
+
+      if (last10Digits.length >= 7) {
+        const allLeads = await prisma.lead.findMany();
+        lead = allLeads.find(l => {
+          const cleanLeadPhone = l.phone.replace(/\D/g, "");
+          return cleanLeadPhone.endsWith(last10Digits) || cleanFrom.endsWith(cleanLeadPhone.slice(-10));
+        });
+      }
+
+      if (lead) {
+        resolvedLeadId = lead.id;
+        console.log(`[INBOUND Webhook] Resolved incoming call caller ${fromPhone} to existing Lead: ${lead.name}`);
+      } else {
+        // Create a new Lead for unrecognized incoming caller
+        lead = await prisma.lead.create({
+          data: {
+            name: `Inbound Call (${fromPhone})`,
+            phone: fromPhone,
+            status: "NEW",
+            source: "INBOUND_CALL"
+          }
+        });
+        resolvedLeadId = lead.id;
+        console.log(`[INBOUND Webhook] Created new Lead for unrecognized caller: ${fromPhone}`);
+      }
+    }
+
+    if (!resolvedLeadId) {
+      return NextResponse.json({ error: "Missing leadId parameter and caller identification" }, { status: 400 });
     }
 
     // Save Twilio recording audio locally
@@ -67,10 +108,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // 1. Fetch Lead
-    const lead = await prisma.lead.findUnique({
-      where: { id: leadId }
-    });
+    // 1. Validate resolved Lead
     if (!lead) {
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     }
@@ -187,7 +225,9 @@ export async function POST(request: Request) {
           analysis: conversation.analysis,
           aiScore: conversation.aiScore,
           audioUrl: recordingUrl,
-          notes: existingCallLog.notes || `Call recorded successfully. Audio URL: ${recordingUrl}`
+          notes: existingCallLog.notes || `Call recorded successfully. Audio URL: ${recordingUrl}`,
+          callerPhone: existingCallLog.callerPhone || fromPhone || null,
+          receiverPhone: existingCallLog.receiverPhone || toPhone || null
         }
       });
       console.log(`Updated CallLog ${existingCallLog.id} with Twilio recording transcription.`);
@@ -196,7 +236,7 @@ export async function POST(request: Request) {
       await prisma.callLog.create({
         data: {
           jobId: callSid,
-          leadId,
+          leadId: resolvedLeadId,
           userId: agentId,
           duration: recordingDurationSec,
           status: "CONNECTED",
@@ -209,7 +249,9 @@ export async function POST(request: Request) {
           analysis: conversation.analysis,
           aiScore: conversation.aiScore,
           audioUrl: recordingUrl,
-          notes: `Automatic logging from Twilio recording callback. Audio URL: ${recordingUrl}`
+          notes: `Automatic logging from Twilio recording callback. Audio URL: ${recordingUrl}`,
+          callerPhone: fromPhone || null,
+          receiverPhone: toPhone || null
         }
       });
       console.log(`Created new CallLog from Twilio recording callback for CallSid: ${callSid}`);

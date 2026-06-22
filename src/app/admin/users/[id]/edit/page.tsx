@@ -28,7 +28,8 @@ export default async function EditUserPage({ params, searchParams }: { params: P
     name: user.name,
     email: user.email,
     role: user.role,
-    status: user.status || "Active"
+    status: user.status || "Active",
+    phone: user.phone || ""
   };
 
   return <EditUserForm user={typedUser} success={success === "true"} currentUserRole={userRole} />;

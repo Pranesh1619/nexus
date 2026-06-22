@@ -6,11 +6,15 @@ import { useRouter } from "next/navigation";
 import {
   saveCallLog,
   placeRealTwilioCall,
+  placeClickToCall,
+  getCurrentAgent,
+  getAllAgents,
   syncSipCallLog,
   getCallLogStatus,
   endTwilioCall,
   getTwilioCallStatus,
-  getOverallSummary
+  getOverallSummary,
+  assignLeadToAgent
 } from "./new/actions";
 import { deleteCallLog } from "./actions";
 import CallList, { CallLogListItem } from "./CallList";
@@ -148,6 +152,7 @@ interface LeadType {
   status: string;
   email: string | null;
   createdAt?: Date | string;
+  assignedTo?: string | null;
 }
 
 interface SipConfigPreview {
@@ -235,19 +240,90 @@ export default function CallsWorkspace({
   const [detailTab, setDetailTab] = useState<"transcript" | "recording">("transcript");
 
   // Dialer & Call States (ported from new/page.tsx)
-  const [dialMode, setDialMode] = useState<"SIP" | "AI">("AI");
+  const [dialMode, setDialMode] = useState<"SIP" | "AI" | "CTC">("CTC");
+  const [agentPhone, setAgentPhone] = useState("");
   const [calling, setCalling] = useState(false);
   const [timer, setTimer] = useState(0);
   const [status, setStatus] = useState("Ready to dial");
   const [sipStatus, setSipStatus] = useState("Disconnected");
+  const [callError, setCallError] = useState<string | null>(null);
 
   const [showOutcome, setShowOutcome] = useState(false);
   const [selectedStage, setSelectedStage] = useState("Interested");
   const [isSyncing, setIsSyncing] = useState(false);
 
-  const [callLanguage, setCallLanguage] = useState("English");
+  const [callLanguage, setCallLanguage] = useState("auto");
   const [callSid, setCallSid] = useState<string | null>(null);
   const [lastCallSummary, setLastCallSummary] = useState<any | null>(null);
+  const [agentsList, setAgentsList] = useState<{ id: string; name: string; phone: string | null; email: string }[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState("");
+  const [loadingAgents, setLoadingAgents] = useState(true);
+
+  const isProcessing = useMemo(() => {
+    return !!(lastCallSummary?.transcript && lastCallSummary.transcript.includes("Recording is being processed by Twilio"));
+  }, [lastCallSummary]);
+
+  // Pre-load the current agent's phone number and all active agents list
+  useEffect(() => {
+    async function loadAgentAndAllAgents() {
+      setLoadingAgents(true);
+      try {
+        const [agent, allAgents] = await Promise.all([
+          getCurrentAgent(),
+          getAllAgents()
+        ]);
+        if (agent && agent.phone) {
+          setAgentPhone(agent.phone);
+        }
+        if (allAgents) {
+          setAgentsList(allAgents as any);
+          if (agent) {
+            const matched = allAgents.find((a: any) => a.phone === agent.phone || a.id === agent.id);
+            if (matched) {
+              setSelectedAgentId(matched.id);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error loading agents:", err);
+      } finally {
+        setLoadingAgents(false);
+      }
+    }
+    loadAgentAndAllAgents();
+  }, []);
+  // Synchronize dropdown selection when selectedLeadId or agentsList changes
+  useEffect(() => {
+    if (!selectedLeadId || agentsList.length === 0) return;
+    
+    // Find the assigned agent in the agentsList
+    const assignedAgentId = selectedLead?.assignedTo;
+    if (assignedAgentId) {
+      const matched = agentsList.find(a => a.id === assignedAgentId);
+      if (matched) {
+        setSelectedAgentId(matched.id);
+        setAgentPhone(matched.phone || "");
+        return;
+      }
+    }
+    
+    // If no assigned agent or not found in list, fall back to current logged-in agent if available
+    async function loadCurrentAgentFallback() {
+      try {
+        const agent = await getCurrentAgent();
+        if (agent) {
+          const matched = agentsList.find(a => a.id === agent.id);
+          if (matched) {
+            setSelectedAgentId(matched.id);
+            setAgentPhone(matched.phone || "");
+          }
+        }
+      } catch (err) {
+        console.error("Error setting fallback agent:", err);
+      }
+    }
+    loadCurrentAgentFallback();
+  }, [selectedLeadId, agentsList, selectedLead]);
 
   // Terminal & Protocol states
   const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
@@ -346,10 +422,7 @@ export default function CallsWorkspace({
   useEffect(() => {
     if (!sipConfig) return;
 
-    // Default to SIP if trunk config is active
-    if (sipConfig.isActive) {
-      setDialMode("SIP");
-    }
+    // Default to CTC as requested by user
 
     if (!sipConfig.useRealTwilio || typeof window === "undefined") return;
 
@@ -459,7 +532,7 @@ export default function CallsWorkspace({
 
   // Poll Twilio call status
   useEffect(() => {
-    if (!calling || dialMode !== "SIP" || !callSid) return;
+    if (!calling || (dialMode !== "SIP" && dialMode !== "CTC") || !callSid) return;
 
     const interval = setInterval(async () => {
       try {
@@ -547,6 +620,12 @@ export default function CallsWorkspace({
     setTimer(0);
     setPipelineConnected(false);
     setCallSid(null);
+    setCallError(null);
+
+    // Auto-assign lead to the selected agent when call starts
+    if (selectedAgentId && selectedLeadId) {
+      assignLeadToAgent(selectedLeadId, selectedAgentId);
+    }
 
     const destPhone = selectedLead.phone;
     const sipUser = sipConfig ? sipConfig.username : "guest";
@@ -584,7 +663,7 @@ export default function CallsWorkspace({
             destPhone: formattedPhone,
             leadId: selectedLeadId,
             lang: callLanguage,
-            userId: "placeholder"
+            userId: selectedAgentId || "placeholder"
           }
         }).then((twilioCall: any) => {
           twilioCall.on("accept", () => {
@@ -605,7 +684,7 @@ export default function CallsWorkspace({
                 callSid: sid,
                 duration: 0,
                 stage: selectedStage,
-                userId: "placeholder"
+                userId: selectedAgentId || "placeholder"
               });
             }
           });
@@ -630,6 +709,7 @@ export default function CallsWorkspace({
         }).catch((err: any) => {
           logToTerminal(`[ERROR] Failed to start WebRTC session: ${err.message}`);
           setStatus("Failed to connect");
+          setCallError(err.message);
           setSipStatus("Registered");
           setCalling(false);
         });
@@ -655,10 +735,11 @@ export default function CallsWorkspace({
       } else {
         // Mock Twilio Outbound
         const origin = typeof window !== "undefined" ? window.location.origin : "";
-        placeRealTwilioCall(selectedLeadId, origin, callLanguage).then((res) => {
+        placeRealTwilioCall(selectedLeadId, origin, callLanguage, selectedAgentId || undefined).then((res) => {
           if (res.error) {
             logToTerminal(`[ERROR] Twilio Trunk rejected request: ${res.error}`);
             setStatus("Failed to connect");
+            setCallError(res.error);
             setSipStatus("Registered");
             setCalling(false);
           } else {
@@ -705,6 +786,61 @@ export default function CallsWorkspace({
 
         timeoutsRef.current = [t1, t2, t3, t4, t5];
       }
+    } else if (dialMode === "CTC") {
+      setStatus("Calling Agent Mobile...");
+      logToTerminal(`[CTC] Initiating Click-to-Call sequence via Twilio REST API...`);
+      logToTerminal(`[CTC] Calling Agent mobile: ${agentPhone}`);
+
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      placeClickToCall({
+        leadId: selectedLeadId,
+        agentPhone,
+        language: callLanguage,
+        userId: selectedAgentId || "placeholder",
+        currentHost: origin
+      }).then((res) => {
+        if (res.error) {
+          logToTerminal(`[ERROR] Twilio Click-to-Call failed: ${res.error}`);
+          setStatus("Failed to connect");
+          setCallError(res.error);
+          setCalling(false);
+        } else {
+          setCallSid(res.callSid || null);
+          logToTerminal(`[CTC] Outbound call placed to Agent. Call SID: ${res.callSid}`);
+          setStatus("Calling Agent...");
+
+          // Register initial call log entry in the background
+          if (res.callSid) {
+            syncSipCallLog({
+              leadId: selectedLeadId,
+              callSid: res.callSid,
+              duration: 0,
+              stage: selectedStage,
+              userId: selectedAgentId || "placeholder"
+            });
+          }
+
+          // In mock mode, simulate agent answering, dialing customer, and bridging
+          if (!sipConfig?.useRealTwilio) {
+            const t1 = setTimeout(() => {
+              setStatus("Agent Answered. Dialing Customer...");
+              logToTerminal(`[CTC] Agent answered. Dialing customer: ${destPhone}`);
+            }, 2000);
+
+            const t2 = setTimeout(() => {
+              setStatus("Connected - Audio Active");
+              setPipelineConnected(true);
+              logToTerminal(`[CTC] Customer answered. Bridged successfully.`);
+            }, 5500);
+
+            timeoutsRef.current = [t1, t2];
+          } else {
+            // For real Twilio, we'll mark pipeline connected so timer and status show correctly
+            setStatus("Bridging Customer...");
+            setPipelineConnected(true);
+          }
+        }
+      });
     } else {
       // AI dialer simulator
       setStatus("AI Dialing...");
@@ -734,12 +870,14 @@ export default function CallsWorkspace({
     const sipUser = sipConfig ? sipConfig.username : "guest";
     const sipDom = sipConfig ? sipConfig.domain : "simulated.voice";
 
-    if (dialMode === "SIP" && sipConfig) {
-      setStatus("SIP: Sending BYE...");
-      setSipStatus("Registered");
-      logToTerminal(`[TX] BYE sip:${destPhone}@${sipDom} SIP/2.0`);
+    if ((dialMode === "SIP" || dialMode === "CTC") && sipConfig) {
+      setStatus(dialMode === "SIP" ? "SIP: Sending BYE..." : "Ending Twilio Session...");
+      if (dialMode === "SIP") {
+        setSipStatus("Registered");
+        logToTerminal(`[TX] BYE sip:${destPhone}@${sipDom} SIP/2.0`);
+      }
 
-      if (sipConfig.useRealTwilio && deviceRef.current) {
+      if (dialMode === "SIP" && sipConfig.useRealTwilio && deviceRef.current) {
         deviceRef.current.disconnectAll();
       }
 
@@ -749,9 +887,13 @@ export default function CallsWorkspace({
       }
 
       setTimeout(() => {
-        logToTerminal(`[RX] SIP/2.0 200 OK (BYE Processed)`);
-        logToTerminal(`[MEDIA] WebRTC connection terminated.`);
-        logToTerminal(`[SIP] Trunk Idle.`);
+        if (dialMode === "SIP") {
+          logToTerminal(`[RX] SIP/2.0 200 OK (BYE Processed)`);
+          logToTerminal(`[MEDIA] WebRTC connection terminated.`);
+          logToTerminal(`[SIP] Trunk Idle.`);
+        } else {
+          logToTerminal(`[SYSTEM] Twilio Click-to-Call session terminated.`);
+        }
         setStatus("Call ended. Ready.");
       }, 500);
     } else {
@@ -765,13 +907,13 @@ export default function CallsWorkspace({
     setStatus("AI Analysis & Sync in progress...");
 
     let result;
-    if (dialMode === "SIP" && callSid) {
+    if ((dialMode === "SIP" || dialMode === "CTC") && callSid) {
       result = await syncSipCallLog({
         leadId: selectedLeadId,
         callSid,
         duration: timer,
         stage: selectedStage,
-        userId: "placeholder"
+        userId: selectedAgentId || "placeholder"
       });
     } else {
       // Mock generated conversation analysis
@@ -781,7 +923,7 @@ export default function CallsWorkspace({
       ]);
       result = await saveCallLog({
         leadId: selectedLeadId,
-        userId: "placeholder",
+        userId: selectedAgentId || "placeholder",
         duration: timer || 15,
         status: selectedStage === "Not Interested" ? "FAILED" : "CONNECTED",
         stage: selectedStage,
@@ -957,11 +1099,20 @@ export default function CallsWorkspace({
                     /* Post Call Transcript & AI Summary Panel */
                     <div className="card border-0 shadow-sm p-4 bg-white animate-fade" style={{ borderRadius: "16px" }}>
                       <div className="d-flex justify-content-between align-items-center pb-3 border-bottom mb-4">
-                        <h4 className="fw-bold mb-0 text-dark">Call Summary Report</h4>
+                        <div className="d-flex align-items-center gap-2 flex-wrap">
+                          <h4 className="fw-bold mb-0 text-dark">Call Summary Report</h4>
+                          {isProcessing && (
+                            <span className="badge bg-warning bg-opacity-15 text-warning px-3 py-1.5 rounded-pill d-inline-flex align-items-center gap-2 border border-warning border-opacity-10 animate-pulse" style={{ fontSize: "11px", color: "#d97706" }}>
+                              <span className="spinner-border spinner-border-sm" role="status" style={{ width: "10px", height: "10px", borderWidth: "1.5px" }}></span>
+                              AI Processing...
+                            </span>
+                          )}
+                        </div>
                         <button
                           onClick={() => setLastCallSummary(null)}
                           className="btn btn-outline-primary btn-sm px-3 py-1.5 fw-bold"
                           style={{ borderRadius: "8px" }}
+                          disabled={isProcessing}
                         >
                           <i className="bi bi-telephone-plus me-1.5"></i>
                           New Call Session
@@ -1034,124 +1185,188 @@ export default function CallsWorkspace({
 
                       {/* Contents */}
                       <div className="tab-content flex-grow-1 overflow-auto" style={{ maxHeight: "400px" }}>
-                        {postCallSummaryTab === "requirement" && (
-                          <div className="p-3 bg-light rounded-0 border-start border-primary border-3 mb-3">
-                            <p className="small text-dark mb-0" style={{ lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
-                              {lastCallSummary.analysis || "No requirements compiled yet."}
-                            </p>
-                          </div>
-                        )}
-
-                        {postCallSummaryTab === "overall" && (
-                          <div className="p-3 bg-light rounded-0 border-start border-primary border-3 mb-3">
-                            {loadingPostCallOverall ? (
-                              <div className="d-flex align-items-center gap-2 py-2 text-primary">
-                                <div className="spinner-border spinner-border-sm" role="status">
+                        {isProcessing ? (
+                          <>
+                            {postCallSummaryTab === "requirement" && (
+                              <div className="p-4 bg-light rounded-4 border text-center py-5">
+                                <div className="spinner-border text-info mb-3" role="status">
                                   <span className="visually-hidden">Loading...</span>
                                 </div>
-                                <span style={{ fontSize: "12px" }}>Generating consolidated summary...</span>
-                              </div>
-                            ) : (
-                              <div className="small text-dark mb-0 markdown-content" style={{ lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
-                                {postCallOverallSummary || "No overall summary generated yet."}
+                                <h6 className="fw-bold text-dark">Extracting Client Requirements...</h6>
+                                <p className="text-secondary small max-w-md mx-auto mb-0">
+                                  Our LLM pipeline will analyze the conversation turns to extract client needs, questions, and action items as soon as the audio finishes transcribing.
+                                </p>
                               </div>
                             )}
-                          </div>
-                        )}
 
-                        {postCallSummaryTab === "transcript" && (
-                          <div className="d-flex flex-column gap-3">
-                            {(() => {
-                              try {
-                                const rawTurns = JSON.parse(lastCallSummary.transcript || "[]");
-                                if (Array.isArray(rawTurns) && rawTurns.length > 0) {
-                                  const turns: any[] = [];
-                                  rawTurns.forEach((turn: any) => {
-                                    const last = turns[turns.length - 1];
-                                    if (last && last.speaker === turn.speaker) {
-                                      last.text = (last.text + " " + turn.text).trim();
-                                      if (turn.translation || last.translation) {
-                                        last.translation = ((last.translation || "") + " " + (turn.translation || "")).trim();
-                                      }
-                                    } else {
-                                      turns.push({ ...turn });
-                                    }
-                                  });
-                                  return (
-                                    <div className="d-flex flex-column gap-3">
-                                      {turns.map((turn: any, idx: number) => {
-                                        const isAgent = turn.speaker === "Agent";
-                                        const speakerName = isAgent ? "Agent" : (selectedLead?.name || "Lead");
-                                        const showTranslation = !!turn.translation && turn.translation !== turn.text;
-                                        
-                                        return (
-                                          <div key={idx} className={`d-flex gap-3 align-items-start ${isAgent ? "" : "flex-row-reverse"}`}>
-                                            <div 
-                                              className={`rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center shadow-sm fw-bold text-white ${
-                                                isAgent ? "bg-primary" : "bg-success"
-                                              }`} 
-                                              style={{ width: 36, height: 36, fontSize: 13 }}
-                                            >
-                                              {isAgent ? "A" : "L"}
-                                            </div>
-                                            <div 
-                                              className={`p-3 rounded-4 flex-grow-1 shadow-sm border ${
-                                                isAgent 
-                                                  ? "bg-white border-light-subtle text-start" 
-                                                  : "bg-success bg-opacity-10 border-success border-opacity-20 text-end"
-                                              }`}
-                                              style={{ maxWidth: "80%" }}
-                                            >
-                                              <div className={`d-flex justify-content-between align-items-center mb-1.5 ${isAgent ? "" : "flex-row-reverse"}`}>
-                                                <span className={`fw-bold small ${isAgent ? "text-primary" : "text-success"}`}>
-                                                  {speakerName}
-                                                </span>
-                                                <span className="x-small text-secondary font-monospace">{turn.time}</span>
-                                              </div>
-                                              <div className="d-flex flex-column gap-1">
-                                                {showTranslation && (
-                                                  <div className={`x-small text-muted mb-0.5 ${isAgent ? "text-start" : "text-end"}`}>
-                                                    <span className="badge bg-secondary bg-opacity-10 text-secondary" style={{ fontSize: "9px" }}>ORIGINAL SPEECH</span>
-                                                  </div>
-                                                )}
-                                                <p className="small mb-0 text-dark fw-medium" style={{ wordBreak: "break-word", lineHeight: "1.5" }}>
-                                                  {turn.text}
-                                                </p>
-                                              </div>
-                                              {showTranslation && (
-                                                <div className={`mt-2 pt-2 border-top border-secondary border-opacity-10 x-small text-muted ${isAgent ? "text-start" : "text-end"}`}>
-                                                  <div className="mb-1">
-                                                    <span className="badge bg-success bg-opacity-15" style={{ fontSize: "9px", letterSpacing: "0.5px" }}>TRANSLATED TO ENGLISH</span>
-                                                  </div>
-                                                  <div className="mt-1 font-monospace fw-semibold text-secondary" style={{ whiteSpace: "pre-wrap" }}>
-                                                    {turn.translation}
-                                                  </div>
-                                                </div>
-                                              )}
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
+                            {postCallSummaryTab === "overall" && (
+                              <div className="p-4 bg-light rounded-4 border text-center py-5">
+                                <div className="spinner-border text-primary mb-3" role="status">
+                                  <span className="visually-hidden">Loading...</span>
+                                </div>
+                                <h6 className="fw-bold text-dark">Generating AI Call Summary...</h6>
+                                <p className="text-secondary small max-w-md mx-auto mb-0">
+                                  We are waiting for Twilio's audio recording callback. Once transcribed, we will compile a comprehensive analysis of the call.
+                                </p>
+                              </div>
+                            )}
+
+                            {postCallSummaryTab === "transcript" && (
+                              <div className="p-4 bg-light rounded-4 border text-center py-5">
+                                <div className="spinner-grow text-success mb-3" role="status">
+                                  <span className="visually-hidden">Loading...</span>
+                                </div>
+                                <h6 className="fw-bold text-dark">Speech-to-Text Transcription in Progress...</h6>
+                                <p className="text-secondary small max-w-md mx-auto mb-2">
+                                  Twilio is currently processing the audio recording. Groq Whisper will transcribe the speech turns shortly.
+                                </p>
+                                <div className="mt-4 px-4 py-3 text-start bg-dark text-light-green rounded-3 font-monospace x-small border border-secondary border-opacity-25" style={{ maxWidth: "480px", margin: "0 auto", fontSize: "11px", color: "#00FF66" }}>
+                                  <div className="d-flex align-items-center gap-2 mb-1.5 text-secondary">
+                                    <span className="spinner-border spinner-border-sm text-info" role="status" style={{ width: "12px", height: "12px" }}></span>
+                                    <span>LIVE PIPELINE TELEMETRY</span>
+                                  </div>
+                                  <div style={{ color: "#888" }}>[SYSTEM] Call SID: <span style={{ color: "#00e5ff" }}>{lastCallSummary.jobId}</span></div>
+                                  <div style={{ color: "#888" }}>[SYSTEM] Target Language: <span style={{ color: "#d580ff" }}>{callLanguage}</span></div>
+                                  <div style={{ color: "#888" }}>[SYSTEM] Webhook: <span style={{ color: "#e2e8f0" }}>/api/twilio/recording-callback</span></div>
+                                  <div style={{ color: "#00FF66" }}>[SYSTEM] Polling database status: ACTIVE (every 2s)</div>
+                                </div>
+                              </div>
+                            )}
+
+                            {postCallSummaryTab === "recording" && (
+                              <div className="p-4 bg-light rounded-4 border text-center py-5">
+                                <div className="spinner-border text-secondary mb-3" role="status">
+                                  <span className="visually-hidden">Loading...</span>
+                                </div>
+                                <h6 className="fw-bold text-dark">Processing Call Recording...</h6>
+                                <p className="text-secondary small max-w-md mx-auto mb-0">
+                                  The MP3 audio file is being generated and saved. Once compiled by Twilio, the custom audio player will load here automatically.
+                                </p>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {postCallSummaryTab === "requirement" && (
+                              <div className="p-3 bg-light rounded-0 border-start border-primary border-3 mb-3">
+                                <p className="small text-dark mb-0" style={{ lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
+                                  {lastCallSummary.analysis || "No requirements compiled yet."}
+                                </p>
+                              </div>
+                            )}
+
+                            {postCallSummaryTab === "overall" && (
+                              <div className="p-3 bg-light rounded-0 border-start border-primary border-3 mb-3">
+                                {loadingPostCallOverall ? (
+                                  <div className="d-flex align-items-center gap-2 py-2 text-primary">
+                                    <div className="spinner-border spinner-border-sm" role="status">
+                                      <span className="visually-hidden">Loading...</span>
                                     </div>
-                                  );
-                                }
-                              } catch (e) { }
-                              return <p className="text-secondary small">No transcript data available.</p>;
-                            })()}
-                          </div>
-                        )}
-
-                        {postCallSummaryTab === "recording" && (
-                          <div className="p-3 bg-light rounded-0 border-start border-primary border-3">
-                            {lastCallSummary.jobId || lastCallSummary.audioUrl ? (
-                              <CustomAudioPlayer
-                                src={lastCallSummary.jobId ? `/api/recordings/${lastCallSummary.jobId}` : lastCallSummary.audioUrl}
-                                initialDuration={lastCallSummary.duration || 0}
-                              />
-                            ) : (
-                              <p className="text-secondary small mb-0">No audio recording file available.</p>
+                                    <span style={{ fontSize: "12px" }}>Generating consolidated summary...</span>
+                                  </div>
+                                ) : (
+                                  <div className="small text-dark mb-0 markdown-content" style={{ lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
+                                    {postCallOverallSummary || "No overall summary generated yet."}
+                                  </div>
+                                )}
+                              </div>
                             )}
-                          </div>
+
+                            {postCallSummaryTab === "transcript" && (
+                              <div className="d-flex flex-column gap-3">
+                                {(() => {
+                                  try {
+                                    const rawTurns = JSON.parse(lastCallSummary.transcript || "[]");
+                                    if (Array.isArray(rawTurns) && rawTurns.length > 0) {
+                                      const turns: any[] = [];
+                                      rawTurns.forEach((turn: any) => {
+                                        const last = turns[turns.length - 1];
+                                        if (last && last.speaker === turn.speaker) {
+                                          last.text = (last.text + " " + turn.text).trim();
+                                          if (turn.translation || last.translation) {
+                                            last.translation = ((last.translation || "") + " " + (turn.translation || "")).trim();
+                                          }
+                                        } else {
+                                          turns.push({ ...turn });
+                                        }
+                                      });
+                                      return (
+                                        <div className="d-flex flex-column gap-3">
+                                          {turns.map((turn: any, idx: number) => {
+                                            const isAgent = turn.speaker === "Agent";
+                                            const speakerName = isAgent ? "Agent" : (selectedLead?.name || "Lead");
+                                            const showTranslation = !!turn.translation && turn.translation !== turn.text;
+                                            
+                                            return (
+                                              <div key={idx} className={`d-flex gap-3 align-items-start ${isAgent ? "" : "flex-row-reverse"}`}>
+                                                <div 
+                                                  className={`rounded-circle flex-shrink-0 d-flex align-items-center justify-content-center shadow-sm fw-bold text-white ${
+                                                    isAgent ? "bg-primary" : "bg-success"
+                                                  }`} 
+                                                  style={{ width: 36, height: 36, fontSize: 13 }}
+                                                >
+                                                  {isAgent ? "A" : "L"}
+                                                </div>
+                                                <div 
+                                                  className={`p-3 rounded-4 flex-grow-1 shadow-sm border ${
+                                                    isAgent 
+                                                      ? "bg-white border-light-subtle text-start" 
+                                                      : "bg-success bg-opacity-10 border-success border-opacity-20 text-end"
+                                                  }`}
+                                                  style={{ maxWidth: "80%" }}
+                                                >
+                                                  <div className={`d-flex justify-content-between align-items-center mb-1.5 ${isAgent ? "" : "flex-row-reverse"}`}>
+                                                    <span className={`fw-bold small ${isAgent ? "text-primary" : "text-success"}`}>
+                                                      {speakerName}
+                                                    </span>
+                                                    <span className="x-small text-secondary font-monospace">{turn.time}</span>
+                                                  </div>
+                                                  <div className="d-flex flex-column gap-1">
+                                                    {showTranslation && (
+                                                      <div className={`x-small text-muted mb-0.5 ${isAgent ? "text-start" : "text-end"}`}>
+                                                        <span className="badge bg-secondary bg-opacity-10 text-secondary" style={{ fontSize: "9px" }}>ORIGINAL SPEECH</span>
+                                                      </div>
+                                                    )}
+                                                    <p className="small mb-0 text-dark fw-medium" style={{ wordBreak: "break-word", lineHeight: "1.5" }}>
+                                                      {turn.text}
+                                                    </p>
+                                                  </div>
+                                                  {showTranslation && (
+                                                    <div className={`mt-2 pt-2 border-top border-secondary border-opacity-10 x-small text-muted ${isAgent ? "text-start" : "text-end"}`}>
+                                                      <div className="mb-1">
+                                                        <span className="badge bg-success bg-opacity-15" style={{ fontSize: "9px", letterSpacing: "0.5px" }}>TRANSLATED TO ENGLISH</span>
+                                                      </div>
+                                                      <div className="mt-1 font-monospace fw-semibold text-secondary" style={{ whiteSpace: "pre-wrap" }}>
+                                                        {turn.translation}
+                                                      </div>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      );
+                                    }
+                                  } catch (e) { }
+                                  return <p className="text-secondary small">No transcript data available.</p>;
+                                })()}
+                              </div>
+                            )}
+
+                            {postCallSummaryTab === "recording" && (
+                              <div className="p-3 bg-light rounded-0 border-start border-primary border-3">
+                                {lastCallSummary.jobId || lastCallSummary.audioUrl ? (
+                                  <CustomAudioPlayer
+                                    src={lastCallSummary.jobId ? `/api/recordings/${lastCallSummary.jobId}` : lastCallSummary.audioUrl}
+                                    initialDuration={lastCallSummary.duration || 0}
+                                  />
+                                ) : (
+                                  <p className="text-secondary small mb-0">No audio recording file available.</p>
+                                )}
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
@@ -1186,9 +1401,9 @@ export default function CallsWorkspace({
                           </div>
 
                           <div className="col-md-4 text-md-end">
-                            <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-2 fw-bold" style={{ fontSize: "12px" }}>
-                              <i className="bi bi-shield-check me-1.5 animate-pulse"></i>
-                              SIP Trunk Mode Enabled
+                            <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-2 small fw-bold d-inline-flex align-items-center gap-1.5 border border-success border-opacity-10 shadow-sm" style={{ fontSize: "11px" }}>
+                              <span className="rounded-circle bg-success animate-pulse" style={{ width: "8px", height: "8px", display: "inline-block" }}></span>
+                              Twilio Connected
                             </span>
                           </div>
                         </div>
@@ -1198,43 +1413,97 @@ export default function CallsWorkspace({
                       <div className="row justify-content-center">
                         <div className="col-12 col-md-8 col-lg-6">
                           <div className="card border p-4 bg-white" style={{ borderRadius: "16px", borderColor: "#cbd5e1" }}>
-
                             {/* Calling Visualizer Header */}
                             <div className="text-center mb-4 pb-3 border-bottom">
                               <div className={`rounded-circle mx-auto d-flex align-items-center justify-content-center mb-3 ${calling ? 'bg-danger pulse-dialer-active' : 'bg-light border text-secondary'
-                                }`} style={{ width: 80, height: 80, transition: "all 0.3s" }}>
+                                 }`} style={{ width: 80, height: 80, transition: "all 0.3s" }}>
                                 <i className={`bi ${calling ? 'bi-telephone-fill text-white animate-bounce' : 'bi-telephone-outbound text-secondary'} fs-2`}></i>
                               </div>
                               <h5 className="fw-bold mb-1">
-                                {calling ? (dialMode === "SIP" ? "Trunk Session Connected" : "Simulating Call Flow...") : "Dialer Console Ready"}
+                                {calling ? (
+                                  dialMode === "SIP" ? "Trunk Session Connected" :
+                                  dialMode === "CTC" ? "Click-to-Call Session" :
+                                  "Simulating Call Flow..."
+                                ) : "Dialer Console Ready"}
                               </h5>
                               <p className="small text-secondary mb-0">
                                 {dialMode === "SIP"
                                   ? (sipStatus === "Registered" ? "Trunk registered & idle" : `SIP: ${sipStatus}`)
+                                  : dialMode === "CTC"
+                                  ? `Status: ${status}`
                                   : "AI Speech Simulator Engine ready"}
                               </p>
+                              {callError && (
+                                <div className="alert alert-danger bg-danger bg-opacity-10 border-danger border-opacity-10 py-2 px-3 mt-3 mb-0 rounded-3 text-start">
+                                  <div className="d-flex gap-2 align-items-start">
+                                    <i className="bi bi-exclamation-triangle-fill text-danger fs-6 mt-0.5"></i>
+                                    <div className="small text-danger fw-semibold" style={{ fontSize: "11.5px", lineHeight: "1.4" }}>
+                                      {callError}
+                                      {callError.includes("unverified") && (
+                                        <div className="mt-2 text-secondary fw-normal">
+                                          To resolve this:
+                                          <ol className="ps-3 mb-0 mt-1">
+                                            <li>Go to your <strong>Twilio Console</strong>.</li>
+                                            <li>Navigate to <strong>Phone Numbers &gt; Verified Caller IDs</strong>.</li>
+                                            <li>Add and verify this number: <strong>{agentPhone}</strong>.</li>
+                                            <li>Or upgrade your Twilio account to a paid plan.</li>
+                                          </ol>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
 
                             {/* Configurations Panel */}
                             <div className="d-flex flex-column gap-3 mb-4">
-                              <div className="bg-light p-2.5 rounded-3 border-0 small">
-                                <div className="d-flex justify-content-between align-items-center mb-1">
-                                  <span className="text-secondary fw-bold text-uppercase x-small">Language Target</span>
+                              {dialMode === "CTC" && (
+                                <div className="bg-light p-2.5 rounded-3 border-0 small">
+                                  <div className="d-flex justify-content-between align-items-center mb-1">
+                                    <span className="text-secondary fw-bold text-uppercase x-small">Agent Mobile Device</span>
+                                  </div>
+                                  
+                                  {loadingAgents ? (
+                                    <div className="d-flex align-items-center gap-2 py-1.5 px-3 bg-white border rounded shadow-sm text-secondary" style={{ height: "38px" }}>
+                                      <span className="spinner-border spinner-border-sm text-success" role="status"></span>
+                                      <span style={{ fontSize: "12px", fontWeight: 500 }}>Loading active agents...</span>
+                                    </div>
+                                  ) : agentsList.length > 0 ? (
+                                    <select
+                                      className="form-select form-select-sm border bg-white shadow-sm"
+                                      style={{ fontSize: "12px", fontWeight: 500 }}
+                                      onChange={(e) => {
+                                        const id = e.target.value;
+                                        setSelectedAgentId(id);
+                                        const selectedAgent = agentsList.find(a => a.id === id);
+                                        setAgentPhone(selectedAgent?.phone || "");
+                                      }}
+                                      value={selectedAgentId}
+                                      disabled={calling}
+                                    >
+                                      <option value="">-- Select Active Agent --</option>
+                                      {agentsList.map((agent) => (
+                                        <option key={agent.id} value={agent.id}>
+                                          {agent.name} {agent.phone ? `(${agent.phone})` : "(No Phone)"}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <input
+                                      type="tel"
+                                      className="form-control form-control-sm border bg-white"
+                                      placeholder="e.g. +919876543210"
+                                      value={agentPhone}
+                                      onChange={(e) => setAgentPhone(e.target.value)}
+                                      disabled={calling}
+                                      style={{ fontSize: "12px" }}
+                                      required
+                                    />
+                                  )}
+                                  {/* <div className="x-small text-muted mt-1.5" style={{ fontSize: "10px" }}>Twilio will call this phone first.</div> */}
                                 </div>
-                                <select
-                                  className="form-select form-select-sm border bg-white"
-                                  value={callLanguage}
-                                  onChange={(e) => setCallLanguage(e.target.value)}
-                                  disabled={calling}
-                                >
-                                  <option value="English">English</option>
-                                  <option value="Spanish">Español</option>
-                                  <option value="Hindi">हिन्दी (Hindi)</option>
-                                  <option value="Tamil">தமிழ் (Tamil)</option>
-                                  <option value="French">Français</option>
-                                  <option value="German">Deutsch</option>
-                                </select>
-                              </div>
+                              )}
                             </div>
 
                             {/* Timer & Connection Progress */}
@@ -1253,10 +1522,15 @@ export default function CallsWorkspace({
                             <div className="mt-auto">
                               {!calling && !showOutcome && (
                                 <button
-                                  className={`btn btn-lg w-100 py-2.5 rounded-pill fw-bold text-white shadow d-flex align-items-center justify-content-center gap-2 ${dialMode === "SIP" ? "btn-primary" : "btn-success"
-                                    }`}
+                                  className={`btn btn-lg w-100 py-2.5 rounded-pill fw-bold text-white shadow d-flex align-items-center justify-content-center gap-2 ${
+                                    dialMode === "SIP" ? "btn-primary" :
+                                    dialMode === "CTC" ? "btn-success" : "btn-dark"
+                                  }`}
                                   onClick={startCall}
-                                  disabled={dialMode === "SIP" && sipStatus !== "Registered"}
+                                  disabled={
+                                    (dialMode === "SIP" && sipStatus !== "Registered") ||
+                                    (dialMode === "CTC" && !agentPhone)
+                                  }
                                 >
                                   {dialMode === "SIP" && sipStatus !== "Registered" ? (
                                     <span className="spinner-border spinner-border-sm me-1.5" role="status"></span>
@@ -1266,6 +1540,8 @@ export default function CallsWorkspace({
                                   <span>
                                     {dialMode === "SIP"
                                       ? (sipStatus === "Registered" ? "Start Voice Call" : "Activating Trunk...")
+                                      : dialMode === "CTC"
+                                      ? "Click-to-Call"
                                       : "Start AI Call"}
                                   </span>
                                 </button>

@@ -18,10 +18,8 @@ export default async function AgentsPage() {
 
   if (userRole !== "SUPER_ADMIN" && userCompanyId) {
     whereClause.companyId = userCompanyId;
-    whereClause.role = "SALES";
-  } else if (userRole === "SUPER_ADMIN") {
-    whereClause.role = { in: ["SUPER_ADMIN", "COMPANY_ADMIN"] };
   }
+  whereClause.role = "SALES";
 
   // Fetch active sales/admin agents along with their leads and calls
   const agents = await prisma.user.findMany({

@@ -173,6 +173,106 @@ export async function placeRealTwilioCall(leadId: string, currentHost?: string, 
   }
 }
 
+export async function placeClickToCall(params: {
+  leadId: string;
+  agentPhone: string;
+  language?: string;
+  userId?: string;
+  currentHost?: string;
+}) {
+  try {
+    const lead = await prisma.lead.findUnique({
+      where: { id: params.leadId }
+    });
+
+    if (!lead) {
+      return { error: "Lead not found in database." };
+    }
+
+    const sipConfig = await prisma.sipTrunkConfig.findUnique({
+      where: { id: "default_sip_config" }
+    });
+
+    const useRealTwilio = process.env.USE_REAL_TWILIO === "true";
+    const mockTwilioUrl = !useRealTwilio ? ((sipConfig as any)?.mockTwilioUrl || process.env.MOCK_TWILIO_URL || "http://localhost:5050") : null;
+    const accountSid = process.env.TWILIO_ACCOUNT_SID || "AC_mock_sid";
+    const authToken = process.env.TWILIO_AUTH_TOKEN || "mock_token";
+
+    if (useRealTwilio) {
+      if (!sipConfig || !sipConfig.isActive || !sipConfig.callerId) {
+        return { error: "No active SIP Trunk configuration found. Please check your settings." };
+      }
+      if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+        return { error: "Twilio credentials are not configured in your .env file." };
+      }
+    }
+
+    const callerId = sipConfig?.callerId || "+10000000000";
+
+    const formatPhone = (num: string) => {
+      let formatted = num.replace(/[^\d+]/g, "");
+      if (!formatted.startsWith("+")) {
+        if (formatted.startsWith("91") && formatted.length === 12) {
+          formatted = "+" + formatted;
+        } else {
+          formatted = "+91" + formatted;
+        }
+      }
+      return formatted;
+    };
+
+    const agentPhoneFormatted = formatPhone(params.agentPhone);
+    const customerPhoneFormatted = formatPhone(lead.phone);
+
+    const hostUrl = process.env.APP_URL || params.currentHost || "http://localhost:3000";
+    const selectedLang = params.language || "English";
+    const activeUserId = params.userId || "placeholder";
+
+    // Build the voice connect url which Twilio will call when the agent answers.
+    // When the agent answers, voice-connect TwiML will <Dial> the customer phone number.
+    const voiceConnectUrl = `${hostUrl}/api/twilio/voice-connect?destPhone=${encodeURIComponent(customerPhoneFormatted)}&leadId=${params.leadId}&lang=${selectedLang}&userId=${activeUserId}`;
+
+    let callSid = "";
+    if (mockTwilioUrl) {
+      console.log(`[SYSTEM] Click-to-Call: Self-hosted Twilio URL detected: ${mockTwilioUrl}`);
+      const bodyParams = new URLSearchParams();
+      bodyParams.append("To", agentPhoneFormatted);
+      bodyParams.append("From", callerId);
+      bodyParams.append("Url", voiceConnectUrl);
+
+      const response = await fetch(`${mockTwilioUrl}/2010-04-01/Accounts/${accountSid}/Calls.json`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: "Basic " + Buffer.from(`${accountSid}:${authToken}`).toString("base64")
+        },
+        body: bodyParams.toString()
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        return { error: `Mock Twilio Server Error: ${response.status} - ${errText}` };
+      }
+
+      const resData = await response.json();
+      callSid = resData.sid;
+    } else {
+      const client = twilio(accountSid, authToken);
+      const call = await client.calls.create({
+        url: voiceConnectUrl,
+        to: agentPhoneFormatted,
+        from: callerId,
+      });
+      callSid = call.sid;
+    }
+
+    return { success: true, callSid };
+  } catch (error: any) {
+    console.error("Twilio Click-to-Call Error:", error);
+    return { error: error.message || "Failed to trigger Click-to-Call via Twilio." };
+  }
+}
+
 export async function syncSipCallLog(data: {
   leadId: string;
   callSid: string;
@@ -374,6 +474,55 @@ export async function getOverallSummary(leadId: string) {
   } catch (error: any) {
     console.error("Error in getOverallSummary Server Action:", error);
     return `Failed to compile overall summary: ${error.message || error}`;
+  }
+}
+
+export async function getCurrentAgent() {
+  try {
+    const { cookies } = await import("next/headers");
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("user_id")?.value;
+    if (userId) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, name: true, phone: true, email: true }
+      });
+      return user;
+    }
+  } catch (error) {
+    console.error("Error getting current agent:", error);
+  }
+  return null;
+}
+
+export async function assignLeadToAgent(leadId: string, agentId: string) {
+  try {
+    if (!leadId || !agentId || agentId === "placeholder") return;
+    await prisma.lead.update({
+      where: { id: leadId },
+      data: { assignedTo: agentId }
+    });
+    revalidatePath("/admin/leads");
+    revalidatePath("/admin/agents");
+    revalidatePath("/admin/sales");
+  } catch (error) {
+    console.error("Error assigning lead to agent:", error);
+  }
+}
+
+export async function getAllAgents() {
+  try {
+    const users = await prisma.user.findMany({
+      where: { 
+        role: "SALES"
+      },
+      select: { id: true, name: true, phone: true, email: true },
+      orderBy: { name: "asc" }
+    });
+    return users;
+  } catch (error) {
+    console.error("Error getting all agents:", error);
+    return [];
   }
 }
 

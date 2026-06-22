@@ -12,6 +12,7 @@ interface User {
   email: string;
   role: string;
   status: string;
+  phone?: string | null;
 }
 
 export default function EditUserForm({ user, success, currentUserRole = "ADMIN" }: { user: User; success?: boolean; currentUserRole?: string }) {
@@ -65,7 +66,8 @@ export default function EditUserForm({ user, success, currentUserRole = "ADMIN" 
                     if (currentUserRole === "SUPER_ADMIN") {
                       roles.push(
                         { value: "SUPER_ADMIN", label: "Super Admin" },
-                        { value: "COMPANY_ADMIN", label: "Company Admin" }
+                        { value: "COMPANY_ADMIN", label: "Company Admin" },
+                        { value: "SALES", label: "Sales Agent" }
                       );
                     } else {
                       // Company Admin, Admin, etc. can only assign/edit to Sales Agent
@@ -86,6 +88,10 @@ export default function EditUserForm({ user, success, currentUserRole = "ADMIN" 
                   <option value="Inactive">Inactive</option>
                   <option value="Suspended">Suspended</option>
                 </select>
+              </div>
+              <div className="col-md-6">
+                <label className="form-label">Phone Number</label>
+                <input name="phone" type="tel" className="form-control form-control-sm bg-light border-0 small px-3 py-2" defaultValue={user.phone || ""} placeholder="e.g. +919876543210" />
               </div>
             </div>
             <div className="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">

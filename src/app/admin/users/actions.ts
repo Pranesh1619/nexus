@@ -14,6 +14,7 @@ export async function createUser(formData: FormData) {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
   const role = formData.get("role") as string;
+  const phone = formData.get("phone") as string;
 
   if (!name || !email || !password || !role) {
     throw new Error("All fields (Name, Email, Password, and Role) are mandatory.");
@@ -29,6 +30,7 @@ export async function createUser(formData: FormData) {
       email: email.trim().toLowerCase(),
       password,
       role,
+      phone: phone ? phone.trim() : null,
     },
   });
 
@@ -68,6 +70,7 @@ export async function updateUser(id: string, formData: FormData) {
   const email = formData.get("email") as string;
   const role = formData.get("role") as string;
   const status = formData.get("status") as string;
+  const phone = formData.get("phone") as string;
 
   await prisma.user.update({
     where: { id },
@@ -76,6 +79,7 @@ export async function updateUser(id: string, formData: FormData) {
       email,
       role,
       status,
+      phone: phone ? phone.trim() : null,
     },
   });
 

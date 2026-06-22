@@ -20,9 +20,6 @@ export default async function UserListingPage() {
   
   if (userRole === "COMPANY_ADMIN" || userRole === "ADMIN") {
     users = users.filter(u => u.role === "SALES" && u.companyId === userCompanyId);
-  } else if (userRole === "SUPER_ADMIN") {
-    // Super admin only manages other Admins (Super Admin and Company Admin)
-    users = users.filter(u => u.role === "SUPER_ADMIN" || u.role === "COMPANY_ADMIN");
   }
 
   return (
@@ -31,7 +28,7 @@ export default async function UserListingPage() {
         <div>
           <h2 className="fw-bold mb-1">User Management</h2>
           <p className="text-secondary small">
-            {userRole === "SUPER_ADMIN" ? "Manage company administrators and super admins." : "Manage your sales agents."}
+            {userRole === "SUPER_ADMIN" ? "Manage all user accounts including super admins, company administrators, and sales agents." : "Manage your sales agents."}
           </p>
         </div>
         <Link href="/admin/users/new" className="btn btn-primary">

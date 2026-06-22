@@ -9,6 +9,7 @@ export async function updateUserInfo(formData: FormData) {
   const email = formData.get("email") as string;
   const role = formData.get("role") as string;
   const status = formData.get("status") as string;
+  const phone = formData.get("phone") as string;
 
   if (!userId) return { error: "User ID is required" };
 
@@ -20,6 +21,7 @@ export async function updateUserInfo(formData: FormData) {
         email,
         role,
         status,
+        phone: phone || null,
       },
     });
     revalidatePath("/admin/settings");
