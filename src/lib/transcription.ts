@@ -850,17 +850,36 @@ export async function transcribeAndAnalyzeRecording(
     } else {
       const mp3Url = recordingUrl.endsWith(".mp3") ? recordingUrl : `${recordingUrl}.mp3`;
       console.log(`[Whisper] Downloading MP3 call recording from: ${mp3Url}`);
-      const twilioSid = process.env.TWILIO_ACCOUNT_SID || "";
-      const twilioToken = process.env.TWILIO_AUTH_TOKEN || "";
-      const authHeader = "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64");
-
-      const audioRes = await fetch(mp3Url, {
-        headers: {
-          Authorization: authHeader
+      
+      const isPlivo = mp3Url.includes("plivo.com");
+      let authHeader = "";
+      
+      if (isPlivo) {
+        const { prisma } = require("@/lib/db");
+        const sipConfig = await prisma.sipTrunkConfig.findFirst({
+          where: { isActive: true }
+        });
+        const plivoAuthId = process.env.PLIVO_AUTH_ID || sipConfig?.plivoAuthId || "";
+        const plivoAuthToken = process.env.PLIVO_AUTH_TOKEN || sipConfig?.plivoAuthToken || "";
+        if (plivoAuthId && plivoAuthToken) {
+          authHeader = "Basic " + Buffer.from(`${plivoAuthId}:${plivoAuthToken}`).toString("base64");
         }
-      });
+      } else {
+        const twilioSid = process.env.TWILIO_ACCOUNT_SID || "";
+        const twilioToken = process.env.TWILIO_AUTH_TOKEN || "";
+        if (twilioSid && twilioToken) {
+          authHeader = "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64");
+        }
+      }
+
+      const headers: Record<string, string> = {};
+      if (authHeader) {
+        headers["Authorization"] = authHeader;
+      }
+
+      const audioRes = await fetch(mp3Url, { headers });
       if (!audioRes.ok) {
-        throw new Error(`Failed to fetch audio from Twilio: ${audioRes.status} ${audioRes.statusText}`);
+        throw new Error(`Failed to fetch audio from ${isPlivo ? "Plivo" : "Twilio"}: ${audioRes.status} ${audioRes.statusText}`);
       }
       arrayBuffer = await audioRes.arrayBuffer();
     }
@@ -1690,4 +1709,187 @@ Do not include any extra sections, timelines, action plans, or introductions. Ke
     console.error("Error in generateOverallSummaryFromLLM:", error);
     return `Failed to generate overall summary: ${error.message || error}`;
   }
+}
+
+export function startOfflineRetranscription(id: string) {
+  const job = retranscribeJobs.get(id);
+  if (job && job.status === "running") {
+    return;
+  }
+
+  // Initialize/reset job state
+  const currentJob: {
+    status: "running" | "done" | "error";
+    logs: string[];
+    error?: string;
+    duration?: string;
+  } = {
+    status: "running",
+    logs: [`[System] Initiating offline retranscription for call ID: ${id}...`],
+  };
+  retranscribeJobs.set(id, currentJob);
+
+  // Start background processing - DO NOT await it so we return immediately
+  (async () => {
+    try {
+      const startTime = Date.now();
+      const { prisma } = require("@/lib/db");
+      
+      // Wrap transcription in AsyncLocalStorage to capture console.logs
+      await transcriptionLogStorage.run(
+        (msg) => {
+          currentJob.logs.push(msg);
+        },
+        async () => {
+          try {
+            // 1. Fetch Call log
+            const call = await prisma.callLog.findUnique({
+              where: { id },
+              include: { lead: true, user: true },
+            });
+
+            if (!call) {
+              currentJob.status = "error";
+              currentJob.error = "Call log not found in database.";
+              currentJob.logs.push(`[ERROR] ${currentJob.error}`);
+              return;
+            }
+
+            let audioUrl = call.audioUrl;
+            
+            if (!audioUrl || !audioUrl.startsWith("http") || audioUrl.includes("processed")) {
+              currentJob.logs.push(`[System] Audio URL missing or placeholder. Attempting to fetch recording from provider APIs...`);
+              
+              const sipConfig = await prisma.sipTrunkConfig.findFirst({
+                where: { isActive: true }
+              });
+              const provider = sipConfig?.telephonyProvider || "TWILIO";
+              
+              if (provider === "PLIVO") {
+                const authId = process.env.PLIVO_AUTH_ID || sipConfig?.plivoAuthId || "";
+                const authToken = process.env.PLIVO_AUTH_TOKEN || sipConfig?.plivoAuthToken || "";
+                
+                if (authId && authToken) {
+                  currentJob.logs.push(`[Plivo] Checking recordings for call UUID: ${call.jobId}...`);
+                  const plivoRes = await fetch(`https://api.plivo.com/v1/Account/${authId}/Recording/?call_uuid=${call.jobId}`, {
+                    headers: {
+                      Authorization: "Basic " + Buffer.from(`${authId}:${authToken}`).toString("base64")
+                    }
+                  });
+                  if (plivoRes.ok) {
+                    const plivoData = await plivoRes.json();
+                    if (plivoData.objects && plivoData.objects.length > 0) {
+                      audioUrl = plivoData.objects[0].recording_url;
+                      currentJob.logs.push(`[Plivo] Found recording: ${audioUrl}`);
+                      
+                      // Save it to callLog so we don't have to fetch it again next time
+                      await prisma.callLog.update({
+                        where: { id },
+                        data: { audioUrl }
+                      });
+                    } else {
+                      currentJob.logs.push(`[Plivo] No recordings found for call UUID: ${call.jobId}`);
+                    }
+                  } else {
+                    currentJob.logs.push(`[Plivo] Failed to query recordings API: ${plivoRes.status} ${plivoRes.statusText}`);
+                  }
+                } else {
+                  currentJob.logs.push(`[System] Plivo credentials not configured.`);
+                }
+              } else {
+                // Twilio
+                const twilioSid = process.env.TWILIO_ACCOUNT_SID || "";
+                const twilioToken = process.env.TWILIO_AUTH_TOKEN || "";
+                
+                if (twilioSid && twilioToken) {
+                  currentJob.logs.push(`[Twilio] Checking recordings for call SID: ${call.jobId}...`);
+                  const twilioRes = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Recordings.json?CallSid=${call.jobId}`, {
+                    headers: {
+                      Authorization: "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64")
+                    }
+                  });
+                  if (twilioRes.ok) {
+                    const twilioData = await twilioRes.json();
+                    if (twilioData.recordings && twilioData.recordings.length > 0) {
+                      const recording = twilioData.recordings[0];
+                      audioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Recordings/${recording.sid}.mp3`;
+                      currentJob.logs.push(`[Twilio] Found recording: ${audioUrl}`);
+                      
+                      // Save it to callLog
+                      await prisma.callLog.update({
+                        where: { id },
+                        data: { audioUrl }
+                      });
+                    } else {
+                      currentJob.logs.push(`[Twilio] No recordings found for call SID: ${call.jobId}`);
+                    }
+                  } else {
+                    currentJob.logs.push(`[Twilio] Failed to query recordings API: ${twilioRes.status} ${twilioRes.statusText}`);
+                  }
+                } else {
+                  currentJob.logs.push(`[System] Twilio credentials not configured.`);
+                }
+              }
+            }
+
+            if (!audioUrl || !audioUrl.startsWith("http") || audioUrl.includes("processed")) {
+              currentJob.status = "error";
+              currentJob.error = "This call has no audio recording URL available yet.";
+              currentJob.logs.push(`[ERROR] ${currentJob.error}`);
+              return;
+            }
+
+            currentJob.logs.push(`[System] Fetching audio from: ${audioUrl}`);
+
+            // 2. Invoke transcription
+            const apiKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || "";
+            const leadName = call.lead?.name || "Client";
+            const agentName = call.user?.name || "Sales Rep";
+            const targetLanguage = call.detectedVoiceLanguage || "Tamil";
+            
+            const result = await transcribeAndAnalyzeRecording(
+              audioUrl,
+              apiKey,
+              leadName,
+              agentName,
+              targetLanguage,
+              false // isWebRTC
+            );
+
+            // 3. Update the database
+            currentJob.logs.push("[System] Updating call log in database with new transcription...");
+            const updated = await prisma.callLog.update({
+              where: { id },
+              data: {
+                audioUrl,
+                transcript: result.transcript,
+                translatedText: result.translatedText,
+                detectedVoiceLanguage: result.detectedVoiceLanguage,
+                translatedLanguage: result.translatedLanguage,
+                wordCount: result.wordCount,
+                analysis: result.analysis,
+                aiScore: result.aiScore,
+                notes: `Retranscribed offline using local Whisper model. Duration: ${((Date.now() - startTime) / 1000).toFixed(1)}s`
+              }
+            });
+
+            const durationSec = ((Date.now() - startTime) / 1000).toFixed(1);
+            currentJob.status = "done";
+            currentJob.duration = durationSec;
+            currentJob.logs.push(`[System] Retranscription complete in ${durationSec}s!`);
+          } catch (err: any) {
+            console.error("Retranscribe background task error:", err);
+            currentJob.status = "error";
+            currentJob.error = err.message || "An unexpected error occurred during retranscription.";
+            currentJob.logs.push(`[ERROR] ${currentJob.error}`);
+          }
+        }
+      );
+    } catch (err: any) {
+      console.error("Failed to run transcriptionLogStorage:", err);
+      currentJob.status = "error";
+      currentJob.error = err.message || "Failed to initialize log storage.";
+      currentJob.logs.push(`[ERROR] ${currentJob.error}`);
+    }
+  })();
 }

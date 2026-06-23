@@ -47,33 +47,54 @@ export async function GET(
         return new Response("Call recording not found in database", { status: 404 });
       }
 
-      const twilioSid = process.env.TWILIO_ACCOUNT_SID || "";
-      const twilioToken = process.env.TWILIO_AUTH_TOKEN || "";
-      const authHeader = "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64");
-
+      let response;
       const mp3Url = callLog.audioUrl.endsWith(".mp3") ? callLog.audioUrl : `${callLog.audioUrl}.mp3`;
       contentType = "audio/mpeg";
 
-      // Fetch the recording with manual redirect follow to strip Auth headers for S3
-      let response = await fetch(mp3Url, {
-        headers: {
-          Authorization: authHeader
-        },
-        redirect: "manual"
-      });
+      if (mp3Url.includes("plivo.com")) {
+        const sipConfig = await prisma.sipTrunkConfig.findFirst({
+          where: { isActive: true }
+        });
+        const plivoAuthId = process.env.PLIVO_AUTH_ID || sipConfig?.plivoAuthId || "";
+        const plivoAuthToken = process.env.PLIVO_AUTH_TOKEN || sipConfig?.plivoAuthToken || "";
+        const plivoAuthHeader = "Basic " + Buffer.from(`${plivoAuthId}:${plivoAuthToken}`).toString("base64");
 
-      if (response.status >= 300 && response.status < 400) {
-        const location = response.headers.get("location");
-        if (location) {
-          // Fetch redirected S3 URL WITHOUT Twilio's basic auth header
-          console.log(`[Recording Proxy] Following redirect manually: ${location.split('?')[0]}`);
-          response = await fetch(location);
+        if (plivoAuthId && plivoAuthToken) {
+          response = await fetch(mp3Url, {
+            headers: {
+              Authorization: plivoAuthHeader
+            }
+          });
+        }
+        if (!response || !response.ok) {
+          response = await fetch(mp3Url);
+        }
+      } else {
+        const twilioSid = process.env.TWILIO_ACCOUNT_SID || "";
+        const twilioToken = process.env.TWILIO_AUTH_TOKEN || "";
+        const twilioAuthHeader = "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64");
+
+        // Fetch the recording with manual redirect follow to strip Auth headers for S3
+        response = await fetch(mp3Url, {
+          headers: {
+            Authorization: twilioAuthHeader
+          },
+          redirect: "manual"
+        });
+
+        if (response.status >= 300 && response.status < 400) {
+          const location = response.headers.get("location");
+          if (location) {
+            // Fetch redirected S3 URL WITHOUT Twilio's basic auth header
+            console.log(`[Recording Proxy] Following redirect manually: ${location.split('?')[0]}`);
+            response = await fetch(location);
+          }
         }
       }
 
-      if (!response.ok) {
-        return new Response(`Failed to fetch audio from Twilio: ${response.statusText}`, {
-          status: response.status
+      if (!response || !response.ok) {
+        return new Response(`Failed to fetch audio from telephony provider: ${response?.statusText || "unknown"}`, {
+          status: response?.status || 500
         });
       }
 

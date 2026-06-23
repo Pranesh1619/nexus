@@ -26,8 +26,8 @@ export default async function CallViewPage({ params }: { params: Promise<{ id: s
 
       if (logs.length > 1) {
         // Find which one is the real transcription and which one is the placeholder
-        const realLog = logs.find(l => l.transcript && !l.transcript.includes("Recording is being processed by Twilio"));
-        const placeholderLog = logs.find(l => l.transcript && l.transcript.includes("Recording is being processed by Twilio"));
+        const realLog = logs.find(l => l.transcript && !l.transcript.includes("Recording is being processed by Twilio") && !l.transcript.includes("Recording is being processed by Plivo"));
+        const placeholderLog = logs.find(l => l.transcript && (l.transcript.includes("Recording is being processed by Twilio") || l.transcript.includes("Recording is being processed by Plivo")));
 
         if (realLog && placeholderLog) {
           // Merge user options from placeholder into the real log
@@ -79,7 +79,7 @@ export default async function CallViewPage({ params }: { params: Promise<{ id: s
 
   if (!call) return <div className="page-container"><div className="alert alert-danger">Call not found.</div></div>;
 
-  const isPlaceholder = !!(call.transcript && call.transcript.includes("Recording is being processed by Twilio"));
+  const isPlaceholder = !!(call.transcript && (call.transcript.includes("Recording is being processed by Twilio") || call.transcript.includes("Recording is being processed by Plivo")));
 
   const currentStageIndex = [
     "New Lead", "Attempted Contact", "Connected", "Enquiry", "Engaged", 

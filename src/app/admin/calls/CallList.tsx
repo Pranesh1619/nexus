@@ -35,6 +35,7 @@ export interface CallLogListItem {
   startTime?: string | Date | null;
   jobId?: string | null;
   audioUrl?: string | null;
+  notes?: string | null;
 }
 
 // Consistent scoring logic for the list view
@@ -70,7 +71,7 @@ export default function CallList({ logs }: { logs: CallLogListItem[] }) {
   const router = useRouter();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedFilter, setSelectedFilter] = useState<"all" | "missed" | "connected" | "converted">("all");
+  const [selectedFilter, setSelectedFilter] = useState<"all" | "missed" | "connected" | "converted" | "inbound">("all");
   const [selectedAgentId, setSelectedAgentId] = useState<string>("all");
   const [expandedLeadIds, setExpandedLeadIds] = useState<Record<string, boolean>>({});
   const [activeModalLog, setActiveModalLog] = useState<CallLogListItem | null>(null);
@@ -79,13 +80,13 @@ export default function CallList({ logs }: { logs: CallLogListItem[] }) {
   // Poll active modal log if it is in a placeholder state
   React.useEffect(() => {
     if (!activeModalLog) return;
-    const isPlaceholder = !!(activeModalLog.transcript && activeModalLog.transcript.includes("Recording is being processed by Twilio"));
+    const isPlaceholder = !!(activeModalLog.transcript && (activeModalLog.transcript.includes("Recording is being processed by Twilio") || activeModalLog.transcript.includes("Recording is being processed by Plivo")));
     if (!isPlaceholder) return;
 
     const intervalId = setInterval(async () => {
       try {
         const freshLog = await getCallLogStatus(activeModalLog.id);
-        if (freshLog && freshLog.transcript && !freshLog.transcript.includes("Recording is being processed by Twilio")) {
+        if (freshLog && freshLog.transcript && !freshLog.transcript.includes("Recording is being processed by Twilio") && !freshLog.transcript.includes("Recording is being processed by Plivo")) {
           setActiveModalLog(freshLog as any);
           router.refresh(); // Refresh the list in the background
         }
@@ -154,6 +155,14 @@ export default function CallList({ logs }: { logs: CallLogListItem[] }) {
         const isConverted = log.stage === "Closed" || log.stage === "Qualified" || log.stage === "Interested";
         if (!isConverted) return false;
       }
+      if (selectedFilter === "inbound") {
+        const cleanCaller = log.callerPhone?.replace(/\D/g, "") || "";
+        const cleanLead = log.lead.phone?.replace(/\D/g, "") || "";
+        const isInboundByPhone = cleanCaller && cleanLead && (cleanCaller.endsWith(cleanLead.slice(-10)) || cleanLead.endsWith(cleanCaller.slice(-10)));
+        const isInboundByNotes = log.notes?.toLowerCase().includes("inbound") || false;
+        
+        if (!isInboundByPhone && !isInboundByNotes) return false;
+      }
 
       // Agent filters
       if (selectedAgentId !== "all" && log.userId !== selectedAgentId) {
@@ -212,11 +221,12 @@ export default function CallList({ logs }: { logs: CallLogListItem[] }) {
             {/* Status Dropdown - No label */}
             <select
               value={selectedFilter}
-              onChange={(e) => setSelectedFilter(e.target.value as "all" | "missed" | "connected" | "converted")}
+              onChange={(e) => setSelectedFilter(e.target.value as "all" | "missed" | "connected" | "converted" | "inbound")}
               className="form-select form-select-sm border cursor-pointer"
               style={{ width: "150px", borderRadius: "50px", height: "36px", paddingLeft: "15px", paddingRight: "30px", fontWeight: "600" }}
             >
               <option value="all">All Calls</option>
+              <option value="inbound">Inbound Calls</option>
               <option value="missed">Missed</option>
               <option value="connected">Connected</option>
               <option value="converted">Converted</option>

@@ -89,7 +89,11 @@ export async function getSipTrunkConfig() {
         callerId: "",
         codec: "OPUS",
         isActive: false,
-        mockTwilioUrl: ""
+        mockTwilioUrl: "",
+        telephonyProvider: "TWILIO",
+        plivoAuthId: "",
+        plivoAuthToken: "",
+        plivoAppSid: ""
       };
     }
     return config;
@@ -108,6 +112,10 @@ export async function saveSipTrunkConfig(data: {
   codec: string;
   isActive: boolean;
   mockTwilioUrl?: string | null;
+  telephonyProvider: string;
+  plivoAuthId?: string | null;
+  plivoAuthToken?: string | null;
+  plivoAppSid?: string | null;
 }) {
   try {
     const existing = await prisma.sipTrunkConfig.findUnique({
@@ -121,7 +129,10 @@ export async function saveSipTrunkConfig(data: {
       callerId: data.callerId,
       codec: data.codec,
       isActive: data.isActive,
-      mockTwilioUrl: data.mockTwilioUrl || ""
+      mockTwilioUrl: data.mockTwilioUrl || "",
+      telephonyProvider: data.telephonyProvider,
+      plivoAuthId: data.plivoAuthId || "",
+      plivoAppSid: data.plivoAppSid || ""
     };
 
     if (data.password !== undefined && data.password !== "") {
@@ -130,12 +141,19 @@ export async function saveSipTrunkConfig(data: {
       payload.password = "";
     }
 
+    if (data.plivoAuthToken !== undefined && data.plivoAuthToken !== "") {
+      payload.plivoAuthToken = data.plivoAuthToken;
+    } else if (!existing) {
+      payload.plivoAuthToken = "";
+    }
+
     const config = await prisma.sipTrunkConfig.upsert({
       where: { id: "default_sip_config" },
       create: {
         id: "default_sip_config",
         ...payload,
-        password: payload.password || ""
+        password: payload.password || "",
+        plivoAuthToken: payload.plivoAuthToken || ""
       },
       update: payload
     });

@@ -163,6 +163,7 @@ interface SipConfigPreview {
   isActive: boolean;
   mockTwilioUrl?: string;
   useRealTwilio?: boolean;
+  telephonyProvider?: string;
 }
 
 interface CallsWorkspaceProps {
@@ -537,11 +538,12 @@ export default function CallsWorkspace({
     const interval = setInterval(async () => {
       try {
         const liveStatus = await getTwilioCallStatus(callSid);
+        const providerName = sipConfig?.telephonyProvider === "PLIVO" ? "Plivo" : "Twilio";
         if (liveStatus) {
-          logToTerminal(`[SYSTEM] Live Twilio Call Status: ${liveStatus}`);
+          logToTerminal(`[SYSTEM] Live ${providerName} Call Status: ${liveStatus}`);
         }
         if (liveStatus && ["completed", "failed", "busy", "no-answer", "canceled"].includes(liveStatus)) {
-          logToTerminal(`[SYSTEM] Call disconnected by remote party (Twilio Status: ${liveStatus})`);
+          logToTerminal(`[SYSTEM] Call disconnected by remote party (${providerName} Status: ${liveStatus})`);
           handleEndCall();
         }
       } catch (error) {
@@ -562,13 +564,13 @@ export default function CallsWorkspace({
   // Poll lastCallSummary if it is in a placeholder state
   useEffect(() => {
     if (!lastCallSummary) return;
-    const isPlaceholder = !!(lastCallSummary.transcript && lastCallSummary.transcript.includes("Recording is being processed by Twilio"));
+    const isPlaceholder = !!(lastCallSummary.transcript && lastCallSummary.transcript.includes("Recording is being processed"));
     if (!isPlaceholder) return;
 
     const intervalId = setInterval(async () => {
       try {
         const freshLog = await getCallLogStatus(lastCallSummary.id);
-        if (freshLog && freshLog.transcript && !freshLog.transcript.includes("Recording is being processed by Twilio")) {
+        if (freshLog && freshLog.transcript && !freshLog.transcript.includes("Recording is being processed")) {
           setLastCallSummary(freshLog);
           router.refresh();
         }
@@ -583,13 +585,13 @@ export default function CallsWorkspace({
   // Poll activeModalLog if it is in a placeholder state
   useEffect(() => {
     if (!activeModalLog) return;
-    const isPlaceholder = !!(activeModalLog.transcript && activeModalLog.transcript.includes("Recording is being processed by Twilio"));
+    const isPlaceholder = !!(activeModalLog.transcript && activeModalLog.transcript.includes("Recording is being processed"));
     if (!isPlaceholder) return;
 
     const intervalId = setInterval(async () => {
       try {
         const freshLog = await getCallLogStatus(activeModalLog.id);
-        if (freshLog && freshLog.transcript && !freshLog.transcript.includes("Recording is being processed by Twilio")) {
+        if (freshLog && freshLog.transcript && !freshLog.transcript.includes("Recording is being processed")) {
           setActiveModalLog(freshLog);
           router.refresh();
         }
@@ -733,19 +735,31 @@ export default function CallsWorkspace({
 
         timeoutsRef.current = [t1, t2, t3];
       } else {
-        // Mock Twilio Outbound
+        // Outbound calling
         const origin = typeof window !== "undefined" ? window.location.origin : "";
         placeRealTwilioCall(selectedLeadId, origin, callLanguage, selectedAgentId || undefined).then((res) => {
+          const providerName = sipConfig?.telephonyProvider === "PLIVO" ? "Plivo" : "Twilio";
           if (res.error) {
-            logToTerminal(`[ERROR] Twilio Trunk rejected request: ${res.error}`);
+            logToTerminal(`[ERROR] ${providerName} Trunk rejected request: ${res.error}`);
             setStatus("Failed to connect");
             setCallError(res.error);
             setSipStatus("Registered");
             setCalling(false);
           } else {
             setCallSid(res.callSid || null);
-            logToTerminal(`[SYSTEM] Twilio session established. Call SID: ${res.callSid}`);
+            logToTerminal(`[SYSTEM] ${providerName} session established. Call SID: ${res.callSid}`);
             logToTerminal(`[SYSTEM] Dispatching SIP INVITE request packet...`);
+            
+            // Register initial call log entry in the background
+            if (res.callSid) {
+              syncSipCallLog({
+                leadId: selectedLeadId,
+                callSid: res.callSid,
+                duration: 0,
+                stage: selectedStage,
+                userId: selectedAgentId || "placeholder"
+              });
+            }
           }
         });
 
@@ -787,8 +801,9 @@ export default function CallsWorkspace({
         timeoutsRef.current = [t1, t2, t3, t4, t5];
       }
     } else if (dialMode === "CTC") {
+      const providerName = sipConfig?.telephonyProvider === "PLIVO" ? "Plivo" : "Twilio";
       setStatus("Calling Agent Mobile...");
-      logToTerminal(`[CTC] Initiating Click-to-Call sequence via Twilio REST API...`);
+      logToTerminal(`[CTC] Initiating Click-to-Call sequence via ${providerName} REST API...`);
       logToTerminal(`[CTC] Calling Agent mobile: ${agentPhone}`);
 
       const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -800,7 +815,7 @@ export default function CallsWorkspace({
         currentHost: origin
       }).then((res) => {
         if (res.error) {
-          logToTerminal(`[ERROR] Twilio Click-to-Call failed: ${res.error}`);
+          logToTerminal(`[ERROR] ${providerName} Click-to-Call failed: ${res.error}`);
           setStatus("Failed to connect");
           setCallError(res.error);
           setCalling(false);
@@ -871,7 +886,8 @@ export default function CallsWorkspace({
     const sipDom = sipConfig ? sipConfig.domain : "simulated.voice";
 
     if ((dialMode === "SIP" || dialMode === "CTC") && sipConfig) {
-      setStatus(dialMode === "SIP" ? "SIP: Sending BYE..." : "Ending Twilio Session...");
+      const providerName = sipConfig?.telephonyProvider === "PLIVO" ? "Plivo" : "Twilio";
+      setStatus(dialMode === "SIP" ? "SIP: Sending BYE..." : `Ending ${providerName} Session...`);
       if (dialMode === "SIP") {
         setSipStatus("Registered");
         logToTerminal(`[TX] BYE sip:${destPhone}@${sipDom} SIP/2.0`);
@@ -882,7 +898,7 @@ export default function CallsWorkspace({
       }
 
       if (callSid) {
-        logToTerminal(`[SYSTEM] Hanging up active Twilio session: ${callSid}...`);
+        logToTerminal(`[SYSTEM] Hanging up active ${providerName} session: ${callSid}...`);
         endTwilioCall(callSid);
       }
 
@@ -892,7 +908,7 @@ export default function CallsWorkspace({
           logToTerminal(`[MEDIA] WebRTC connection terminated.`);
           logToTerminal(`[SIP] Trunk Idle.`);
         } else {
-          logToTerminal(`[SYSTEM] Twilio Click-to-Call session terminated.`);
+          logToTerminal(`[SYSTEM] ${providerName} Click-to-Call session terminated.`);
         }
         setStatus("Call ended. Ready.");
       }, 500);
@@ -938,7 +954,7 @@ export default function CallsWorkspace({
       });
     }
 
-    if (result && result.id && dialMode === "SIP" && callSid) {
+    if (result && result.id && (dialMode === "SIP" || dialMode === "CTC") && callSid) {
       let isReal = false;
       let attempts = 0;
       const maxAttempts = 15;
@@ -949,7 +965,7 @@ export default function CallsWorkspace({
 
         try {
           const freshLog = await getCallLogStatus(result.id);
-          if (freshLog && freshLog.transcript && !freshLog.transcript.includes("Recording is being processed by Twilio")) {
+          if (freshLog && freshLog.transcript && !freshLog.transcript.includes("processed")) {
             isReal = true;
             result = freshLog;
           }

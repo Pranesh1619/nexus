@@ -22,6 +22,7 @@ type SipConfigPreview = {
   isActive: boolean;
   mockTwilioUrl?: string;
   useRealTwilio?: boolean;
+  telephonyProvider?: string;
 };
 
 function NewCallContent() {
@@ -404,15 +405,16 @@ function NewCallContent() {
         // Trigger the mock Twilio voice outbound call
         const origin = typeof window !== "undefined" ? window.location.origin : "";
         placeRealTwilioCall(leadId, origin, callLanguage, currentAgentId || undefined).then((res) => {
+          const providerName = sipConfig?.telephonyProvider === "PLIVO" ? "Plivo" : "Twilio";
           if (res.error) {
-            logToTerminal(`[ERROR] Twilio Trunk rejected request: ${res.error}`);
+            logToTerminal(`[ERROR] ${providerName} Trunk rejected request: ${res.error}`);
             setStatus("Failed to connect");
             setCallError(res.error);
             setSipStatus("Registered");
             setCalling(false);
           } else {
             setCallSid(res.callSid || null);
-            logToTerminal(`[SYSTEM] Twilio session established. Call SID: ${res.callSid}`);
+            logToTerminal(`[SYSTEM] ${providerName} session established. Call SID: ${res.callSid}`);
             logToTerminal(`[SYSTEM] Dispatching SIP INVITE request packet...`);
           }
         });
@@ -631,10 +633,10 @@ function NewCallContent() {
       });
     }
 
-    if (result && result.id && dialMode === "SIP" && callSid) {
+    if (result && result.id && (dialMode === "SIP" || dialMode === "CTC") && callSid) {
       let isReal = false;
       let attempts = 0;
-      const maxAttempts = 15; // Wait up to 22.5 seconds total for Twilio + Groq to finish
+      const maxAttempts = 15; // Wait up to 22.5 seconds total for Twilio/Plivo + Groq/Gemini to finish
       
       while (!isReal && attempts < maxAttempts) {
         // Wait 1.5 seconds between status checks
@@ -643,7 +645,7 @@ function NewCallContent() {
         
         try {
           const freshLog = await getCallLogStatus(result.id);
-          if (freshLog && freshLog.transcript && !freshLog.transcript.includes("Recording is being processed by Twilio")) {
+          if (freshLog && freshLog.transcript && !freshLog.transcript.includes("processed")) {
             isReal = true;
             result = freshLog;
           }

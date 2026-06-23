@@ -20,21 +20,26 @@ export async function requestLoginOtp(email: string) {
       return { error: "No account found with this email address" };
     }
 
-    // Generate random 6-digit OTP
-    const dynamicOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate random 6-digit OTP (or use static if email disabled)
+    const shouldSendEmail = process.env.SEND_EMAIL !== "false";
+    const otpCode = shouldSendEmail ? Math.floor(100000 + Math.random() * 900000).toString() : "758369";
     const expires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
 
     // Save in database
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        otpCode: dynamicOtp,
+        otpCode,
         otpExpires: expires,
       },
     });
 
-    // Send the dynamic OTP code to their email
-    await sendOtpEmail(user.email, dynamicOtp);
+    if (shouldSendEmail) {
+      // Send the dynamic OTP code to their email
+      await sendOtpEmail(user.email, otpCode);
+    } else {
+      console.log(`[Mailer] SEND_EMAIL is false. Skipping email send. Static OTP is: ${otpCode}`);
+    }
     return { success: true };
   } catch (error: any) {
     console.error("Request OTP error:", error);

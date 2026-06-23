@@ -76,16 +76,21 @@ model ZohoConfig {
 }
 
 model SipTrunkConfig {
-  id            String   @id @default("default_sip_config")
-  domain        String   // SIP domain / gateway host (e.g. phone.provider.com)
-  webSocketUrl  String   // WebSocket connection URL for WebRTC SIP client (e.g. wss://phone.provider.com/ws)
-  username      String
-  password      String
-  callerId      String   // Outbound caller ID number (e.g. +1234567890)
-  codec         String   @default("OPUS") // OPUS, G711_ULAW, G711_ALAW
-  isActive      Boolean  @default(true)
-  mockTwilioUrl String?  // Optional self-hosted mock Twilio server URL (e.g. http://localhost:5050)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                String   @id @default("default_sip_config")
+  domain            String   // SIP domain / gateway host (e.g. phone.provider.com)
+  webSocketUrl      String   // WebSocket connection URL for WebRTC SIP client (e.g. wss://phone.provider.com/ws)
+  username          String
+  password          String
+  callerId          String   // Outbound caller ID number (e.g. +1234567890)
+  codec             String   @default("OPUS") // OPUS, G711_ULAW, G711_ALAW
+  isActive          Boolean  @default(true)
+  mockTwilioUrl     String?  // Optional self-hosted mock Twilio server URL (e.g. http://localhost:5050)
+  telephonyProvider String   @default("TWILIO") // TWILIO or PLIVO
+  plivoAuthId       String?  @default("")
+  plivoAuthToken    String?  @default("")
+  plivoAppSid       String?  @default("")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
+
 

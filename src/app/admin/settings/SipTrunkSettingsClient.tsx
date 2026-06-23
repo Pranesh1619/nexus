@@ -13,6 +13,10 @@ type SipConfigType = {
   codec: string;
   isActive: boolean;
   mockTwilioUrl?: string | null;
+  telephonyProvider?: string;
+  plivoAuthId?: string | null;
+  plivoAuthToken?: string | null;
+  plivoAppSid?: string | null;
 };
 
 interface SipTrunkSettingsClientProps {
@@ -24,6 +28,8 @@ export default function SipTrunkSettingsClient({ initialConfig }: SipTrunkSettin
   const [config, setConfig] = useState<SipConfigType>(initialConfig);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [plivoAuthToken, setPlivoAuthToken] = useState("");
+  const [showPlivoToken, setShowPlivoToken] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "danger"; text: string } | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -54,16 +60,22 @@ export default function SipTrunkSettingsClient({ initialConfig }: SipTrunkSettin
         callerId: config.callerId,
         codec: config.codec,
         isActive: config.isActive,
-        mockTwilioUrl: config.mockTwilioUrl
+        mockTwilioUrl: config.mockTwilioUrl,
+        telephonyProvider: config.telephonyProvider || "TWILIO",
+        plivoAuthId: config.plivoAuthId,
+        plivoAuthToken: plivoAuthToken || undefined,
+        plivoAppSid: config.plivoAppSid
       });
 
       if (res.success) {
-        setMessage({ type: "success", text: "SIP Trunk configuration saved successfully!" });
+        setMessage({ type: "success", text: "Telephony & Trunk configuration saved successfully!" });
         setPassword(""); // Clear password field after save
+        setPlivoAuthToken(""); // Clear Plivo token field after save
         if (res.config) {
           setConfig({
             ...res.config,
-            password: "" // Don't keep password plaintext in local state
+            password: "", // Don't keep password plaintext in local state
+            plivoAuthToken: "" // Don't keep token plaintext in local state
           });
         }
       } else {
@@ -77,8 +89,8 @@ export default function SipTrunkSettingsClient({ initialConfig }: SipTrunkSettin
       <div className="card-body p-4">
         <div className="d-flex justify-content-between align-items-center mb-3">
           <div>
-            <h6 className="fw-bold mb-1 small uppercase text-secondary">SIP Trunk Integration</h6>
-            <p className="text-secondary x-small mb-0">Configure your Session Initiation Protocol (SIP) trunk provider for external VoIP calls.</p>
+            <h6 className="fw-bold mb-1 small uppercase text-secondary">Telephony & Trunk Integration</h6>
+            <p className="text-secondary x-small mb-0">Configure your Session Initiation Protocol (SIP) trunk and communications provider for voice calls.</p>
           </div>
           <div className="form-check form-switch p-0 m-0 d-flex align-items-center">
             <span className="small text-secondary fw-semibold me-2">{config.isActive ? "Enabled" : "Disabled"}</span>
@@ -101,6 +113,133 @@ export default function SipTrunkSettingsClient({ initialConfig }: SipTrunkSettin
         )}
 
         <form onSubmit={handleSubmit} className="row g-3">
+          
+          {/* Active Provider Cards */}
+          <div className="col-12 mb-3">
+            <label className="form-label x-small fw-bold text-secondary text-uppercase mb-2">Active Telephony Provider</label>
+            <div className="row g-3">
+              <div className="col-md-6">
+                <div 
+                  className={`card cursor-pointer border-2 h-100 ${config.telephonyProvider === "TWILIO" ? "border-primary bg-primary bg-opacity-5" : "border-light bg-light"}`}
+                  onClick={() => setConfig(prev => ({ ...prev, telephonyProvider: "TWILIO" }))}
+                  style={{ borderRadius: "12px", cursor: "pointer", transition: "all 0.2s" }}
+                >
+                  <div className="card-body p-3 d-flex align-items-center gap-3">
+                    <div className={`rounded-circle d-flex align-items-center justify-content-center ${config.telephonyProvider === "TWILIO" ? "bg-primary text-white" : "bg-secondary bg-opacity-10 text-secondary"}`} style={{ width: "40px", height: "40px" }}>
+                      <i className="bi bi-telephone-fill"></i>
+                    </div>
+                    <div>
+                      <h6 className="fw-bold mb-0 small">Twilio Integration</h6>
+                      <p className="text-secondary x-small mb-0 text-muted">Use Twilio for programmable voice calling & WebRTC.</p>
+                    </div>
+                    <div className="ms-auto">
+                      <input
+                        type="radio"
+                        name="telephonyProvider"
+                        value="TWILIO"
+                        checked={config.telephonyProvider === "TWILIO"}
+                        onChange={handleInputChange}
+                        className="form-check-input"
+                        style={{ pointerEvents: "none" }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="col-md-6">
+                <div 
+                  className={`card cursor-pointer border-2 h-100 ${config.telephonyProvider === "PLIVO" ? "border-primary bg-primary bg-opacity-5" : "border-light bg-light"}`}
+                  onClick={() => setConfig(prev => ({ ...prev, telephonyProvider: "PLIVO" }))}
+                  style={{ borderRadius: "12px", cursor: "pointer", transition: "all 0.2s" }}
+                >
+                  <div className="card-body p-3 d-flex align-items-center gap-3">
+                    <div className={`rounded-circle d-flex align-items-center justify-content-center ${config.telephonyProvider === "PLIVO" ? "bg-warning text-dark" : "bg-secondary bg-opacity-10 text-secondary"}`} style={{ width: "40px", height: "40px" }}>
+                      <i className="bi bi-lightning-charge-fill"></i>
+                    </div>
+                    <div>
+                      <h6 className="fw-bold mb-0 small">Plivo Integration</h6>
+                      <p className="text-secondary x-small mb-0 text-muted">Use Plivo (up to 85% cheaper call rates in India).</p>
+                    </div>
+                    <div className="ms-auto">
+                      <input
+                        type="radio"
+                        name="telephonyProvider"
+                        value="PLIVO"
+                        checked={config.telephonyProvider === "PLIVO"}
+                        onChange={handleInputChange}
+                        className="form-check-input"
+                        style={{ pointerEvents: "none" }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Plivo Settings Section */}
+          {config.telephonyProvider === "PLIVO" && (
+            <div className="col-12 p-3 bg-light rounded-3 border mb-3 row g-3 mx-0">
+              <h6 className="fw-bold mb-0 text-dark small d-flex align-items-center gap-2">
+                <i className="bi bi-key-fill text-warning"></i>
+                Plivo API Credentials
+              </h6>
+              <div className="col-md-6">
+                <label className="form-label x-small fw-bold text-secondary text-uppercase mb-1">Plivo Auth ID</label>
+                <div className="input-group input-group-sm">
+                  <span className="input-group-text bg-white text-secondary border-0"><i className="bi bi-person-badge"></i></span>
+                  <input
+                    type="text"
+                    name="plivoAuthId"
+                    value={config.plivoAuthId || ""}
+                    onChange={handleInputChange}
+                    className="form-control border-0 bg-white"
+                    placeholder="Enter Plivo Auth ID"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="col-md-6">
+                <label className="form-label x-small fw-bold text-secondary text-uppercase mb-1">Plivo Auth Token</label>
+                <div className="input-group input-group-sm">
+                  <span className="input-group-text bg-white text-secondary border-0"><i className="bi bi-shield-lock"></i></span>
+                  <input
+                    type={showPlivoToken ? "text" : "password"}
+                    value={plivoAuthToken}
+                    onChange={(e) => setPlivoAuthToken(e.target.value)}
+                    className="form-control border-0 bg-white"
+                    placeholder={initialConfig.plivoAuthId ? "•••••••• (unchanged)" : "Enter Plivo Auth Token"}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-white border-0"
+                    onClick={() => setShowPlivoToken(!showPlivoToken)}
+                    tabIndex={-1}
+                  >
+                    <i className={`bi ${showPlivoToken ? "bi-eye-slash" : "bi-eye"}`}></i>
+                  </button>
+                </div>
+              </div>
+              <div className="col-12 mt-2">
+                <label className="form-label x-small fw-bold text-secondary text-uppercase mb-1">Plivo Application SID</label>
+                <div className="input-group input-group-sm">
+                  <span className="input-group-text bg-white text-secondary border-0"><i className="bi bi-cpu"></i></span>
+                  <input
+                    type="text"
+                    name="plivoAppSid"
+                    value={config.plivoAppSid || ""}
+                    onChange={handleInputChange}
+                    className="form-control border-0 bg-white"
+                    placeholder="Enter Plivo Application SID"
+                  />
+                </div>
+                <div className="x-small text-muted mt-1">Found in Plivo Console &gt; Voice &gt; Applications. Used to route call handling flow.</div>
+              </div>
+            </div>
+          )}
+
+          {/* SIP Trunk Configurations */}
           <div className="col-md-6">
             <label className="form-label x-small fw-bold text-secondary text-uppercase mb-1">SIP Server Domain</label>
             <div className="input-group input-group-sm">
@@ -207,21 +346,25 @@ export default function SipTrunkSettingsClient({ initialConfig }: SipTrunkSettin
               </select>
             </div>
           </div>
-          <div className="col-12">
-            <label className="form-label x-small fw-bold text-secondary text-uppercase mb-1">Self-hosted Mock Twilio Server URL (Optional)</label>
-            <div className="input-group input-group-sm">
-              <span className="input-group-text bg-light text-secondary border-0"><i className="bi bi-server"></i></span>
-              <input
-                type="text"
-                name="mockTwilioUrl"
-                value={config.mockTwilioUrl || ""}
-                onChange={handleInputChange}
-                className="form-control border-0 bg-light"
-                placeholder="e.g. http://localhost:5050"
-              />
+
+          {/* Self-hosted Mock URL (Only for Twilio) */}
+          {config.telephonyProvider === "TWILIO" && (
+            <div className="col-12">
+              <label className="form-label x-small fw-bold text-secondary text-uppercase mb-1">Self-hosted Mock Twilio Server URL (Optional)</label>
+              <div className="input-group input-group-sm">
+                <span className="input-group-text bg-light text-secondary border-0"><i className="bi bi-server"></i></span>
+                <input
+                  type="text"
+                  name="mockTwilioUrl"
+                  value={config.mockTwilioUrl || ""}
+                  onChange={handleInputChange}
+                  className="form-control border-0 bg-light"
+                  placeholder="e.g. http://localhost:5050"
+                />
+              </div>
+              <div className="x-small text-muted mt-1">Specify a custom endpoint for your self-hosted Twilio simulator server (leaves real Twilio active if blank).</div>
             </div>
-            <div className="x-small text-muted mt-1">Specify a custom endpoint for your self-hosted Twilio simulator server (leaves real Twilio active if blank).</div>
-          </div>
+          )}
 
           <div className="col-12 mt-4 pt-2 border-top d-flex gap-2 justify-content-end">
             <button
@@ -233,7 +376,7 @@ export default function SipTrunkSettingsClient({ initialConfig }: SipTrunkSettin
               {isPending ? (
                 <>
                   <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                  <span>Saving Trunk...</span>
+                  <span>Saving Configuration...</span>
                 </>
               ) : (
                 <>
@@ -248,3 +391,5 @@ export default function SipTrunkSettingsClient({ initialConfig }: SipTrunkSettin
     </div>
   );
 }
+
+
