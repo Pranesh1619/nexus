@@ -47,7 +47,7 @@ export async function POST(request: Request) {
         // Create a new Lead for unrecognized incoming caller
         lead = await prisma.lead.create({
           data: {
-            name: `Inbound Call (${fromPhone})`,
+            name: `New User (${fromPhone})`,
             phone: fromPhone,
             status: "NEW",
             source: "INBOUND_CALL"
@@ -116,8 +116,12 @@ export async function POST(request: Request) {
     // 2. Fetch Agent
     let agentId = userId;
     if (!agentId || agentId === "placeholder") {
-      const firstUser = await prisma.user.findFirst();
-      agentId = firstUser ? firstUser.id : "";
+      if (lead && lead.assignedTo) {
+        agentId = lead.assignedTo;
+      } else {
+        const firstUser = await prisma.user.findFirst();
+        agentId = firstUser ? firstUser.id : "";
+      }
     }
     const agent = agentId ? await prisma.user.findUnique({ where: { id: agentId } }) : null;
     const agentName = agent ? agent.name : "Sales Advisor";

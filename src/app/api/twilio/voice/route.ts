@@ -60,7 +60,7 @@ export async function POST(request: Request) {
         if (!matchedLead) {
           matchedLead = await prisma.lead.create({
             data: {
-              name: `Inbound Call (${callerPhone})`,
+              name: `New User (${callerPhone})`,
               phone: callerPhone,
               status: "NEW",
               source: "INBOUND_CALL"

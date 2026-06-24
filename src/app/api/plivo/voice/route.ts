@@ -91,7 +91,7 @@ export async function POST(request: Request) {
         if (!matchedLead) {
           matchedLead = await prisma.lead.create({
             data: {
-              name: `Inbound Call (${callerPhone})`,
+              name: `New User (${callerPhone})`,
               phone: callerPhone,
               status: "NEW",
               source: "INBOUND_CALL"
@@ -112,6 +112,14 @@ export async function POST(request: Request) {
 
         if (matchedLead.salesPerson?.phone) {
           agentPhone = matchedLead.salesPerson.phone;
+        } else if (matchedLead.calls.length > 0) {
+          const lastCall = matchedLead.calls[0];
+          const lastUser = await prisma.user.findUnique({
+            where: { id: lastCall.userId }
+          });
+          if (lastUser?.phone) {
+            agentPhone = lastUser.phone;
+          }
         }
       }
     }
