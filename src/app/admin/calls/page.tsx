@@ -28,7 +28,9 @@ export default async function CallLogsPage({
   try {
     const userCompanyId = cookieStore.get("user_company_id")?.value;
     const leadsWhereClause: any = {};
-    if (userRole !== "SUPER_ADMIN" && userCompanyId) {
+    if (userRole === "SALES") {
+      leadsWhereClause.assignedTo = userId;
+    } else if (userRole !== "SUPER_ADMIN" && userCompanyId) {
       leadsWhereClause.salesPerson = {
         companyId: userCompanyId
       };

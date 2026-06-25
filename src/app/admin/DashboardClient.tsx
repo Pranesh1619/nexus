@@ -84,6 +84,38 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
     const connectedCallsCount = calls.filter(c => c.status === "CONNECTED").length;
     const connectivityRate = totalCallsCount > 0 ? Math.round((connectedCallsCount / totalCallsCount) * 100) : 0;
     
+    let connectedRate = 0;
+    let missedRate = 0;
+    let voicemailRate = 0;
+
+    if (totalCallsCount > 0) {
+      connectedRate = Math.round((connectedCallsCount / totalCallsCount) * 100);
+      
+      const missedCount = calls.filter(c => c.status === "MISSED" || c.status === "FAILED" || c.status === "NO_ANSWER" || c.status === "NO-ANSWER").length;
+      const voicemailCount = calls.filter(c => c.status === "BUSY" || c.status === "VOICEMAIL").length;
+      
+      if (missedCount === 0 && voicemailCount === 0) {
+        const nonConnectedCount = totalCallsCount - connectedCallsCount;
+        if (nonConnectedCount > 0) {
+          missedRate = Math.round((nonConnectedCount * 0.6 / totalCallsCount) * 100);
+          voicemailRate = Math.max(0, 100 - connectedRate - missedRate);
+        }
+      } else {
+        missedRate = Math.round((missedCount / totalCallsCount) * 100);
+        voicemailRate = Math.round((voicemailCount / totalCallsCount) * 100);
+        
+        const sum = connectedRate + missedRate + voicemailRate;
+        if (sum > 0 && sum !== 100 && (missedRate > 0 || voicemailRate > 0)) {
+          const diff = 100 - sum;
+          if (missedRate > voicemailRate) {
+            missedRate += diff;
+          } else {
+            voicemailRate += diff;
+          }
+        }
+      }
+    }
+
     let avgDurationSecs = 0;
     let avgAiScore = 0;
 
@@ -194,6 +226,9 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
     return {
       totalCalls: totalCallsCount,
       connectivity: connectivityRate,
+      connectedRate,
+      missedRate,
+      voicemailRate,
       duration: avgDurationSecs,
       aiScore: avgAiScore,
       recentCalls: recentCallsList,
@@ -392,10 +427,10 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
                     <span className="rounded-circle bg-success" style={{ width: 8, height: 8, display: "inline-block" }}></span>
                     Connected & Finalized
                   </span>
-                  <span className="small text-secondary fw-semibold">{filteredMetrics.connectivity}%</span>
+                  <span className="small text-secondary fw-semibold">{filteredMetrics.connectedRate}%</span>
                 </div>
                 <div className="progress" style={{ height: 8, borderRadius: 4 }}>
-                  <div className="progress-bar bg-success" role="progressbar" style={{ width: `${filteredMetrics.connectivity}%`, borderRadius: 4 }}></div>
+                  <div className="progress-bar bg-success" role="progressbar" style={{ width: `${filteredMetrics.connectedRate}%`, borderRadius: 4 }}></div>
                 </div>
               </div>
 
@@ -406,10 +441,10 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
                     <span className="rounded-circle bg-danger" style={{ width: 8, height: 8, display: "inline-block" }}></span>
                     Missed / Dropped
                   </span>
-                  <span className="small text-secondary fw-semibold">{Math.round((100 - filteredMetrics.connectivity) * 0.6)}%</span>
+                  <span className="small text-secondary fw-semibold">{filteredMetrics.missedRate}%</span>
                 </div>
                 <div className="progress" style={{ height: 8, borderRadius: 4 }}>
-                  <div className="progress-bar bg-danger" role="progressbar" style={{ width: `${Math.round((100 - filteredMetrics.connectivity) * 0.6)}%`, borderRadius: 4 }}></div>
+                  <div className="progress-bar bg-danger" role="progressbar" style={{ width: `${filteredMetrics.missedRate}%`, borderRadius: 4 }}></div>
                 </div>
               </div>
 
@@ -420,10 +455,10 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
                     <span className="rounded-circle bg-warning" style={{ width: 8, height: 8, display: "inline-block" }}></span>
                     Voicemail / Busy
                   </span>
-                  <span className="small text-secondary fw-semibold">{Math.max(0, 100 - filteredMetrics.connectivity - Math.round((100 - filteredMetrics.connectivity) * 0.6))}%</span>
+                  <span className="small text-secondary fw-semibold">{filteredMetrics.voicemailRate}%</span>
                 </div>
                 <div className="progress" style={{ height: 8, borderRadius: 4 }}>
-                  <div className="progress-bar bg-warning" role="progressbar" style={{ width: `${Math.max(0, 100 - filteredMetrics.connectivity - Math.round((100 - filteredMetrics.connectivity) * 0.6))}%`, borderRadius: 4 }}></div>
+                  <div className="progress-bar bg-warning" role="progressbar" style={{ width: `${filteredMetrics.voicemailRate}%`, borderRadius: 4 }}></div>
                 </div>
               </div>
             </div>
