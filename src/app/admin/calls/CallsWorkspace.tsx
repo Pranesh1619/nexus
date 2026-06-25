@@ -1631,8 +1631,8 @@ export default function CallsWorkspace({
                                       style={{ transition: "all 0.15s", borderRadius: "12px" }}
                                     >
                                       <div className="d-flex align-items-center gap-3">
-                                        <div className="bg-light rounded-circle p-2 d-flex align-items-center justify-content-center" style={{ width: "40px", height: "40px" }}>
-                                          <i className="bi bi-telephone text-primary"></i>
+                                        <div className={`${(log.callerPhone && selectedLead?.phone && (log.callerPhone.replace(/\D/g, "").endsWith(selectedLead.phone.replace(/\D/g, "").slice(-7)) || selectedLead.phone.replace(/\D/g, "").endsWith(log.callerPhone.replace(/\D/g, "").slice(-7)))) || log.notes?.toLowerCase().includes("inbound") || log.notes?.toLowerCase().includes("voicemail") ? 'bg-success bg-opacity-10' : 'bg-primary bg-opacity-10'} rounded-circle p-2 d-flex align-items-center justify-content-center`} style={{ width: "40px", height: "40px" }}>
+                                          <i className={`bi ${(log.callerPhone && selectedLead?.phone && (log.callerPhone.replace(/\D/g, "").endsWith(selectedLead.phone.replace(/\D/g, "").slice(-7)) || selectedLead.phone.replace(/\D/g, "").endsWith(log.callerPhone.replace(/\D/g, "").slice(-7)))) || log.notes?.toLowerCase().includes("inbound") || log.notes?.toLowerCase().includes("voicemail") ? 'bi-telephone-inbound text-success' : 'bi-telephone-outbound text-primary'}`}></i>
                                         </div>
                                         <div>
                                           <span className="fw-bold text-dark d-block" style={{ fontSize: "14px" }}>{dt}</span>
@@ -1640,12 +1640,10 @@ export default function CallsWorkspace({
                                         </div>
                                       </div>
                                       <div className="d-flex align-items-center gap-2">
-                                        {log.aiScore !== null && (
-                                          <span className="badge bg-success bg-opacity-10 text-success fw-bold px-2.5 py-1.5" style={{ fontSize: "12px" }}>
-                                            Score: {log.aiScore}%
-                                          </span>
-                                        )}
-                                        <span className="badge bg-primary bg-opacity-10 text-primary fw-bold px-2.5 py-1.5" style={{ fontSize: "12px" }}>
+                                        <span className={`badge ${((log.callerPhone && selectedLead?.phone && (log.callerPhone.replace(/\D/g, "").endsWith(selectedLead.phone.replace(/\D/g, "").slice(-7)) || selectedLead.phone.replace(/\D/g, "").endsWith(log.callerPhone.replace(/\D/g, "").slice(-7)))) || log.notes?.toLowerCase().includes("inbound") || log.notes?.toLowerCase().includes("voicemail") ? 'bg-success bg-opacity-10 text-success' : 'bg-primary bg-opacity-10 text-primary')} fw-bold px-2.5 py-1.5`} style={{ fontSize: "12px" }}>
+                                          {((log.callerPhone && selectedLead?.phone && (log.callerPhone.replace(/\D/g, "").endsWith(selectedLead.phone.replace(/\D/g, "").slice(-7)) || selectedLead.phone.replace(/\D/g, "").endsWith(log.callerPhone.replace(/\D/g, "").slice(-7)))) || log.notes?.toLowerCase().includes("inbound") || log.notes?.toLowerCase().includes("voicemail") ? 'Inbound' : 'Outbound')}
+                                        </span>
+                                        <span className="badge bg-secondary bg-opacity-10 text-secondary fw-bold px-2.5 py-1.5" style={{ fontSize: "12px" }}>
                                           {log.stage}
                                         </span>
                                         <i className="bi bi-chevron-right text-secondary ms-1"></i>

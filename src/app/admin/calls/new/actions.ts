@@ -616,10 +616,10 @@ export async function getTwilioCallStatus(callSid: string) {
           return resData.hangup_cause_code ? "completed" : "in-progress";
         }
 
-        if (response.status === 404) {
+        if (response.status === 404 || response.status === 400) {
           const errText = await response.text();
-          console.log(`[Plivo Status Check 404 Response]`, errText);
-          // If Plivo returns 404:
+          console.log(`[Plivo Status Check ${response.status} Response]`, errText);
+          // If Plivo returns 404 or 400:
           // A. If we haven't mapped the request_uuid yet, we check the database placeholder age.
           //    If the placeholder log is very fresh (less than 45 seconds old), the call is still setting up/dialing.
           if (!isMapped) {
@@ -634,7 +634,7 @@ export async function getTwilioCallStatus(callSid: string) {
               return "completed";
             }
           } else {
-            // B. If it WAS mapped, but now Plivo active call API returns 404, it means the bridged call has ended!
+            // B. If it WAS mapped, but now Plivo active call API returns 404 or 400, it means the bridged call has ended!
             return "completed";
           }
           return "queued";

@@ -182,27 +182,27 @@ function NewCallContent() {
     return () => clearInterval(interval);
   }, [calling]);
 
-  // Poll Twilio call status to automatically disconnect when customer hangs up their phone
+  // Poll Twilio/Plivo call status to automatically disconnect when customer hangs up their phone
   useEffect(() => {
-    if (!calling || dialMode !== "SIP" || !callSid) return;
+    if (!calling || !callSid) return;
 
     const interval = setInterval(async () => {
       try {
         const liveStatus = await getTwilioCallStatus(callSid);
         if (liveStatus) {
-          logToTerminal(`[SYSTEM] Live Twilio Call Status: ${liveStatus}`);
+          logToTerminal(`[SYSTEM] Live ${providerName} Call Status: ${liveStatus}`);
         }
         if (liveStatus && ["completed", "failed", "busy", "no-answer", "canceled"].includes(liveStatus)) {
-          logToTerminal(`[SYSTEM] Call disconnected by remote party (Twilio Status: ${liveStatus})`);
+          logToTerminal(`[SYSTEM] Call disconnected by remote party (${providerName} Status: ${liveStatus})`);
           handleEndCall();
         }
       } catch (error) {
-        console.error("Error checking live Twilio call status:", error);
+        console.error("Error checking live call status:", error);
       }
     }, 2500);
 
     return () => clearInterval(interval);
-  }, [calling, dialMode, callSid]);
+  }, [calling, callSid, providerName]);
 
   // Live conversation streaming based on timer ticks
   useEffect(() => {
@@ -980,10 +980,22 @@ function NewCallContent() {
                       const seconds = call.duration ? call.duration % 60 : 0;
                       const durationStr = call.duration ? `${minutes}:${seconds.toString().padStart(2, '0')}` : "0:00";
                       
+                      const isCallInbound = !!(
+                        (call.callerPhone && lead?.phone && (
+                          call.callerPhone.replace(/\D/g, "").endsWith(lead.phone.replace(/\D/g, "").slice(-7)) ||
+                          lead.phone.replace(/\D/g, "").endsWith(call.callerPhone.replace(/\D/g, "").slice(-7))
+                        )) ||
+                        call.notes?.toLowerCase().includes("inbound") ||
+                        call.notes?.toLowerCase().includes("voicemail")
+                      );
+
                       return (
                         <tr key={call.id}>
                           <td className="small text-dark fw-medium">
-                            {new Date(call.startTime).toLocaleDateString()}
+                            <span className="d-flex align-items-center gap-2">
+                              <i className={`bi ${isCallInbound ? 'bi-telephone-inbound text-success' : 'bi-telephone-outbound text-primary'}`} title={isCallInbound ? "Inbound Call" : "Outbound Call"}></i>
+                              {new Date(call.startTime).toLocaleDateString()}
+                            </span>
                           </td>
                           <td className="small text-dark fw-medium">
                             {call.user?.name || "Agent"}
