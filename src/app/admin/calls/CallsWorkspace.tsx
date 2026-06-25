@@ -1461,37 +1461,43 @@ export default function CallsWorkspace({
                                       <span className="spinner-border spinner-border-sm text-success" role="status"></span>
                                       <span style={{ fontSize: "12px", fontWeight: 500 }}>Loading active agents...</span>
                                     </div>
-                                  ) : agentsList.length > 0 ? (
-                                    <select
-                                      className="form-select form-select-sm border bg-white shadow-sm"
-                                      style={{ fontSize: "12px", fontWeight: 500 }}
-                                      onChange={(e) => {
-                                        const id = e.target.value;
-                                        setSelectedAgentId(id);
-                                        const selectedAgent = agentsList.find(a => a.id === id);
-                                        setAgentPhone(selectedAgent?.phone || "");
-                                      }}
-                                      value={selectedAgentId}
-                                      disabled={calling}
-                                    >
-                                      <option value="">-- Select Active Agent --</option>
-                                      {agentsList.map((agent) => (
-                                        <option key={agent.id} value={agent.id}>
-                                          {agent.name} {agent.phone ? `(${agent.phone})` : "(No Phone)"}
-                                        </option>
-                                      ))}
-                                    </select>
+                                  ) : (currentUserRole === "SUPER_ADMIN" || currentUserRole === "COMPANY_ADMIN") ? (
+                                    agentsList.length > 0 ? (
+                                      <select
+                                        className="form-select form-select-sm border bg-white shadow-sm"
+                                        style={{ fontSize: "12px", fontWeight: 500 }}
+                                        onChange={(e) => {
+                                          const id = e.target.value;
+                                          setSelectedAgentId(id);
+                                          const selectedAgent = agentsList.find(a => a.id === id);
+                                          setAgentPhone(selectedAgent?.phone || "");
+                                        }}
+                                        value={selectedAgentId}
+                                        disabled={calling}
+                                      >
+                                        <option value="">-- Select Active Agent --</option>
+                                        {agentsList.map((agent) => (
+                                          <option key={agent.id} value={agent.id}>
+                                            {agent.name} {agent.phone ? `(${agent.phone})` : "(No Phone)"}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    ) : (
+                                      <input
+                                        type="tel"
+                                        className="form-control form-control-sm border bg-white"
+                                        placeholder="e.g. +919876543210"
+                                        value={agentPhone}
+                                        onChange={(e) => setAgentPhone(e.target.value)}
+                                        disabled={calling}
+                                        style={{ fontSize: "12px" }}
+                                        required
+                                      />
+                                    )
                                   ) : (
-                                    <input
-                                      type="tel"
-                                      className="form-control form-control-sm border bg-white"
-                                      placeholder="e.g. +919876543210"
-                                      value={agentPhone}
-                                      onChange={(e) => setAgentPhone(e.target.value)}
-                                      disabled={calling}
-                                      style={{ fontSize: "12px" }}
-                                      required
-                                    />
+                                    <div className="py-1.5 px-3 bg-white border rounded shadow-sm text-dark fw-semibold" style={{ fontSize: "12px" }}>
+                                      {currentAgentName} {agentPhone ? `(${agentPhone})` : "(No Phone)"}
+                                    </div>
                                   )}
                                   {/* <div className="x-small text-muted mt-1.5" style={{ fontSize: "10px" }}>Twilio will call this phone first.</div> */}
                                 </div>
