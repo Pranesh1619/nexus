@@ -493,9 +493,27 @@ export async function endTwilioCall(callSid: string) {
         return { error: "Plivo credentials are not configured. Please check your settings." };
       }
 
-      console.log(`[Plivo Hangup] Requesting hangup for Call: ${callSid}`);
+      // Check if callSid is a request_uuid mapped to a CallUUID in database
+      let activeCallSid = callSid;
+      try {
+        const mappedLog = await prisma.callLog.findFirst({
+          where: {
+            OR: [
+              { jobId: callSid },
+              { notes: { contains: `[RequestUUID: ${callSid}]` } }
+            ]
+          }
+        });
+        if (mappedLog && mappedLog.jobId && mappedLog.jobId !== callSid) {
+          activeCallSid = mappedLog.jobId;
+        }
+      } catch (dbErr) {
+        console.error("[Plivo Hangup] Error checking mapped call log:", dbErr);
+      }
+
+      console.log(`[Plivo Hangup] Requesting hangup for Call: ${activeCallSid}`);
       
-      const response = await fetch(`https://api.plivo.com/v1/Account/${authId}/Call/${callSid}/`, {
+      const response = await fetch(`https://api.plivo.com/v1/Account/${authId}/Call/${activeCallSid}/`, {
         method: "DELETE",
         headers: {
           Authorization: "Basic " + Buffer.from(`${authId}:${authToken}`).toString("base64")

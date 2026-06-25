@@ -73,20 +73,61 @@ export async function POST(request: Request) {
       const last10Digits = cleanFrom.slice(-10);
 
       if (last10Digits.length >= 7) {
-        const allLeads = await prisma.lead.findMany({
-          include: {
-            salesPerson: true,
-            calls: {
-              orderBy: { createdAt: "desc" },
-              take: 1
+        let matchedLead = null;
+
+        // Try to find recently called agent from CallLog history
+        try {
+          const recentCall = await prisma.callLog.findFirst({
+            where: {
+              lead: {
+                OR: [
+                  { phone: { endsWith: last10Digits } },
+                  { phone: { contains: last10Digits } }
+                ]
+              }
+            },
+            orderBy: {
+              createdAt: "desc"
+            },
+            include: {
+              user: true,
+              lead: {
+                include: {
+                  salesPerson: true,
+                  calls: {
+                    orderBy: { createdAt: "desc" },
+                    take: 1
+                  }
+                }
+              }
             }
+          });
+
+          if (recentCall && recentCall.user.phone) {
+            matchedLead = recentCall.lead;
+            agentPhone = recentCall.user.phone;
+            console.log(`[INBOUND Plivo Voice Route] Routed to recently called agent: ${recentCall.user.name} (${agentPhone}) based on CallLog.`);
           }
-        });
-        
-        let matchedLead = allLeads.find(l => {
-          const cleanLeadPhone = l.phone.replace(/\D/g, "");
-          return cleanLeadPhone.endsWith(last10Digits) || cleanFrom.endsWith(cleanLeadPhone.slice(-10));
-        });
+        } catch (dbErr) {
+          console.error("[INBOUND Plivo Voice Route] Error checking recent calls:", dbErr);
+        }
+
+        if (!agentPhone) {
+          const allLeads = await prisma.lead.findMany({
+            include: {
+              salesPerson: true,
+              calls: {
+                orderBy: { createdAt: "desc" },
+                take: 1
+              }
+            }
+          });
+          
+          matchedLead = allLeads.find(l => {
+            const cleanLeadPhone = l.phone.replace(/\D/g, "");
+            return cleanLeadPhone.endsWith(last10Digits) || cleanFrom.endsWith(cleanLeadPhone.slice(-10));
+          });
+        }
 
         if (!matchedLead) {
           matchedLead = await prisma.lead.create({
@@ -110,15 +151,17 @@ export async function POST(request: Request) {
         targetLeadId = matchedLead.id;
         leadName = matchedLead.name;
 
-        if (matchedLead.salesPerson?.phone) {
-          agentPhone = matchedLead.salesPerson.phone;
-        } else if (matchedLead.calls.length > 0) {
-          const lastCall = matchedLead.calls[0];
-          const lastUser = await prisma.user.findUnique({
-            where: { id: lastCall.userId }
-          });
-          if (lastUser?.phone) {
-            agentPhone = lastUser.phone;
+        if (!agentPhone) {
+          if (matchedLead.salesPerson?.phone) {
+            agentPhone = matchedLead.salesPerson.phone;
+          } else if (matchedLead.calls.length > 0) {
+            const lastCall = matchedLead.calls[0];
+            const lastUser = await prisma.user.findUnique({
+              where: { id: lastCall.userId }
+            });
+            if (lastUser?.phone) {
+              agentPhone = lastUser.phone;
+            }
           }
         }
       }

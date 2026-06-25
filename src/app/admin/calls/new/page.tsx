@@ -37,6 +37,8 @@ function NewCallContent() {
   const [sipConfig, setSipConfig] = useState<SipConfigPreview | null>(null);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
 
+  const providerName = sipConfig?.telephonyProvider === "PLIVO" ? "Plivo" : "Twilio";
+
   // Dialer and call state
   const [dialMode, setDialMode] = useState<"SIP" | "AI" | "CTC">("CTC");
   const [agentPhone, setAgentPhone] = useState("");
@@ -282,11 +284,11 @@ function NewCallContent() {
       setStatus("Establishing SIP Session...");
       setSipStatus("Dialing");
       
-      logToTerminal(`[CALL] Initiating outbound call via Twilio Trunk...`);
+      logToTerminal(`[CALL] Initiating outbound call via ${providerName} Trunk...`);
 
       if (sipConfig.useRealTwilio) {
         if (!deviceRef.current) {
-          logToTerminal(`[ERROR] Twilio WebRTC Device not ready yet.`);
+          logToTerminal(`[ERROR] WebRTC Device not ready yet.`);
           setStatus("Failed to connect");
           setSipStatus("Registered");
           setCalling(false);
@@ -447,7 +449,7 @@ function NewCallContent() {
       }
     } else if (dialMode === "CTC") {
       setStatus("Calling Agent Mobile...");
-      logToTerminal(`[CTC] Initiating Click-to-Call sequence via Twilio REST API...`);
+      logToTerminal(`[CTC] Initiating Click-to-Call sequence via ${providerName} REST API...`);
       logToTerminal(`[CTC] Calling Agent mobile: ${agentPhone}`);
 
       const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -459,7 +461,7 @@ function NewCallContent() {
         currentHost: origin
       }).then((res) => {
         if (res.error) {
-          logToTerminal(`[ERROR] Twilio Click-to-Call failed: ${res.error}`);
+          logToTerminal(`[ERROR] ${providerName} Click-to-Call failed: ${res.error}`);
           setStatus("Failed to connect");
           setCallError(res.error);
           setCalling(false);
@@ -530,7 +532,7 @@ function NewCallContent() {
     const sipDom = sipConfig ? sipConfig.domain : "simulated.voice";
 
     if ((dialMode === "SIP" || dialMode === "CTC") && sipConfig) {
-      setStatus(dialMode === "SIP" ? "SIP: Sending BYE..." : "Ending Twilio Session...");
+      setStatus(dialMode === "SIP" ? "SIP: Sending BYE..." : `Ending ${providerName} Session...`);
       if (dialMode === "SIP") {
         setSipStatus("Registered");
         logToTerminal(`[TX] BYE sip:${destPhone}@${sipDom} SIP/2.0`);
@@ -544,12 +546,12 @@ function NewCallContent() {
       }
 
       if (callSid) {
-        logToTerminal(`[SYSTEM] Hanging up active Twilio call Session: ${callSid}...`);
+        logToTerminal(`[SYSTEM] Hanging up active ${providerName} call Session: ${callSid}...`);
         endTwilioCall(callSid).then((res) => {
           if (res?.success) {
-            logToTerminal(`[SYSTEM] Live Twilio Call successfully disconnected.`);
+            logToTerminal(`[SYSTEM] Live ${providerName} Call successfully disconnected.`);
           } else {
-            console.warn("Twilio call disconnect result:", res?.error);
+            console.warn(`${providerName} call disconnect result:`, res?.error);
           }
         });
       }
@@ -560,7 +562,7 @@ function NewCallContent() {
           logToTerminal(`[MEDIA] WebRTC connection terminated.`);
           logToTerminal(`[SIP] Trunk Idle.`);
         } else {
-          logToTerminal(`[SYSTEM] Twilio Click-to-Call session terminated.`);
+          logToTerminal(`[SYSTEM] ${providerName} Click-to-Call session terminated.`);
         }
         setStatus("Call ended. Ready.");
       }, 500);
@@ -808,7 +810,7 @@ function NewCallContent() {
                   
                   <div className="d-flex justify-content-between px-1 x-small fw-bold text-secondary mt-1">
                     <span>{dialMode === "CTC" ? "Agent Mobile" : "Softphone Browser"}</span>
-                    <span>{dialMode === "SIP" ? "SIP Proxy Gateway" : dialMode === "CTC" ? "Twilio Cloud" : "AI Dial Server"}</span>
+                    <span>{dialMode === "SIP" ? "SIP Proxy Gateway" : dialMode === "CTC" ? `${providerName} Cloud` : "AI Dial Server"}</span>
                     <span>Customer Trunk</span>
                   </div>
                 </div>
