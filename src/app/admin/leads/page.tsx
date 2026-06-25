@@ -6,7 +6,8 @@ import StatusModal from "@/components/StatusModal";
 
 export const dynamic = "force-dynamic";
 
-export default async function LeadsPage() {
+export default async function LeadsPage({ searchParams }: { searchParams: Promise<{ updated?: string }> }) {
+  const { updated } = await searchParams;
   const cookieStore = await cookies();
   const userId = cookieStore.get("user_id")?.value;
   const userRole = cookieStore.get("user_role")?.value;
@@ -38,7 +39,7 @@ export default async function LeadsPage() {
           </div>
         </div>
       )}
-      <LeadList leads={leads} />
+      <LeadList leads={leads} updated={updated === "true"} />
 
       <StatusModal 
         id="successModal" 

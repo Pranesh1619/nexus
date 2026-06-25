@@ -26,7 +26,7 @@ export default function EditLeadForm({ lead, id }: { lead: Lead; id: string }) {
     startTransition(async () => {
       try {
         await updateLead(id, formData);
-        router.push("/admin/leads");
+        router.push("/admin/leads?updated=true");
         router.refresh();
       } catch (err) {
         console.error("Failed to update lead:", err);

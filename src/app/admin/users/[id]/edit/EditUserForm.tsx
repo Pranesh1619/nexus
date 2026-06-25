@@ -26,7 +26,7 @@ export default function EditUserForm({ user, success, currentUserRole = "ADMIN" 
     startTransition(async () => {
       try {
         await updateUser(user.id, formData);
-        router.push(`/admin/users/${user.id}/edit?success=true`);
+        router.push("/admin/users?updated=true");
         router.refresh();
       } catch (err) {
         console.error("Failed to update user:", err);

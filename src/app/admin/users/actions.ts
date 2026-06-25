@@ -12,12 +12,12 @@ export async function getAllUsers() {
 export async function createUser(formData: FormData) {
   const name = formData.get("name") as string;
   const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
+  const password = (formData.get("password") as string) || "123456";
   const role = formData.get("role") as string;
   const phone = formData.get("phone") as string;
 
-  if (!name || !email || !password || !role) {
-    throw new Error("All fields (Name, Email, Password, and Role) are mandatory.");
+  if (!name || !email || !role) {
+    throw new Error("All fields (Name, Email, and Role) are mandatory.");
   }
 
   const { cookies } = await import("next/headers");

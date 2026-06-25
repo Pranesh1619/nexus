@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useTransition, useEffect } from "react";
 import Link from "next/link";
 import { deleteUser } from "./actions";
 
@@ -13,9 +13,20 @@ interface User {
   createdAt: Date;
 }
 
-export default function UserList({ users }: { users: User[] }) {
+export default function UserList({ users, updated }: { users: User[]; updated?: boolean }) {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [showAlert, setShowAlert] = useState(updated);
+
+  useEffect(() => {
+    if (updated) {
+      setShowAlert(true);
+      const timer = setTimeout(() => {
+        setShowAlert(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [updated]);
 
   const handleDelete = async () => {
     if (deleteId) {
@@ -32,6 +43,16 @@ export default function UserList({ users }: { users: User[] }) {
 
   return (
     <>
+      {showAlert && (
+        <div className="alert alert-success border-0 shadow-sm d-flex align-items-center justify-content-between p-3 mb-4 animate-fade" style={{ borderRadius: "12px", backgroundColor: "rgba(0, 167, 111, 0.08)", color: "#007A53" }}>
+          <div className="d-flex align-items-center gap-2">
+            <i className="bi bi-check-circle-fill fs-5" style={{ color: "#00A76F" }}></i>
+            <span className="small fw-semibold">User Updated Successfully</span>
+          </div>
+          <button type="button" className="btn-close" onClick={() => setShowAlert(false)} aria-label="Close"></button>
+        </div>
+      )}
+
       <div className="card border-0 shadow-sm">
 
         <div className="table-responsive">

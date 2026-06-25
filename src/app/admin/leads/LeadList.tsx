@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { deleteLead, triggerZohoSync } from "./actions";
@@ -47,7 +47,7 @@ function getLeadTags(id: string, source: string | null) {
   return [t1, t2];
 }
 
-export default function LeadList({ leads }: { leads: Lead[] }) {
+export default function LeadList({ leads, updated }: { leads: Lead[]; updated?: boolean }) {
   const router = useRouter();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -55,6 +55,17 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
   const [selectedAgentId, setSelectedAgentId] = useState<string>("all");
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedLeadForSummary, setSelectedLeadForSummary] = useState<Lead | null>(null);
+  const [showAlert, setShowAlert] = useState(updated);
+
+  useEffect(() => {
+    if (updated) {
+      setShowAlert(true);
+      const timer = setTimeout(() => {
+        setShowAlert(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [updated]);
 
   // Zoho Sync States
   const [isSyncing, setIsSyncing] = useState(false);
@@ -184,6 +195,15 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
 
   return (
     <div className="d-flex flex-column gap-3 animate-fade">
+      {showAlert && (
+        <div className="alert alert-success border-0 shadow-sm d-flex align-items-center justify-content-between p-3 mb-1 animate-fade" style={{ borderRadius: "12px", backgroundColor: "rgba(0, 167, 111, 0.08)", color: "#007A53" }}>
+          <div className="d-flex align-items-center gap-2">
+            <i className="bi bi-check-circle-fill fs-5" style={{ color: "#00A76F" }}></i>
+            <span className="small fw-semibold">Lead updated</span>
+          </div>
+          <button type="button" className="btn-close" onClick={() => setShowAlert(false)} aria-label="Close"></button>
+        </div>
+      )}
       
       {/* Page Header with Actions */}
       <div className="d-flex justify-content-between align-items-center mb-1">

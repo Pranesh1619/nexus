@@ -7,7 +7,8 @@ import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export default async function UserListingPage() {
+export default async function UserListingPage({ searchParams }: { searchParams: Promise<{ updated?: string }> }) {
+  const { updated } = await searchParams;
   const cookieStore = await cookies();
   const userRole = cookieStore.get("user_role")?.value;
 
@@ -36,7 +37,7 @@ export default async function UserListingPage() {
         </Link>
       </div>
 
-      <UserList users={users} />
+      <UserList users={users} updated={updated === "true"} />
     </div>
   );
 }
