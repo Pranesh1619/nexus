@@ -317,8 +317,17 @@ export default function AgentDetailsWorkspace({ agent }: AgentDetailsWorkspacePr
 
             <div className="card-body p-0 border-top">
               {filteredLeads.length === 0 ? (
-                <div className="text-center py-5 text-secondary small">
-                  No assigned leads match this search.
+                <div className="text-center py-5 px-4 text-secondary small d-flex flex-column align-items-center gap-3">
+                  <div>
+                    <i className="bi bi-people fs-2 text-muted mb-2 d-block"></i>
+                    No assigned leads match this search.
+                  </div>
+                  <Link 
+                    href={`/admin/leads/new?assignedTo=${agent.id}`}
+                    className="btn btn-sm btn-outline-primary px-3 py-1.5 fw-bold"
+                  >
+                    <i className="bi bi-person-plus-fill me-1.5"></i>Create &amp; Assign Lead
+                  </Link>
                 </div>
               ) : (
                 <div className="row g-0">

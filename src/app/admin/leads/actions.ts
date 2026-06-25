@@ -38,23 +38,53 @@ export async function createLead(formData: FormData) {
   const email = formData.get("email") as string;
   const company = formData.get("company") as string;
   const source = formData.get("source") as string;
+  const assignedToInput = formData.get("assignedTo") as string;
 
   const cookieStore = await cookies();
   const creatorId = cookieStore.get("user_id")?.value;
 
-  await prisma.lead.create({
-    data: {
-      name,
-      phone,
-      email,
-      company,
-      source,
-      status: "NEW",
-      assignedTo: creatorId,
-    },
+  // Check if a lead with this phone number already exists for this specific agent or general pool
+  const targetAgent = assignedToInput || creatorId || null;
+  const cleanPhone = phone.replace(/[^\d+]/g, "");
+  const allLeads = await prisma.lead.findMany({
+    where: { assignedTo: targetAgent },
+    select: { id: true, name: true, phone: true }
   });
 
-  revalidatePath("/admin/leads");
+  const existingLead = allLeads.find(l => {
+    const dbCleanPhone = l.phone.replace(/[^\d+]/g, "");
+    return dbCleanPhone === cleanPhone || l.phone.trim() === phone.trim();
+  });
+
+  if (existingLead) {
+    return {
+      success: false,
+      error: `A lead with the phone number '${phone}' already exists for this agent.`,
+    };
+  }
+
+  try {
+    await prisma.lead.create({
+      data: {
+        name,
+        phone,
+        email: email || null,
+        company: company || null,
+        source: source || "WEBSITE",
+        status: "NEW",
+        assignedTo: assignedToInput || creatorId || null,
+      },
+    });
+
+    revalidatePath("/admin/leads");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error creating lead in database:", error);
+    return {
+      success: false,
+      error: "An unexpected error occurred while creating the lead.",
+    };
+  }
 }
 
 export async function deleteLead(id: string) {

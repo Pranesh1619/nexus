@@ -469,7 +469,7 @@ export async function updateZohoBiginStatus(leadPhone: string, status: string, u
   let userId = userIdParam;
   if (!userId) {
     try {
-      const lead = await prisma.lead.findUnique({
+      const lead = await prisma.lead.findFirst({
         where: { phone: leadPhone },
         select: { assignedTo: true }
       });
@@ -551,7 +551,7 @@ export async function updateZohoBiginContact(leadPhone: string, leadData: {
   let userId = userIdParam;
   if (!userId) {
     try {
-      const lead = await prisma.lead.findUnique({
+      const lead = await prisma.lead.findFirst({
         where: { phone: leadPhone },
         select: { assignedTo: true }
       });

@@ -28,7 +28,7 @@ model User {
 model Lead {
   id          String   @id @default(cuid())
   name        String
-  phone       String   @unique
+  phone       String
   email       String?
   company     String?
   status      String   @default("NEW") // NEW, CONTACTED, QUALIFIED, WON, LOST
@@ -38,6 +38,8 @@ model Lead {
   calls       CallLog[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@unique([phone, assignedTo])
 }
 
 model CallLog {

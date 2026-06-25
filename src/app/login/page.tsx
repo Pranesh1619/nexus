@@ -238,12 +238,6 @@ export default function LoginPage() {
             </button>
           </form>
         )}
-
-        <div className="text-center mt-4 pt-3 border-top">
-          <p className="small text-secondary mb-0">
-            Don’t have an account? <Link href="/register" className="text-success fw-bold text-decoration-none">Get started</Link>
-          </p>
-        </div>
       </div>
     </div>
   );

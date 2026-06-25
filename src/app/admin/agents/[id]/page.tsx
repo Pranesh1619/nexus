@@ -52,6 +52,9 @@ export default async function AgentDetailsPage({ params }: AgentDetailsPageProps
           <h3 className="fw-bold mb-1 text-dark">{agent.name} Profile</h3>
         </div>
         <div className="d-flex gap-2">
+          <Link href={`/admin/leads/new?assignedTo=${agent.id}`} className="btn btn-primary px-3 py-1.5 small fw-bold text-white d-flex align-items-center gap-2" style={{ backgroundColor: "#00a76f", borderColor: "#00a76f" }}>
+            <i className="bi bi-person-plus-fill"></i>Create Lead for Agent
+          </Link>
           <Link href={`/admin/users/${agent.id}/edit`} className="btn btn-light border px-3 py-1.5 small fw-bold">
             <i className="bi bi-pencil-square me-2 text-info"></i>Edit Agent Settings
           </Link>
