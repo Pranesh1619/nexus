@@ -120,8 +120,8 @@ export async function placeRealTwilioCall(leadId: string, currentHost?: string, 
 
     // 4. Delegate to Plivo if chosen
     if (sipConfig?.telephonyProvider === "PLIVO") {
-      const authId = process.env.PLIVO_AUTH_ID || sipConfig.plivoAuthId || "";
-      const authToken = process.env.PLIVO_AUTH_TOKEN || sipConfig.plivoAuthToken || "";
+      const authId = sipConfig.plivoAuthId || process.env.PLIVO_AUTH_ID || "";
+      const authToken = sipConfig.plivoAuthToken || process.env.PLIVO_AUTH_TOKEN || "";
       
       if (!authId || !authToken) {
         return { error: "Plivo credentials are not configured. Please check your settings." };
@@ -256,8 +256,8 @@ export async function placeClickToCall(params: {
 
     // 1. Delegate to Plivo if chosen
     if (sipConfig?.telephonyProvider === "PLIVO") {
-      const authId = process.env.PLIVO_AUTH_ID || sipConfig.plivoAuthId || "";
-      const authToken = process.env.PLIVO_AUTH_TOKEN || sipConfig.plivoAuthToken || "";
+      const authId = sipConfig.plivoAuthId || process.env.PLIVO_AUTH_ID || "";
+      const authToken = sipConfig.plivoAuthToken || process.env.PLIVO_AUTH_TOKEN || "";
 
       if (!authId || !authToken) {
         return { error: "Plivo credentials are not configured. Please check your settings." };
@@ -486,8 +486,8 @@ export async function endTwilioCall(callSid: string) {
     });
 
     if (sipConfig?.telephonyProvider === "PLIVO") {
-      const authId = process.env.PLIVO_AUTH_ID || sipConfig.plivoAuthId || "";
-      const authToken = process.env.PLIVO_AUTH_TOKEN || sipConfig.plivoAuthToken || "";
+      const authId = sipConfig.plivoAuthId || process.env.PLIVO_AUTH_ID || "";
+      const authToken = sipConfig.plivoAuthToken || process.env.PLIVO_AUTH_TOKEN || "";
 
       if (!authId || !authToken) {
         return { error: "Plivo credentials are not configured. Please check your settings." };
@@ -560,8 +560,8 @@ export async function getTwilioCallStatus(callSid: string) {
     });
 
     if (sipConfig?.telephonyProvider === "PLIVO") {
-      const authId = process.env.PLIVO_AUTH_ID || sipConfig.plivoAuthId || "";
-      const authToken = process.env.PLIVO_AUTH_TOKEN || sipConfig.plivoAuthToken || "";
+      const authId = sipConfig.plivoAuthId || process.env.PLIVO_AUTH_ID || "";
+      const authToken = sipConfig.plivoAuthToken || process.env.PLIVO_AUTH_TOKEN || "";
       
       if (!authId || !authToken) return null;
 
@@ -691,7 +691,7 @@ export async function getCurrentAgent() {
     if (userId) {
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { id: true, name: true, phone: true, email: true }
+        select: { id: true, name: true, phone: true, email: true, role: true }
       });
       return user;
     }

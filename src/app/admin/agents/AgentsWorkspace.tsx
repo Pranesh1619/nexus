@@ -172,7 +172,7 @@ export default function AgentsWorkspace({ initialAgents }: AgentsWorkspaceProps)
             >
               <option value="all">All Contacts</option>
               <option value="ADMIN">Admin</option>
-              <option value="SALES">Sales Rep</option>
+              <option value="SALES">Agent</option>
             </select>
 
             {/* Status dropdown */}
@@ -281,7 +281,7 @@ export default function AgentsWorkspace({ initialAgents }: AgentsWorkspaceProps)
                             fontSize: "11px"
                           }}
                         >
-                          {agent.role}
+                          {agent.role === "SALES" ? "AGENT" : agent.role}
                         </span>
                       </td>
                       <td className="text-secondary fw-semibold" style={{ padding: "16px", fontSize: "14px" }}>

@@ -30,7 +30,7 @@ export default function ProfileClient({ user }: { user: ProfileUser }) {
         
         <div className="row g-3">
           <div className="col-md-12">
-            <label className="form-label">Full Display Name</label>
+            <label className="form-label">Full Name</label>
             <input 
               name="name" 
               type="text" 
@@ -41,7 +41,7 @@ export default function ProfileClient({ user }: { user: ProfileUser }) {
           </div>
 
           <div className="col-md-12">
-            <label className="form-label">Professional Email Address</label>
+            <label className="form-label">Email Address</label>
             <input 
               name="email" 
               type="email" 
@@ -52,7 +52,7 @@ export default function ProfileClient({ user }: { user: ProfileUser }) {
           </div>
 
           <div className="col-md-12">
-            <label className="form-label">Mobile Phone Number (for Click-to-Call)</label>
+            <label className="form-label">Phone Number</label>
             <input 
               name="phone" 
               type="tel" 
@@ -72,7 +72,7 @@ export default function ProfileClient({ user }: { user: ProfileUser }) {
             </select>
           </div>
           <div className="col-md-6">
-            <label className="form-label">Floor Status</label>
+            <label className="form-label">Status</label>
             <select name="status" className="form-select form-select-sm bg-light border-0 px-3 py-2 small" defaultValue={user.status}>
               <option value="ACTIVE">ACTIVE</option>
               <option value="INACTIVE">INACTIVE</option>

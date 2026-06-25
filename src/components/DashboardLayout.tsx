@@ -38,16 +38,16 @@ export default function DashboardLayout({ children, userRole = "ADMIN", userName
         { title: "Dashboard", icon: "bi-grid", path: "/admin" },
         { title: "Calls", icon: "bi-telephone-outbound", path: "/admin/calls" },
         { title: "Leads", icon: "bi-person-badge", path: "/admin/leads" },
-        { 
-          title: "Agents", 
-          icon: "bi-headset", 
-          path: "/admin/agents",
-          ...((userRole === "ADMIN" || userRole === "SUPER_ADMIN" || userRole === "COMPANY_ADMIN") ? {
+        ...((userRole === "ADMIN" || userRole === "SUPER_ADMIN" || userRole === "COMPANY_ADMIN") ? [
+          { 
+            title: "Agents", 
+            icon: "bi-headset", 
+            path: "/admin/agents",
             children: [
               { title: "Assign Leads", icon: "bi-person-plus", path: "/admin/sales" }
             ]
-          } : {})
-        },
+          }
+        ] : []),
         // { title: "Deals", icon: "bi-kanban", path: "/admin/deals" },
         ...((userRole === "ADMIN" || userRole === "SUPER_ADMIN" || userRole === "COMPANY_ADMIN") ? [
           { title: "Users", icon: "bi-people", path: "/admin/users" }
@@ -154,25 +154,25 @@ export default function DashboardLayout({ children, userRole = "ADMIN", userName
             <i className="bi bi-list fs-4 text-dark"></i>
           </button>
 
-          {isCrmConnected !== null && (
+          {/* {isCrmConnected !== null && (
             <div className="d-flex align-items-center gap-2 px-3 py-1.5 rounded-pill border" style={{ 
               backgroundColor: isCrmConnected ? "rgba(0, 167, 111, 0.08)" : "rgba(108, 117, 125, 0.08)",
               borderColor: isCrmConnected ? "rgba(0, 167, 111, 0.2)" : "rgba(108, 117, 125, 0.2)"
-            }}>
-              <span className={`rounded-circle ${isCrmConnected ? "animate-pulse" : ""}`} style={{ 
+            }}> */}
+              {/* <span className={`rounded-circle ${isCrmConnected ? "animate-pulse" : ""}`} style={{ 
                 width: "8px", 
                 height: "8px", 
                 backgroundColor: isCrmConnected ? "#00A76F" : "#6c757d",
                 display: "inline-block"
-              }} />
-              <span className="fw-bold" style={{ 
+              }} /> */}
+              {/* <span className="fw-bold" style={{ 
                 fontSize: "12px", 
                 color: isCrmConnected ? "#00A76F" : "#6c757d" 
               }}>
                 {isCrmConnected ? "Bigin Connected" : "Bigin Disconnected"}
-              </span>
-            </div>
-          )}
+              </span> */}
+            {/* </div> */}
+          {/* )} */}
         </div>
 
         <div className="header-actions">
@@ -183,7 +183,7 @@ export default function DashboardLayout({ children, userRole = "ADMIN", userName
               data-bs-toggle="dropdown" 
               aria-expanded="false"
             >
-              <span className="small text-secondary fw-semibold d-none d-md-inline">{userName} ({userRole})</span>
+              <span className="small text-secondary fw-semibold d-none d-md-inline">{userName} ({userRole === "SALES" ? "AGENT" : userRole})</span>
               <div className="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white fw-bold" style={{ width: 40, height: 40 }}>
                 {userName.charAt(0).toUpperCase()}
               </div>

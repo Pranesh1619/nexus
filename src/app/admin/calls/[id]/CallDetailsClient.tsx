@@ -374,21 +374,7 @@ export default function CallDetailsClient({
 
               {/* Premium modern tab navigation with gaps and pill style */}
               <div className="d-flex flex-wrap mb-4" style={{ gap: "10px" }}>
-                <button
-                  onClick={() => handleTabChange("requirement")}
-                  className={`btn d-flex align-items-center gap-2 px-3 py-2 fw-semibold transition-all border-0`}
-                  style={{
-                    fontSize: "13px",
-                    borderRadius: "8px",
-                    letterSpacing: "0.2px",
-                    backgroundColor: activeTab === "requirement" ? "#0d6efd" : "#f1f5f9",
-                    color: activeTab === "requirement" ? "#ffffff" : "#475569",
-                    boxShadow: activeTab === "requirement" ? "0 4px 12px rgba(13, 110, 253, 0.15)" : "none",
-                  }}
-                  type="button"
-                >
-                  <i className="bi bi-list-task"></i>Requirement
-                </button>
+
                 <button
                   onClick={() => handleTabChange("overall")}
                   className={`btn d-flex align-items-center gap-2 px-3 py-2 fw-semibold transition-all border-0`}
@@ -440,13 +426,7 @@ export default function CallDetailsClient({
 
               {/* Tab Contents */}
               <div className="tab-content">
-                {activeTab === "requirement" && (
-                  <div className="p-3 bg-light rounded-0 border-start border-primary border-3 mb-3 animate-fade">
-                    <p className="text-dark mb-0" style={{ fontSize: "13.5px", lineHeight: "1.5", whiteSpace: "pre-wrap" }}>
-                      {call.analysis || "No requirements compiled for this call."}
-                    </p>
-                  </div>
-                )}
+
 
                 {activeTab === "overall" && (
                   <div className="p-3 bg-light rounded-0 border-start border-primary border-3 mb-3 animate-fade">

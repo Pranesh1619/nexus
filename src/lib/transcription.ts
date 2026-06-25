@@ -859,8 +859,8 @@ export async function transcribeAndAnalyzeRecording(
         const sipConfig = await prisma.sipTrunkConfig.findFirst({
           where: { isActive: true }
         });
-        const plivoAuthId = process.env.PLIVO_AUTH_ID || sipConfig?.plivoAuthId || "";
-        const plivoAuthToken = process.env.PLIVO_AUTH_TOKEN || sipConfig?.plivoAuthToken || "";
+        const plivoAuthId = sipConfig?.plivoAuthId || process.env.PLIVO_AUTH_ID || "";
+        const plivoAuthToken = sipConfig?.plivoAuthToken || process.env.PLIVO_AUTH_TOKEN || "";
         if (plivoAuthId && plivoAuthToken) {
           authHeader = "Basic " + Buffer.from(`${plivoAuthId}:${plivoAuthToken}`).toString("base64");
         }
@@ -1766,8 +1766,8 @@ export function startOfflineRetranscription(id: string) {
               const provider = sipConfig?.telephonyProvider || "TWILIO";
               
               if (provider === "PLIVO") {
-                const authId = process.env.PLIVO_AUTH_ID || sipConfig?.plivoAuthId || "";
-                const authToken = process.env.PLIVO_AUTH_TOKEN || sipConfig?.plivoAuthToken || "";
+                const authId = sipConfig?.plivoAuthId || process.env.PLIVO_AUTH_ID || "";
+                const authToken = sipConfig?.plivoAuthToken || process.env.PLIVO_AUTH_TOKEN || "";
                 
                 if (authId && authToken) {
                   currentJob.logs.push(`[Plivo] Checking recordings for call UUID: ${call.jobId}...`);

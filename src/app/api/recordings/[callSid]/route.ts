@@ -55,8 +55,8 @@ export async function GET(
         const sipConfig = await prisma.sipTrunkConfig.findFirst({
           where: { isActive: true }
         });
-        const plivoAuthId = process.env.PLIVO_AUTH_ID || sipConfig?.plivoAuthId || "";
-        const plivoAuthToken = process.env.PLIVO_AUTH_TOKEN || sipConfig?.plivoAuthToken || "";
+        const plivoAuthId = sipConfig?.plivoAuthId || process.env.PLIVO_AUTH_ID || "";
+        const plivoAuthToken = sipConfig?.plivoAuthToken || process.env.PLIVO_AUTH_TOKEN || "";
         const plivoAuthHeader = "Basic " + Buffer.from(`${plivoAuthId}:${plivoAuthToken}`).toString("base64");
 
         if (plivoAuthId && plivoAuthToken) {

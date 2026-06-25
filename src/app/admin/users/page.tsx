@@ -28,7 +28,7 @@ export default async function UserListingPage() {
         <div>
           <h2 className="fw-bold mb-1">User Management</h2>
           <p className="text-secondary small">
-            {userRole === "SUPER_ADMIN" ? "Manage all user accounts including super admins, company administrators, and sales agents." : "Manage your sales agents."}
+            {userRole === "SUPER_ADMIN" ? "Manage all user accounts including super admins, company administrators, and agents." : "Manage your agents."}
           </p>
         </div>
         <Link href="/admin/users/new" className="btn btn-primary">

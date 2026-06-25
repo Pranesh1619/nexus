@@ -101,8 +101,8 @@ export async function POST(request: Request) {
         const sipConfig = await prisma.sipTrunkConfig.findFirst({
           where: { isActive: true }
         });
-        const plivoAuthId = process.env.PLIVO_AUTH_ID || sipConfig?.plivoAuthId || "";
-        const plivoAuthToken = process.env.PLIVO_AUTH_TOKEN || sipConfig?.plivoAuthToken || "";
+        const plivoAuthId = sipConfig?.plivoAuthId || process.env.PLIVO_AUTH_ID || "";
+        const plivoAuthToken = sipConfig?.plivoAuthToken || process.env.PLIVO_AUTH_TOKEN || "";
         const authHeader = "Basic " + Buffer.from(`${plivoAuthId}:${plivoAuthToken}`).toString("base64");
 
         let audioResponse;

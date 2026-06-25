@@ -258,6 +258,8 @@ export default function CallsWorkspace({
   const [lastCallSummary, setLastCallSummary] = useState<any | null>(null);
   const [agentsList, setAgentsList] = useState<{ id: string; name: string; phone: string | null; email: string }[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState("");
+  const [currentUserRole, setCurrentUserRole] = useState("");
+  const [currentAgentName, setCurrentAgentName] = useState("");
   const [loadingAgents, setLoadingAgents] = useState(true);
 
   const isProcessing = useMemo(() => {
@@ -273,8 +275,10 @@ export default function CallsWorkspace({
           getCurrentAgent(),
           getAllAgents()
         ]);
-        if (agent && agent.phone) {
-          setAgentPhone(agent.phone);
+        if (agent) {
+          if (agent.phone) setAgentPhone(agent.phone);
+          setCurrentUserRole(agent.role || "");
+          setCurrentAgentName(agent.name || "");
         }
         if (allAgents) {
           setAgentsList(allAgents as any);
@@ -991,8 +995,8 @@ export default function CallsWorkspace({
       {/* Call Center Workspace Row: Title on Left, Tab Switcher on Right End */}
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-2">
         <div>
-          <h2 className="fw-bold mb-1 text-dark">Call Center Workspace</h2>
-          <p className="text-secondary small mb-0">Dial customers via SIP trunks and manage interactive transcripts in a single screen.</p>
+          <h2 className="fw-bold mb-1 text-dark">Call Center</h2>
+          {/* <p className="text-secondary small mb-0">Dial customers via SIP trunks and manage interactive transcripts in a single screen.</p> */}
         </div>
 
         <div className="d-flex align-items-center gap-3">
@@ -1076,24 +1080,6 @@ export default function CallsWorkspace({
                           >
                             {l.name}
                           </span>
-                          {(() => {
-                            const isGreenStatus = ["QUALIFIED", "CLOSED_WON", "INTERESTED", "CONNECTED"].includes(l.status.toUpperCase());
-                            return (
-                              <span
-                                className="badge text-uppercase"
-                                style={{
-                                  fontSize: "9.5px",
-                                  backgroundColor: isGreenStatus ? "rgba(25,135,84,0.15)" : "rgba(108,117,125,0.12)",
-                                  color: isGreenStatus ? "#198754" : "#6c757d",
-                                  fontWeight: "bold",
-                                  padding: "4px 8px",
-                                  borderRadius: "6px"
-                                }}
-                              >
-                                {l.status}
-                              </span>
-                            );
-                          })()}
                         </div>
                         <div className="d-flex justify-content-between text-secondary" style={{ fontSize: "11.5px" }}>
                           <span className="font-monospace text-truncate">({l.phone})</span>
@@ -1124,7 +1110,7 @@ export default function CallsWorkspace({
                             </span>
                           )}
                         </div>
-                        <button
+                        {/* <button
                           onClick={() => setLastCallSummary(null)}
                           className="btn btn-outline-primary btn-sm px-3 py-1.5 fw-bold"
                           style={{ borderRadius: "8px" }}
@@ -1132,26 +1118,12 @@ export default function CallsWorkspace({
                         >
                           <i className="bi bi-telephone-plus me-1.5"></i>
                           New Call Session
-                        </button>
+                        </button> */}
                       </div>
 
                       {/* Premium modern tab navigation with gaps and pill style */}
                       <div className="d-flex flex-wrap mb-4" style={{ gap: "10px" }}>
-                        <button
-                          onClick={() => handlePostCallTabChange("requirement")}
-                          className={`btn d-flex align-items-center gap-2 px-3 py-2 fw-semibold transition-all border-0`}
-                          style={{
-                            fontSize: "12px",
-                            borderRadius: "8px",
-                            letterSpacing: "0.2px",
-                            backgroundColor: postCallSummaryTab === "requirement" ? "#0d6efd" : "#f1f5f9",
-                            color: postCallSummaryTab === "requirement" ? "#ffffff" : "#475569",
-                            boxShadow: postCallSummaryTab === "requirement" ? "0 4px 12px rgba(13, 110, 253, 0.15)" : "none",
-                          }}
-                          type="button"
-                        >
-                          <i className="bi bi-list-task"></i>Requirement
-                        </button>
+
                         <button
                           onClick={() => handlePostCallTabChange("overall")}
                           className={`btn d-flex align-items-center gap-2 px-3 py-2 fw-semibold transition-all border-0`}
@@ -1203,17 +1175,7 @@ export default function CallsWorkspace({
                       <div className="tab-content flex-grow-1 overflow-auto" style={{ maxHeight: "400px" }}>
                         {isProcessing ? (
                           <>
-                            {postCallSummaryTab === "requirement" && (
-                              <div className="p-4 bg-light rounded-4 border text-center py-5">
-                                <div className="spinner-border text-info mb-3" role="status">
-                                  <span className="visually-hidden">Loading...</span>
-                                </div>
-                                <h6 className="fw-bold text-dark">Extracting Client Requirements...</h6>
-                                <p className="text-secondary small max-w-md mx-auto mb-0">
-                                  Our LLM pipeline will analyze the conversation turns to extract client needs, questions, and action items as soon as the audio finishes transcribing.
-                                </p>
-                              </div>
-                            )}
+
 
                             {postCallSummaryTab === "overall" && (
                               <div className="p-4 bg-light rounded-4 border text-center py-5">
@@ -1263,13 +1225,7 @@ export default function CallsWorkspace({
                           </>
                         ) : (
                           <>
-                            {postCallSummaryTab === "requirement" && (
-                              <div className="p-3 bg-light rounded-0 border-start border-primary border-3 mb-3">
-                                <p className="small text-dark mb-0" style={{ lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
-                                  {lastCallSummary.analysis || "No requirements compiled yet."}
-                                </p>
-                              </div>
-                            )}
+
 
                             {postCallSummaryTab === "overall" && (
                               <div className="p-3 bg-light rounded-0 border-start border-primary border-3 mb-3">
@@ -1417,17 +1373,37 @@ export default function CallsWorkspace({
                           </div>
 
                           <div className="col-md-4 text-md-end">
-                            <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-2 small fw-bold d-inline-flex align-items-center gap-1.5 border border-success border-opacity-10 shadow-sm" style={{ fontSize: "11px" }}>
-                              <span className="rounded-circle bg-success animate-pulse" style={{ width: "8px", height: "8px", display: "inline-block" }}></span>
-                              Twilio Connected
-                            </span>
+                            {currentUserRole === "SUPER_ADMIN" || currentUserRole === "COMPANY_ADMIN" ? null : (
+                              <>
+                                {!calling && !showOutcome ? (
+                                  <button
+                                    onClick={startCall}
+                                    className="btn btn-success px-4 py-2 fw-bold text-white shadow-sm d-inline-flex align-items-center gap-2"
+                                    style={{ borderRadius: "10px", fontSize: "14px" }}
+                                  >
+                                    <i className="bi bi-telephone-fill"></i>
+                                    Call
+                                  </button>
+                                ) : calling ? (
+                                  <button
+                                    onClick={handleEndCall}
+                                    className="btn btn-danger px-4 py-2 fw-bold text-white shadow-sm d-inline-flex align-items-center gap-2"
+                                    style={{ borderRadius: "10px", fontSize: "14px" }}
+                                  >
+                                    <i className="bi bi-telephone-x-fill"></i>
+                                    End Call
+                                  </button>
+                                ) : null}
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
 
                       {/* 2. Outbound Telephony Dialer Widget */}
-                      <div className="row justify-content-center">
-                        <div className="col-12 col-md-8 col-lg-6">
+                      {((currentUserRole === "SUPER_ADMIN" || currentUserRole === "COMPANY_ADMIN") || calling || showOutcome) && (
+                        <div className="row justify-content-center">
+                          <div className="col-12 col-md-8 col-lg-6">
                           <div className="card border p-4 bg-white" style={{ borderRadius: "16px", borderColor: "#cbd5e1" }}>
                             {/* Calling Visualizer Header */}
                             <div className="text-center mb-4 pb-3 border-bottom">
@@ -1438,7 +1414,7 @@ export default function CallsWorkspace({
                               <h5 className="fw-bold mb-1">
                                 {calling ? (
                                   dialMode === "SIP" ? "Trunk Session Connected" :
-                                  dialMode === "CTC" ? "Click-to-Call Session" :
+                                  dialMode === "CTC" ? "" :
                                   "Simulating Call Flow..."
                                 ) : "Dialer Console Ready"}
                               </h5>
@@ -1557,7 +1533,7 @@ export default function CallsWorkspace({
                                     {dialMode === "SIP"
                                       ? (sipStatus === "Registered" ? "Start Voice Call" : "Activating Trunk...")
                                       : dialMode === "CTC"
-                                      ? "Click-to-Call"
+                                      ? "Call"
                                       : "Start AI Call"}
                                   </span>
                                 </button>
@@ -1600,9 +1576,10 @@ export default function CallsWorkspace({
                               )}
                             </div>
 
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )}
 
                       {/* 3. Call History & Transcripts list */}
                       <div className="card border p-4 bg-white" style={{ borderRadius: "16px", borderColor: "#cbd5e1" }}>
@@ -1753,21 +1730,7 @@ export default function CallsWorkspace({
 
               {/* Premium modern tab navigation with gaps and pill style */}
               <div className="d-flex flex-wrap mb-4" style={{ gap: "10px" }}>
-                <button
-                  onClick={() => handleModalTabChange("requirement")}
-                  className={`btn d-flex align-items-center gap-2 px-3 py-2 fw-semibold transition-all border-0`}
-                  style={{
-                    fontSize: "13px",
-                    borderRadius: "8px",
-                    letterSpacing: "0.2px",
-                    backgroundColor: modalDetailTab === "requirement" ? "#0d6efd" : "#f1f5f9",
-                    color: modalDetailTab === "requirement" ? "#ffffff" : "#475569",
-                    boxShadow: modalDetailTab === "requirement" ? "0 4px 12px rgba(13, 110, 253, 0.15)" : "none",
-                  }}
-                  type="button"
-                >
-                  <i className="bi bi-list-task"></i>Requirement
-                </button>
+
                 <button
                   onClick={() => handleModalTabChange("overall")}
                   className={`btn d-flex align-items-center gap-2 px-3 py-2 fw-semibold transition-all border-0`}
@@ -1817,13 +1780,7 @@ export default function CallsWorkspace({
 
               {/* Tab Contents */}
               <div className="tab-content">
-                {modalDetailTab === "requirement" && (
-                  <div className="p-3 bg-light rounded-0 border-start border-primary border-3 mb-3 animate-fade">
-                    <p className="text-dark mb-0" style={{ fontSize: "13.5px", lineHeight: "1.5", whiteSpace: "pre-wrap" }}>
-                      {activeModalLog.analysis || "No requirements compiled for this call."}
-                    </p>
-                  </div>
-                )}
+
 
                 {modalDetailTab === "overall" && (
                   <div className="p-3 bg-light rounded-0 border-start border-primary border-3 mb-3 animate-fade">

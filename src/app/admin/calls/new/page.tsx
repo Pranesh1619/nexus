@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { saveCallLog, getActiveSipConfig, placeRealTwilioCall, placeClickToCall, getCurrentAgent, syncSipCallLog, getCallLogStatus, endTwilioCall, getTwilioCallStatus, assignLeadToAgent } from "./actions";
+import Link from "next/link";
+import { saveCallLog, getActiveSipConfig, placeRealTwilioCall, placeClickToCall, getCurrentAgent, syncSipCallLog, getCallLogStatus, endTwilioCall, getTwilioCallStatus, assignLeadToAgent, getAllAgents } from "./actions";
 import { getLeadById } from "@/app/admin/leads/actions";
 import { generateConversation } from "@/lib/conversation_mock";
 
@@ -12,6 +13,7 @@ type LeadType = {
   phone: string;
   company: string | null;
   status: string;
+  calls?: any[];
 };
 
 type SipConfigPreview = {
@@ -36,8 +38,9 @@ function NewCallContent() {
   const [isDataLoaded, setIsDataLoaded] = useState(false);
 
   // Dialer and call state
-  const [dialMode, setDialMode] = useState<"SIP" | "AI" | "CTC">("AI");
+  const [dialMode, setDialMode] = useState<"SIP" | "AI" | "CTC">("CTC");
   const [agentPhone, setAgentPhone] = useState("");
+  const [agentsList, setAgentsList] = useState<{ id: string; name: string; phone: string | null; email: string }[]>([]);
   const [calling, setCalling] = useState(false);
   const [timer, setTimer] = useState(0);
   const [status, setStatus] = useState("Ready to dial");
@@ -59,11 +62,13 @@ function NewCallContent() {
   const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
   const deviceRef = useRef<any>(null);
   const [currentAgentId, setCurrentAgentId] = useState<string>("");
+  const [currentUserRole, setCurrentUserRole] = useState<string>("");
+  const [currentAgentName, setCurrentAgentName] = useState<string>("");
 
   // Soundwave and pipeline state
   const [pipelineConnected, setPipelineConnected] = useState(false);
 
-  // Load Lead and SIP Config
+  // Load Lead, Agents, and SIP Config
   useEffect(() => {
     async function loadData() {
       try {
@@ -72,10 +77,15 @@ function NewCallContent() {
           if (l) setLead(l as LeadType);
         }
 
+        const allAgents = await getAllAgents();
+        setAgentsList(allAgents);
+
         const agent = await getCurrentAgent();
         if (agent) {
           if (agent.phone) setAgentPhone(agent.phone);
           setCurrentAgentId(agent.id);
+          setCurrentUserRole(agent.role || "");
+          setCurrentAgentName(agent.name || "");
         }
         
         const activeSip = await getActiveSipConfig();
@@ -84,51 +94,19 @@ function NewCallContent() {
           
           if (activeSip.useRealTwilio) {
             if (activeSip.isActive) {
-              setDialMode("SIP"); // Default to SIP if enabled
-              logToTerminal(`[SYSTEM] Active SIP Trunk detected: ${activeSip.domain}`);
-              logToTerminal(`[SYSTEM] Running in REAL Twilio Mode`);
-              logToTerminal(`[SYSTEM] Initializing SIP Stack in browser...`);
-              
-              // Simulate registration (decorative)
-              setTimeout(() => {
-                logToTerminal(`[TX] REGISTER sip:${activeSip.domain} SIP/2.0`);
-                logToTerminal(`     Via: SIP/2.0/WSS client.virpa.ai;branch=z9hG4bK-reg781`);
-                logToTerminal(`     From: <sip:${activeSip.username}@${activeSip.domain}>;tag=reg01`);
-                logToTerminal(`     To: <sip:${activeSip.username}@${activeSip.domain}>`);
-                logToTerminal(`     Call-ID: reg-${Math.random().toString(36).substring(7)}`);
-              }, 600);
-
-              setTimeout(() => {
-                logToTerminal(`[RX] SIP/2.0 401 Unauthorized`);
-                logToTerminal(`     WWW-Authenticate: Digest realm="${activeSip.domain}", nonce="df8924b17"`);
-              }, 1100);
-
-              setTimeout(() => {
-                logToTerminal(`[TX] REGISTER (With Auth Digest)`);
-                logToTerminal(`     Authorization: Digest username="${activeSip.username}", realm="${activeSip.domain}", nonce="df8924b17", response="c7849e8a"`);
-              }, 1600);
-
-              setTimeout(() => {
-                logToTerminal(`[RX] SIP/2.0 200 OK (Registered)`);
-                logToTerminal(`     Contact: <sip:${activeSip.username}@client.virpa.ai;transport=ws>;expires=3600`);
-                logToTerminal(`[SIP] SIP Trunk Successfully Registered and Idle.`);
-              }, 2200);
+              logToTerminal(`[SYSTEM] Active Telephony Config detected.`);
+              logToTerminal(`[SYSTEM] Running in Click-to-Call Mode`);
             } else {
-              logToTerminal(`[SYSTEM] Running in REAL Twilio Mode`);
-              logToTerminal(`[SYSTEM] SIP Trunk configuration is inactive. Defaulting to Simulated AI Dialer.`);
+              logToTerminal(`[SYSTEM] Running in Click-to-Call Mode`);
             }
           } else {
             // Mock Twilio Mode
             const mockUrl = activeSip.mockTwilioUrl || "http://localhost:5050";
-            setDialMode("SIP"); // Allow dialing via Twilio self-hosted replica
-            logToTerminal(`[SYSTEM] Running in MOCK Twilio Mode (Self-hosted)`);
-            logToTerminal(`[SYSTEM] Self-hosted Twilio replica detected: ${mockUrl}`);
+            logToTerminal(`[SYSTEM] Running in MOCK Telephony Mode (Self-hosted)`);
             logToTerminal(`[SYSTEM] Outbound Dialer enabled via local mock server.`);
-            setSipStatus("Registered");
           }
         } else {
-          logToTerminal(`[SYSTEM] No active SIP Trunk configuration found. Defaulting to Simulated AI Dialer.`);
-          logToTerminal(`[SYSTEM] Configure SIP credentials in Admin Settings -> Telephony.`);
+          logToTerminal(`[SYSTEM] Defaulting to Click-to-Call Mode.`);
         }
       } catch (error) {
         console.error("Error loading call data:", error);
@@ -677,58 +655,15 @@ function NewCallContent() {
     <div className="container-fluid p-0">
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
-          <h2 className="fw-bold mb-1">Outbound Dialer</h2>
-          <p className="text-secondary small">Initiate outbound telephony using physical SIP trunks or simulated AI voice pipelines.</p>
+          <h2 className="fw-bold mb-1">Outbound Call</h2>
+          {/* <p className="text-secondary small">Initiate outbound Click-to-Call telephony. Twilio will call your mobile number first, then bridge the customer connection.</p> */}
         </div>
-        {(sipConfig?.isActive || !sipConfig?.useRealTwilio) && (
-          <div className="btn-group shadow-sm" role="group">
-            <button
-              type="button"
-              className={`btn btn-sm px-3 fw-bold ${dialMode === "CTC" ? "btn-primary text-white" : "btn-light border"}`}
-              onClick={() => {
-                if (!calling) {
-                  setDialMode("CTC");
-                  logToTerminal(`[SYSTEM] Telephony Mode toggled: Click-to-Call (Mobile First)`);
-                }
-              }}
-              disabled={calling}
-            >
-              <i className="bi bi-phone-fill me-1.5"></i> Click-to-Call
-            </button>
-            <button
-              type="button"
-              className={`btn btn-sm px-3 fw-bold ${dialMode === "SIP" ? "btn-primary text-white" : "btn-light border"}`}
-              onClick={() => {
-                if (!calling) {
-                  setDialMode("SIP");
-                  logToTerminal(`[SYSTEM] Telephony Mode toggled: Elastic SIP Trunking`);
-                }
-              }}
-              disabled={calling}
-            >
-              <i className="bi bi-cloud-fill me-1.5"></i> SIP Trunk
-            </button>
-            <button
-              type="button"
-              className={`btn btn-sm px-3 fw-bold ${dialMode === "AI" ? "btn-primary text-white" : "btn-light border"}`}
-              onClick={() => {
-                if (!calling) {
-                  setDialMode("AI");
-                  logToTerminal(`[SYSTEM] Telephony Mode toggled: AI Dialer (Simulated)`);
-                }
-              }}
-              disabled={calling}
-            >
-              <i className="bi bi-cpu-fill me-1.5"></i> AI Simulator
-            </button>
-          </div>
-        )}
       </div>
 
       <div className="row g-4">
         {/* Left Column: Call Dashboard Panel */}
         <div className="col-lg-6">
-          <div className="card border-0 shadow-sm p-4 h-100" style={{ borderRadius: "16px" }}>
+          <div className="card border-0 shadow-sm p-4" style={{ borderRadius: "16px" }}>
             
             {/* Calling Header Info */}
             <div className="text-center mb-4 pb-3 border-bottom">
@@ -741,25 +676,7 @@ function NewCallContent() {
               <p className="text-primary fw-semibold mb-2" style={{ letterSpacing: "0.5px" }}>
                 {lead ? lead.phone : "No Phone Number"}
               </p>
-              <div className="d-flex justify-content-center align-items-center gap-2">
-                <span className={`badge ${
-                  dialMode === "SIP" ? "bg-primary text-white" :
-                  dialMode === "CTC" ? "bg-success text-white" : "bg-dark bg-opacity-75"
-                } small px-2.5 py-1`}>
-                  {dialMode === "SIP" ? "SIP TRUNK" :
-                   dialMode === "CTC" ? "CLICK-TO-CALL" : "AI SIMULATOR"}
-                </span>
-                {dialMode === "SIP" && (
-                  <span className={`badge px-2.5 py-1 small ${
-                    sipStatus === "Registered" ? "bg-success bg-opacity-10 text-success" :
-                    sipStatus === "Connected" ? "bg-info bg-opacity-10 text-info" :
-                    sipStatus === "Dialing" ? "bg-warning bg-opacity-10 text-warning" :
-                    "bg-secondary bg-opacity-10 text-secondary"
-                  }`}>
-                    {sipStatus}
-                  </span>
-                )}
-              </div>
+
               {callError && (
                 <div className="alert alert-danger bg-danger bg-opacity-10 border-danger border-opacity-10 py-2 px-3 mt-3 mb-0 rounded-3 text-start mx-auto" style={{ maxWidth: "450px" }}>
                   <div className="d-flex gap-2 align-items-start">
@@ -789,78 +706,55 @@ function NewCallContent() {
                 <div className="card-body p-3">
                   <div className="d-flex justify-content-between align-items-center mb-2">
                     <span className="small text-secondary fw-bold text-uppercase">
-                      <i className="bi bi-phone-fill text-success me-2"></i>Agent Device Number
+                      <i className="bi bi-person-fill text-success me-2"></i>Agent Device Number
                     </span>
-                    <span className="badge bg-success bg-opacity-10 text-success x-small fw-bold">Mobile Ring First</span>
                   </div>
                   <div className="row g-2">
                     <div className="col-12">
-                      <label className="x-small text-secondary fw-bold mb-1">Your Mobile Phone Number</label>
-                      <input
-                        type="tel"
-                        className="form-control form-control-sm border-0 bg-white"
-                        placeholder="e.g. +919876543210 or +14155552671"
-                        value={agentPhone}
-                        onChange={(e) => setAgentPhone(e.target.value)}
-                        disabled={calling}
-                        style={{ fontSize: "12px", borderRadius: "8px", height: "34px" }}
-                        required
-                      />
-                      <div className="x-small text-muted mt-1">Twilio will call this phone number first. When you answer, it will connect the customer.</div>
+                      {currentUserRole === "SUPER_ADMIN" || currentUserRole === "COMPANY_ADMIN" ? (
+                        <>
+                          <label className="x-small text-secondary fw-bold mb-1">Select Agent</label>
+                          <select
+                            className="form-select form-select-sm border-0 bg-white"
+                            value={currentAgentId}
+                            onChange={(e) => {
+                              const selectedId = e.target.value;
+                              setCurrentAgentId(selectedId);
+                              const selectedAgent = agentsList.find(a => a.id === selectedId);
+                              if (selectedAgent && selectedAgent.phone) {
+                                setAgentPhone(selectedAgent.phone);
+                              } else {
+                                setAgentPhone("");
+                              }
+                            }}
+                            disabled={calling}
+                            style={{ fontSize: "12px", borderRadius: "8px", height: "34px", color: "#333" }}
+                            required
+                          >
+                            <option value="">-- Select Agent --</option>
+                            {agentsList.map((agent) => (
+                              <option key={agent.id} value={agent.id}>
+                                {agent.name} {agent.phone ? `(${agent.phone})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                          {/* <div className="x-small text-muted mt-1">Twilio will call this agent's phone number first. When they answer, it will connect the customer.</div> */}
+                        </>
+                      ) : (
+                        <div className="p-1">
+                          <span className="fw-semibold text-dark" style={{ fontSize: "14px" }}>
+                            {currentAgentName} {agentPhone ? `(${agentPhone})` : "(No phone number)"}
+                          </span>
+                          {/* <div className="x-small text-muted mt-1">Twilio will call your registered device number first. When you answer, it will connect the customer.</div> */}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* SIP Active Config Widget */}
-            {dialMode === "SIP" && sipConfig && (
-              <div className="card bg-light border-0 mb-4" style={{ borderRadius: "12px" }}>
-                <div className="card-body p-3">
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <span className="small text-secondary fw-bold text-uppercase"><i className="bi bi-diagram-3-fill text-primary me-2"></i>SIP Trunk Server</span>
-                    <span className="x-small text-muted font-monospace">{sipConfig.codec}</span>
-                  </div>
-                  <div className="row g-2 text-dark font-monospace small">
-                    <div className="col-6 text-truncate"><span className="text-secondary">Host:</span> {sipConfig.domain}</div>
-                    <div className="col-6 text-truncate"><span className="text-secondary">Auth:</span> {sipConfig.username}</div>
-                    <div className="col-12"><span className="text-secondary">Caller ID:</span> {sipConfig.callerId}</div>
-                  </div>
-                </div>
-              </div>
-            )}
 
-            {/* Speech & Translation Settings */}
-            <div className="card bg-light border-0 mb-4" style={{ borderRadius: "12px" }}>
-              <div className="card-body p-3">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <span className="small text-secondary fw-bold text-uppercase"><i className="bi bi-translate text-success me-2"></i>Speech & Language Analysis</span>
-                  <span className="badge bg-success bg-opacity-10 text-success x-small fw-bold">Live Translation</span>
-                </div>
-                <div className="row g-2">
-                  <div className="col-12">
-                    <label className="x-small text-secondary fw-bold mb-1">Target Call Language</label>
-                    <select
-                      className="form-select form-select-sm border-0 bg-white"
-                      value={callLanguage}
-                      onChange={(e) => {
-                        setCallLanguage(e.target.value);
-                        logToTerminal(`[SYSTEM] Target Call Language updated to: ${e.target.value}`);
-                      }}
-                      disabled={calling}
-                      style={{ fontSize: "12px", borderRadius: "8px", height: "34px" }}
-                    >
-                      <option value="English">English (United States / UK)</option>
-                      <option value="Spanish">Español (Spain / Latin America)</option>
-                      <option value="Hindi">हिन्दी (India)</option>
-                      <option value="Tamil">தமிழ் (India / Sri Lanka)</option>
-                      <option value="French">Français (France)</option>
-                      <option value="German">Deutsch (Germany)</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
 
             {/* Pipeline Flow Visualization */}
             {calling && (
@@ -975,7 +869,7 @@ function NewCallContent() {
             )}
 
             {/* Dialer Call Buttons */}
-            <div className="d-flex gap-3 justify-content-center mt-auto">
+            <div className="d-flex gap-3 justify-content-center mt-1">
               {!calling && !showOutcome && (
                 <button 
                   className={`btn btn-lg w-100 py-3 rounded-pill fw-bold text-white shadow d-flex align-items-center justify-content-center gap-2 ${
@@ -995,10 +889,8 @@ function NewCallContent() {
                   )}
                   <span>
                     {dialMode === "SIP" 
-                      ? (sipStatus === "Registered" ? "Initiate Trunk Call" : "Registering SIP softphone...") 
-                      : dialMode === "CTC"
-                      ? "Start Click-to-Call"
-                      : "Launch AI Call"}
+                      ? (sipStatus === "Registered" ? "Call" : "Registering SIP softphone...") 
+                      : "Call"}
                   </span>
                 </button>
               )}
@@ -1052,61 +944,61 @@ function NewCallContent() {
           </div>
         </div>
 
-        {/* Right Column: SIP Signaling Protocol Console */}
+        {/* Right Column: Call History */}
         <div className="col-lg-6">
-          <div 
-            className="card bg-dark border-0 shadow-sm h-100 d-flex flex-column" 
-            style={{ 
-              borderRadius: "16px",
-              minHeight: "450px"
-            }}
-          >
-            <div className="card-header bg-transparent border-bottom border-secondary border-opacity-25 py-3 px-4 d-flex justify-content-between align-items-center">
-              <div className="d-flex align-items-center gap-2">
-                <span className="rounded-circle bg-danger" style={{ width: 10, height: 10 }}></span>
-                <span className="rounded-circle bg-warning" style={{ width: 10, height: 10 }}></span>
-                <span className="rounded-circle bg-success" style={{ width: 10, height: 10 }}></span>
-                <span className="text-secondary small fw-bold font-monospace ms-2">sip_trunk_signaling_log.sh</span>
+          <div className="card border-0 shadow-sm p-4 h-100 d-flex flex-column bg-white" style={{ borderRadius: "16px", minHeight: "450px" }}>
+            <div className="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+              <div>
+                <h4 className="fw-bold text-dark mb-1">Call History</h4>
+                <p className="text-secondary small mb-0">Past call logs and status updates for this contact.</p>
               </div>
-              <button 
-                onClick={clearTerminal} 
-                className="btn btn-outline-secondary btn-sm font-monospace border-0"
-                style={{ fontSize: "11px" }}
-                title="Clear Terminal Output"
-              >
-                <i className="bi bi-trash3 me-1"></i> CLEAR
-              </button>
             </div>
             
-            <div 
-              ref={consoleContainerRef}
-              className="card-body p-4 font-monospace overflow-auto bg-black bg-opacity-75 flex-grow-1"
-              style={{ 
-                height: "380px", 
-                fontSize: "11.5px", 
-                color: "#00FF66",
-                lineHeight: "1.5"
-              }}
-            >
-              {terminalLogs.length === 0 ? (
-                <div className="text-secondary opacity-50 py-5 text-center">
-                  -- Terminal idling. Telephony actions will dump SIP log traces here --
+            <div className="table-responsive flex-grow-1" style={{ maxHeight: "380px" }}>
+              {!lead?.calls || lead.calls.length === 0 ? (
+                <div className="text-secondary opacity-50 py-5 text-center small h-100 d-flex align-items-center justify-content-center">
+                  <div>
+                    <i className="bi bi-telephone-x fs-2 mb-2 d-block"></i>
+                    No previous calls found for this contact.
+                  </div>
                 </div>
               ) : (
-                terminalLogs.map((log, idx) => {
-                  let logClass = "text-light-green";
-                  if (log.includes("[TX]")) logClass = "text-cyan";
-                  if (log.includes("[RX]")) logClass = "text-warning";
-                  if (log.includes("[SYSTEM]")) logClass = "text-secondary opacity-75";
-                  if (log.includes("[ERROR]") || log.includes("[WARNING]")) logClass = "text-danger fw-bold";
-                  if (log.includes("[MEDIA]")) logClass = "text-purple";
-                  
-                  return (
-                    <div key={idx} className={`mb-1 ${logClass}`} style={{ whiteSpace: "pre-wrap" }}>
-                      {log}
-                    </div>
-                  );
-                })
+                <table className="table table-hover align-middle mb-0">
+                  <thead className="table-light">
+                    <tr>
+                      <th className="border-0 small text-secondary">Date</th>
+                      <th className="border-0 small text-secondary">Agent</th>
+                      <th className="border-0 small text-secondary">Duration</th>
+                      <th className="border-0 small text-secondary text-end">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lead.calls.map((call: any) => {
+                      const minutes = call.duration ? Math.floor(call.duration / 60) : 0;
+                      const seconds = call.duration ? call.duration % 60 : 0;
+                      const durationStr = call.duration ? `${minutes}:${seconds.toString().padStart(2, '0')}` : "0:00";
+                      
+                      return (
+                        <tr key={call.id}>
+                          <td className="small text-dark fw-medium">
+                            {new Date(call.startTime).toLocaleDateString()}
+                          </td>
+                          <td className="small text-dark fw-medium">
+                            {call.user?.name || "Agent"}
+                          </td>
+                          <td className="small text-secondary">
+                            {durationStr}
+                          </td>
+                          <td className="text-end">
+                            <Link href={`/admin/calls/${call.id}`} className="btn btn-sm btn-light text-primary border-0" style={{ textDecoration: "none" }}>
+                              <i className="bi bi-eye"></i>
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               )}
             </div>
           </div>

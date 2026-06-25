@@ -29,12 +29,11 @@ export default function NewUserClient({ currentUserRole }: { currentUserRole: st
       return [
         { value: "SUPER_ADMIN", label: "Super Admin" },
         { value: "COMPANY_ADMIN", label: "Company Admin" },
-        { value: "SALES", label: "Sales Agent" }
+        { value: "SALES", label: "Agent" }
       ];
     }
-    // Company Admin, Admin, etc. can only create Sales Agent
     return [
-      { value: "SALES", label: "Sales Agent" }
+      { value: "SALES", label: "Agent" }
     ];
   };
 

@@ -66,7 +66,7 @@ export default function UserList({ users }: { users: User[] }) {
                     </td>
                     <td>
                       <span className={`badge ${user.role === 'ADMIN' ? 'bg-danger bg-opacity-10 text-danger' : 'bg-info bg-opacity-10 text-info'} small fw-normal`}>
-                        {user.role}
+                        {user.role === "SALES" ? "AGENT" : user.role}
                       </span>
                     </td>
                     <td>

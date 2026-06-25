@@ -67,12 +67,11 @@ export default function EditUserForm({ user, success, currentUserRole = "ADMIN" 
                       roles.push(
                         { value: "SUPER_ADMIN", label: "Super Admin" },
                         { value: "COMPANY_ADMIN", label: "Company Admin" },
-                        { value: "SALES", label: "Sales Agent" }
+                        { value: "SALES", label: "Agent" }
                       );
                     } else {
-                      // Company Admin, Admin, etc. can only assign/edit to Sales Agent
                       roles.push(
-                        { value: "SALES", label: "Sales Agent" }
+                        { value: "SALES", label: "Agent" }
                       );
                     }
                     return roles.map(r => (

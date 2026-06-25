@@ -87,6 +87,9 @@ export async function getLeadById(id: string) {
     where: { id },
     include: {
       calls: {
+        include: {
+          user: true
+        },
         orderBy: { createdAt: "desc" },
       },
     },

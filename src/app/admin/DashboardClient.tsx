@@ -66,7 +66,6 @@ interface DashboardClientProps {
 
 export default function DashboardClient({ initialCalls, initialLeads, initialUsers }: DashboardClientProps) {
   // 1. Top Filters State
-  const [activeModule, setActiveModule] = useState<"all" | "sales" | "support" | "leads">("all");
   const [timePeriod, setTimePeriod] = useState<"7days" | "30days" | "thisyear">("7days");
 
   // Helper: Format duration (seconds to m:ss)
@@ -77,25 +76,9 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
     return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
   };
 
-  // 2. Compute Filtered Data based on Selected Module and Time Period
+  // 2. Compute Filtered Data based on Time Period
   const filteredMetrics = useMemo(() => {
-    // A. Filter calls belonging to active module
-    let calls = [...initialCalls];
-    if (activeModule === "sales") {
-      calls = initialCalls.filter(c => 
-        ["Qualified", "Interested", "Closed", "New Lead", "Attempted Contact"].includes(c.stage) || 
-        c.user?.role === "SALES"
-      );
-    } else if (activeModule === "support") {
-      calls = initialCalls.filter(c => 
-        ["Follow-up Needed", "Connected", "Engaged"].includes(c.stage) || 
-        c.status === "RESOLVED"
-      );
-    } else if (activeModule === "leads") {
-      calls = initialCalls.filter(c => 
-        ["New Lead", "Attempted Contact"].includes(c.stage)
-      );
-    }
+    const calls = [...initialCalls];
 
     const totalCallsCount = calls.length;
     const connectedCallsCount = calls.filter(c => c.status === "CONNECTED").length;
@@ -132,14 +115,14 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
           ];
         } else {
           return [
-            { name: "Mon", volume: 0 }, { name: "Tue", volume: 0 }, { name: "Wed", volume: 0 },
-            { name: "Thu", volume: 0 }, { name: "Fri", volume: 0 }, { name: "Sat", volume: 0 },
-            { name: "Sun", volume: 0 }
+            { name: "Monday", volume: 0 }, { name: "Tuesday", volume: 0 }, { name: "Wednesday", volume: 0 },
+            { name: "Thursday", volume: 0 }, { name: "Friday", volume: 0 }, { name: "Saturday", volume: 0 },
+            { name: "Sunday", volume: 0 }
           ];
         }
       }
 
-      const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
       const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
       if (timePeriod === "thisyear") {
@@ -217,7 +200,7 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
       chartData,
       leaders
     };
-  }, [activeModule, timePeriod, initialCalls, initialUsers]);
+  }, [timePeriod, initialCalls, initialUsers]);
 
   return (
     <div className="container-fluid p-0">
@@ -252,47 +235,7 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
         </div>
       </div>
 
-      {/* 2. Top Module Filter Tabs (Interactive Module Analysis Picker) */}
-      <div className="card border-0 mb-4 bg-white p-2 shadow-sm rounded-3">
-        <div className="nav nav-pills nav-fill gap-2">
-          <button
-            onClick={() => setActiveModule("all")}
-            className={`nav-link border-0 py-2.5 rounded-2 fw-semibold transition-all d-flex align-items-center justify-content-center gap-2 ${
-              activeModule === "all" ? "active btn-primary bg-primary text-white" : "text-secondary hover-bg-light"
-            }`}
-          >
-            <i className="bi bi-grid-fill"></i>
-            All Operations Analysis
-          </button>
-          <button
-            onClick={() => setActiveModule("sales")}
-            className={`nav-link border-0 py-2.5 rounded-2 fw-semibold transition-all d-flex align-items-center justify-content-center gap-2 ${
-              activeModule === "sales" ? "active btn-primary bg-primary text-white" : "text-secondary hover-bg-light"
-            }`}
-          >
-            <i className="bi bi-graph-up-arrow"></i>
-            Sales & Conversions
-          </button>
-          <button
-            onClick={() => setActiveModule("support")}
-            className={`nav-link border-0 py-2.5 rounded-2 fw-semibold transition-all d-flex align-items-center justify-content-center gap-2 ${
-              activeModule === "support" ? "active btn-primary bg-primary text-white" : "text-secondary hover-bg-light"
-            }`}
-          >
-            <i className="bi bi-headset"></i>
-            Support & Resolution
-          </button>
-          <button
-            onClick={() => setActiveModule("leads")}
-            className={`nav-link border-0 py-2.5 rounded-2 fw-semibold transition-all d-flex align-items-center justify-content-center gap-2 ${
-              activeModule === "leads" ? "active btn-primary bg-primary text-white" : "text-secondary hover-bg-light"
-            }`}
-          >
-            <i className="bi bi-person-check-fill"></i>
-            Lead Pipeline
-          </button>
-        </div>
-      </div>
+
 
       {/* 3. Call Center-Themed Metric Cards */}
       <div className="row g-4 mb-4">
@@ -304,14 +247,14 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
                 <div className="stats-icon bg-opacity-10 text-primary d-flex align-items-center justify-content-center rounded-3" style={{ width: 44, height: 44 }}>
                   <i className="bi bi-telephone-inbound fs-5"></i>
                 </div>
-                <span className="badge bg-success bg-opacity-10 text-success small">+14.2%</span>
+                {/* <span className="badge bg-success bg-opacity-10 text-success small">+14.2%</span> */}
               </div>
               <div>
                 <div className="stats-title text-uppercase text-secondary fw-bold small mb-1" style={{ fontSize: "11px", letterSpacing: "0.5px" }}>
                   Calls Handled
                 </div>
                 <div className="stats-value fw-bold fs-2 text-dark">{filteredMetrics.totalCalls}</div>
-                <p className="text-secondary small mb-0 mt-1">Total interactive log connections</p>
+                {/* <p className="text-secondary small mb-0 mt-1">Total interactive log connections</p> */}
               </div>
             </div>
           </div>
@@ -325,14 +268,14 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
                 <div className="stats-icon bg-info bg-opacity-10 text-info d-flex align-items-center justify-content-center rounded-3" style={{ width: 44, height: 44 }}>
                   <i className="bi bi-reception-4 fs-5"></i>
                 </div>
-                <span className="badge bg-info bg-opacity-10 text-info small">Target: 80%</span>
+                {/* <span className="badge bg-info bg-opacity-10 text-info small">Target: 80%</span> */}
               </div>
               <div>
                 <div className="stats-title text-uppercase text-secondary fw-bold small mb-1" style={{ fontSize: "11px", letterSpacing: "0.5px" }}>
                   Call Connectivity
                 </div>
                 <div className="stats-value fw-bold fs-2 text-dark">{filteredMetrics.connectivity}%</div>
-                <p className="text-secondary small mb-0 mt-1">SLA target connectivity rate</p>
+                {/* <p className="text-secondary small mb-0 mt-1">SLA target connectivity rate</p> */}
               </div>
             </div>
           </div>
@@ -346,14 +289,14 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
                 <div className="stats-icon bg-warning bg-opacity-10 text-warning d-flex align-items-center justify-content-center rounded-3" style={{ width: 44, height: 44 }}>
                   <i className="bi bi-clock-history fs-5"></i>
                 </div>
-                <span className="badge bg-warning bg-opacity-10 text-warning small">Optimal</span>
+                {/* <span className="badge bg-warning bg-opacity-10 text-warning small">Optimal</span> */}
               </div>
               <div>
                 <div className="stats-title text-uppercase text-secondary fw-bold small mb-1" style={{ fontSize: "11px", letterSpacing: "0.5px" }}>
                   Average Talk Time
                 </div>
                 <div className="stats-value fw-bold fs-2 text-dark">{formatDuration(filteredMetrics.duration)}</div>
-                <p className="text-secondary small mb-0 mt-1">Active customer engagement time</p>
+                {/* <p className="text-secondary small mb-0 mt-1">Active customer engagement time</p> */}
               </div>
             </div>
           </div>
@@ -367,14 +310,14 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
                 <div className="stats-icon bg-success bg-opacity-10 text-success d-flex align-items-center justify-content-center rounded-3" style={{ width: 44, height: 44 }}>
                   <i className="bi bi-cpu fs-5"></i>
                 </div>
-                <span className="badge bg-success bg-opacity-10 text-success small">Excellent</span>
+                {/* <span className="badge bg-success bg-opacity-10 text-success small">Excellent</span> */}
               </div>
               <div>
                 <div className="stats-title text-uppercase text-secondary fw-bold small mb-1" style={{ fontSize: "11px", letterSpacing: "0.5px" }}>
                   AI Quality Score
                 </div>
                 <div className="stats-value fw-bold fs-2 text-dark">{filteredMetrics.aiScore} / 100</div>
-                <p className="text-secondary small mb-0 mt-1">Average sentiment quality review</p>
+                {/* <p className="text-secondary small mb-0 mt-1">Average sentiment quality review</p> */}
               </div>
             </div>
           </div>
@@ -383,18 +326,14 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
 
       {/* 4. Trends Graph and Live Calls Layout */}
       <div className="row g-4 mb-4">
-        
         {/* Call Volume Trend Graph */}
         <div className="col-lg-8">
           <div className="card border-0 p-4 shadow-sm h-100">
             <div className="d-flex justify-content-between align-items-center mb-4">
               <div>
-                <h5 className="fw-bold mb-1">Operations Performance Trend</h5>
+                <h5 className="fw-bold mb-1">Daily Calls</h5>
                 <p className="text-secondary small mb-0">Daily/Monthly aggregated interactive call statistics</p>
               </div>
-              <span className="badge bg-light text-dark border px-3 py-1.5 rounded-pill small">
-                {activeModule.toUpperCase()} OPERATION
-              </span>
             </div>
             
             <div className="chart-container" style={{ height: 320, width: "100%" }}>
@@ -425,6 +364,7 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
                   <Area 
                     type="monotone" 
                     dataKey="volume" 
+                    name="Calls"
                     stroke="#00A76F" 
                     strokeWidth={3}
                     fillOpacity={1} 
@@ -438,10 +378,10 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
 
         {/* Call Connectivity Statistics */}
         <div className="col-lg-4">
-          <div className="card border-0 p-4 shadow-sm h-100 d-flex flex-column justify-content-between">
+          <div className="card border-0 p-4 shadow-sm h-100 d-flex flex-column">
             <div>
               <h5 className="fw-bold mb-1">Resolution Outcomes</h5>
-              <p className="text-secondary small">Breakdown of standard SLA connectivity status</p>
+              {/* <p className="text-secondary small"></p> */}
             </div>
 
             <div className="my-4">
@@ -487,16 +427,8 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
                 </div>
               </div>
             </div>
-
-            <div className="bg-light bg-opacity-50 p-3 rounded-3 mt-auto">
-              <div className="d-flex align-items-center gap-2">
-                <i className="bi bi-info-circle text-primary fs-5"></i>
-                <p className="small mb-0 text-secondary">Operational targets require a connection index above <strong>80%</strong> to maintain standard SLA compliance levels.</p>
-              </div>
-            </div>
           </div>
         </div>
-
       </div>
 
       {/* 5. Live Operations Leaderboard and Live Activities */}
@@ -507,11 +439,11 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
           <div className="card border-0 p-4 shadow-sm h-100">
             <div className="d-flex justify-content-between align-items-center mb-4">
               <div>
-                <h5 className="fw-bold mb-1">Recent Operational Calls</h5>
-                <p className="text-secondary small mb-0">Live interactive call logs and quality audit evaluations</p>
+                <h5 className="fw-bold mb-1">Recent Calls</h5>
+                {/* <p className="text-secondary small mb-0">Live interactive call logs and quality audit evaluations</p> */}
               </div>
               <Link href="/admin/calls" className="btn btn-sm btn-light border rounded-pill px-3">
-                View All Calls <i className="bi bi-arrow-right ms-1"></i>
+                View Calls <i className="bi bi-arrow-right ms-1"></i>
               </Link>
             </div>
 
@@ -522,7 +454,6 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
                     <th className="border-0 small text-secondary">Contact (Lead)</th>
                     <th className="border-0 small text-secondary">Agent</th>
                     <th className="border-0 small text-secondary text-center">Duration</th>
-                    <th className="border-0 small text-secondary">Stage</th>
                     <th className="border-0 small text-secondary text-center">AI Score</th>
                     <th className="border-0 small text-secondary">Outcome</th>
                   </tr>
@@ -530,7 +461,7 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
                 <tbody>
                   {filteredMetrics.recentCalls.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-5 text-secondary">
+                      <td colSpan={5} className="text-center py-5 text-secondary">
                         <i className="bi bi-telephone-x fs-3 d-block mb-2 text-muted"></i>
                         <span className="small fw-semibold text-dark">No calls recorded yet</span>
                         <p className="small text-secondary mb-0 mt-1">Make a call in the dialer workspace to see call center metrics.</p>
@@ -550,17 +481,6 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
                       </td>
                       <td className="text-center small font-monospace">
                         {call.status === "CONNECTED" ? formatDuration(call.duration) : "—"}
-                      </td>
-                      <td>
-                        {call.status === "MISSED" ? (
-                          <span className="badge bg-light text-secondary border rounded-pill px-2.5 py-1.5 small" style={{ fontSize: "11px" }}>
-                            {call.stage}
-                          </span>
-                        ) : (
-                          <span className="badge rounded-pill px-2.5 py-1.5 small" style={{ fontSize: "11px", backgroundColor: "rgba(0, 167, 111, 0.15)", color: "var(--primary-color)", fontWeight: "600" }}>
-                            {call.stage}
-                          </span>
-                        )}
                       </td>
                       <td className="text-center">
                         {call.status === "CONNECTED" ? (
@@ -596,11 +516,11 @@ export default function DashboardClient({ initialCalls, initialLeads, initialUse
         <div className="col-lg-4">
           <div className="card border-0 p-4 shadow-sm h-100">
             <h5 className="fw-bold mb-1">Agent Performance Leaderboard</h5>
-            <p className="text-secondary small mb-4">Ranked by calls handled and quality satisfaction score</p>
+            {/* <p className="text-secondary small mb-4">Ranked by calls handled and quality satisfaction score</p> */}
 
             <div className="d-flex flex-column gap-3">
               {filteredMetrics.leaders.map((leader, idx) => (
-                <div key={idx} className="d-flex align-items-center justify-content-between px-2 py-2.5 border rounded-3 bg-light bg-opacity-40">
+                <div key={idx} className="d-flex align-items-center justify-content-between px-3 border rounded-3 bg-light bg-opacity-40" style={{ paddingTop: "14px", paddingBottom: "14px" }}>
                   <div className="d-flex align-items-center gap-2 overflow-hidden" style={{ minWidth: 0 }}>
                     <div className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold small flex-shrink-0" style={{ width: 36, height: 36, backgroundColor: "var(--primary-color)" }}>
                       {leader.avatar}

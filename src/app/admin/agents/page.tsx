@@ -50,21 +50,6 @@ export default async function AgentsPage() {
           <h2 className="fw-bold mb-1 text-dark">Agent Analytics Dashboard</h2>
           <p className="text-secondary small mb-0">Analyze assigned lead lifecycle metrics, AI call performance transcripts, and pipeline velocity.</p>
         </div>
-        <Link 
-          href="/admin/users/new" 
-          className="btn btn-success d-flex align-items-center gap-2 px-3.5 fw-bold shadow-sm text-decoration-none"
-          style={{ 
-            borderRadius: "8px", 
-            backgroundColor: "#00a76f", 
-            borderColor: "#00a76f",
-            fontSize: "13.5px",
-            height: "38px",
-            color: "#fff"
-          }}
-        >
-          <i className="bi bi-plus-lg"></i>
-          <span>Add Agent</span>
-        </Link>
       </div>
 
       <AgentsWorkspace initialAgents={agents} />

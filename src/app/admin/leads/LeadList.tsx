@@ -189,7 +189,7 @@ export default function LeadList({ leads }: { leads: Lead[] }) {
       <div className="d-flex justify-content-between align-items-center mb-1">
         <div>
           <h2 className="fw-bold mb-1" style={{ fontSize: "28px" }}>Leads Management</h2>
-          <p className="text-secondary small mb-0">Track and manage your potential customers.</p>
+          {/* <p className="text-secondary small mb-0">Track and manage your potential customers.</p> */}
         </div>
         <div className="d-flex align-items-center gap-2">
           <button 
